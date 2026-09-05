@@ -1,0 +1,10 @@
+REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.update_updated_at_column() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.campaign_raised(UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.campaign_raised(UUID) TO authenticated;
+REVOKE ALL ON FUNCTION public.is_platform_admin(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_platform_admin(UUID) TO anon, authenticated;
+REVOKE ALL ON FUNCTION public.is_org_member(UUID, UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_org_member(UUID, UUID) TO anon, authenticated;
+REVOKE ALL ON FUNCTION public.has_org_role(UUID, UUID, public.org_role[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.has_org_role(UUID, UUID, public.org_role[]) TO authenticated;
