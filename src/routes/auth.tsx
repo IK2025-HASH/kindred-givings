@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/useAuth";
 
 type Mode = "signin" | "signup" | "reset";
@@ -76,14 +75,6 @@ function AuthPage() {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function google() {
-    try {
-      await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Google sign-in failed");
     }
   }
 
@@ -158,17 +149,6 @@ function AuthPage() {
                 {mode === "signup" ? "Create account" : mode === "reset" ? "Send link" : "Sign in"}
               </Button>
             </form>
-
-            {mode !== "reset" && (
-              <>
-                <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
-                  <span className="h-px flex-1 bg-border" /> or <span className="h-px flex-1 bg-border" />
-                </div>
-                <Button variant="outline" className="w-full" onClick={google}>
-                  Continue with Google
-                </Button>
-              </>
-            )}
 
             <div className="mt-6 space-y-2 text-sm text-muted-foreground">
               {mode === "signin" && (
