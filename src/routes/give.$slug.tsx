@@ -1,4 +1,4 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { submitPublicDonation } from "@/lib/public-donations.functions";
 import { formatDate, formatMoney } from "@/lib/format";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/give/$slug")({
   head: ({ params }) => ({
@@ -45,6 +46,7 @@ export const Route = createFileRoute("/give/$slug")({
 
 function GivePage() {
   const { slug } = Route.useParams();
+  const { user } = useAuth();
   const [amount, setAmount] = useState<number | "">("");
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -265,6 +267,24 @@ function GivePage() {
               <Button variant="outline" onClick={() => setDone(false)}>
                 Make another gift
               </Button>
+              {user ? (
+                <p className="text-sm text-muted-foreground">
+                  <Link to="/my-giving" className="underline underline-offset-2">
+                    View your giving history
+                  </Link>
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  <Link
+                    to="/auth"
+                    search={{ mode: "signup" }}
+                    className="underline underline-offset-2"
+                  >
+                    Create a free account
+                  </Link>{" "}
+                  to track your giving history across all charities.
+                </p>
+              )}
             </CardContent>
           ) : (
             <>

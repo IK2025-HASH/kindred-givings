@@ -160,53 +160,65 @@ function CreateOrg() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4 py-12">
-      <Card className="w-full max-w-lg">
-        <CardHeader>
-          <CardTitle>Set up your charity</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Create your workspace to start recording donors and donations.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={submit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="org-name">Charity name</Label>
-              <Input
-                id="org-name"
-                value={name}
-                required
-                onChange={(e) => {
-                  setName(e.target.value);
-                  if (!slug) setSlug("");
-                }}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="org-slug">Web address</Label>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">/give/</span>
+      <div className="w-full max-w-lg space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Set up your charity</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Create your workspace to start recording donors and donations.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={submit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="org-name">Charity name</Label>
                 <Input
-                  id="org-slug"
-                  value={slug || slugify(name)}
-                  onChange={(e) => setSlug(e.target.value)}
+                  id="org-name"
+                  value={name}
+                  required
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (!slug) setSlug("");
+                  }}
                 />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="org-email">Contact email</Label>
-              <Input
-                id="org-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <Button type="submit" disabled={busy} className="w-full">
-              {busy ? "Creating…" : "Create workspace"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+              <div className="space-y-2">
+                <Label htmlFor="org-slug">Web address</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">/give/</span>
+                  <Input
+                    id="org-slug"
+                    value={slug || slugify(name)}
+                    onChange={(e) => setSlug(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="org-email">Contact email</Label>
+                <Input
+                  id="org-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+              <Button type="submit" disabled={busy} className="w-full">
+                {busy ? "Creating…" : "Create workspace"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <div className="rounded-lg border bg-card p-4 text-center">
+          <p className="text-sm text-muted-foreground">Not setting up a charity?</p>
+          <Link
+            to="/my-giving"
+            className="mt-1 inline-block text-sm font-medium underline underline-offset-2"
+          >
+            View my donation history →
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
