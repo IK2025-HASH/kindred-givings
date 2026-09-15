@@ -27,7 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { canEdit, useAuth } from "@/hooks/useAuth";
-import { useDonations, useDonors, type Donor } from "@/hooks/useOrgData";
+import { useDonations, useDonors, useSubscription, type Donor } from "@/hooks/useOrgData";
 import { downloadCsv, formatDate, formatMoney } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -54,6 +54,7 @@ function DonorsPage() {
   const currency = currentOrg?.currency ?? "GBP";
   const donors = useDonors(orgId);
   const donations = useDonations(orgId);
+  const subscription = useSubscription(orgId);
   const qc = useQueryClient();
   const editable = canEdit(currentRole);
   const [search, setSearch] = useState("");
@@ -84,6 +85,13 @@ function DonorsPage() {
 
   async function save() {
     if (!orgId || !draft?.full_name) return;
+    if (!draft.id) {
+      const limit = subscription.data?.plan?.max_donors;
+      if (limit !== undefined && (donors.data?.length ?? 0) >= limit) {
+        toast.error(`Your plan allows ${limit} donors. Upgrade to add more.`);
+        return;
+      }
+    }
     setBusy(true);
     try {
       const payload = {

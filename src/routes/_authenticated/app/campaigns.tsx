@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { canEdit, useAuth } from "@/hooks/useAuth";
-import { useCampaigns, useDonations, type Campaign } from "@/hooks/useOrgData";
+import { useCampaigns, useDonations, useSubscription, type Campaign } from "@/hooks/useOrgData";
 import { formatDate, formatMoney, slugify } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -52,6 +52,7 @@ function CampaignsPage() {
   const currency = currentOrg?.currency ?? "GBP";
   const campaigns = useCampaigns(orgId);
   const donations = useDonations(orgId);
+  const subscription = useSubscription(orgId);
   const qc = useQueryClient();
   const editable = canEdit(currentRole);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -67,6 +68,13 @@ function CampaignsPage() {
 
   async function save() {
     if (!orgId || !draft?.title) return;
+    if (!draft.id) {
+      const limit = subscription.data?.plan?.max_campaigns;
+      if (limit !== undefined && (campaigns.data?.length ?? 0) >= limit) {
+        toast.error(`Your plan allows ${limit} campaigns. Upgrade to add more.`);
+        return;
+      }
+    }
     const payload = {
       organization_id: orgId,
       title: draft.title,

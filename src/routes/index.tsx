@@ -148,7 +148,7 @@ function Home() {
           <div>
             <h2 className="font-display text-2xl font-bold">Ready when your next appeal is</h2>
             <p className="mt-2 text-muted-foreground">
-              Set up your charity in minutes. Card payments arrive in a later release.
+              Set up your charity in minutes. Accept bank transfers, cash and cheques — add a card payment link via Settings.
             </p>
           </div>
           <Button asChild size="lg">

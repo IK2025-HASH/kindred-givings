@@ -270,9 +270,18 @@ function GivePage() {
             <>
               <CardHeader>
                 <CardTitle className="font-display text-2xl">Make a donation</CardTitle>
+                {(org as Record<string, unknown>).payment_link_url && (
+                  <a
+                    href={String((org as Record<string, unknown>).payment_link_url)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                  >
+                    Pay by card
+                  </a>
+                )}
                 <p className="text-sm text-muted-foreground">
-                  Card payments are coming soon — for now the charity will contact you to complete
-                  your gift.
+                  Fill in the form below and the charity will be in touch to complete your gift.
                 </p>
               </CardHeader>
               <CardContent>

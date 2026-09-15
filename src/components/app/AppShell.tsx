@@ -109,7 +109,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
 
       {isPlatformAdmin && (
         <Link
-          to="/app/settings"
+          to="/app/admin"
           onClick={onNavigate}
           className="rounded-md border border-sidebar-border px-3 py-2 text-xs text-sidebar-foreground/70"
         >

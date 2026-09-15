@@ -98,6 +98,30 @@ export function useDonations(orgId: string | null) {
   });
 }
 
+export type SubscriptionPlan = {
+  max_donors: number;
+  max_campaigns: number;
+  max_members: number;
+};
+
+export function useSubscription(orgId: string | null) {
+  return useQuery({
+    queryKey: ["subscription", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<{ plan: SubscriptionPlan | null } | null> => {
+      const { data, error } = await supabase
+        .from("subscriptions")
+        .select("status, plans(max_donors, max_campaigns, max_members)")
+        .eq("organization_id", orgId!)
+        .eq("status", "active")
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      return { plan: (data.plans as unknown as SubscriptionPlan | null) ?? null };
+    },
+  });
+}
+
 export function useTeam(orgId: string | null) {
   return useQuery({
     queryKey: ["team", orgId],
@@ -110,7 +134,7 @@ export function useTeam(orgId: string | null) {
           .eq("organization_id", orgId!),
         supabase
           .from("invitations")
-          .select("id, email, role, accepted_at, expires_at, created_at")
+          .select("id, email, role, accepted_at, expires_at, created_at, token")
           .eq("organization_id", orgId!)
           .order("created_at", { ascending: false }),
       ]);
@@ -131,6 +155,7 @@ export function useTeam(orgId: string | null) {
           accepted_at: string | null;
           expires_at: string;
           created_at: string;
+          token: string | null;
         }>,
       };
     },
