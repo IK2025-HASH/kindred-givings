@@ -17,7 +17,9 @@ import { Route as AuthenticatedAppRouteRouteImport } from './routes/_authenticat
 import { Route as GiveSlugRouteImport } from './routes/give.$slug'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app/index'
 import { Route as AuthenticatedAppCampaignsRouteImport } from './routes/_authenticated/app/campaigns'
+import { Route as AuthenticatedAppDonationsRouteImport } from './routes/_authenticated/app/donations'
 import { Route as AuthenticatedAppDonorsRouteImport } from './routes/_authenticated/app/donors'
+import { Route as AuthenticatedAppReportsRouteImport } from './routes/_authenticated/app/reports'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -59,9 +61,20 @@ const AuthenticatedAppCampaignsRoute =
     path: '/campaigns',
     getParentRoute: () => AuthenticatedAppRouteRoute,
   } as any)
+const AuthenticatedAppDonationsRoute =
+  AuthenticatedAppDonationsRouteImport.update({
+    id: '/donations',
+    path: '/donations',
+    getParentRoute: () => AuthenticatedAppRouteRoute,
+  } as any)
 const AuthenticatedAppDonorsRoute = AuthenticatedAppDonorsRouteImport.update({
   id: '/donors',
   path: '/donors',
+  getParentRoute: () => AuthenticatedAppRouteRoute,
+} as any)
+const AuthenticatedAppReportsRoute = AuthenticatedAppReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => AuthenticatedAppRouteRoute,
 } as any)
 
@@ -72,7 +85,9 @@ export interface FileRoutesByFullPath {
   '/app': typeof AuthenticatedAppRouteRouteWithChildren
   '/give/$slug': typeof GiveSlugRoute
   '/app/campaigns': typeof AuthenticatedAppCampaignsRoute
+  '/app/donations': typeof AuthenticatedAppDonationsRoute
   '/app/donors': typeof AuthenticatedAppDonorsRoute
+  '/app/reports': typeof AuthenticatedAppReportsRoute
   '/app/': typeof AuthenticatedAppIndexRoute
 }
 export interface FileRoutesByTo {
@@ -81,7 +96,9 @@ export interface FileRoutesByTo {
   '/pricing': typeof PricingRoute
   '/give/$slug': typeof GiveSlugRoute
   '/app/campaigns': typeof AuthenticatedAppCampaignsRoute
+  '/app/donations': typeof AuthenticatedAppDonationsRoute
   '/app/donors': typeof AuthenticatedAppDonorsRoute
+  '/app/reports': typeof AuthenticatedAppReportsRoute
   '/app': typeof AuthenticatedAppIndexRoute
 }
 export interface FileRoutesById {
@@ -93,7 +110,9 @@ export interface FileRoutesById {
   '/_authenticated/app': typeof AuthenticatedAppRouteRouteWithChildren
   '/give/$slug': typeof GiveSlugRoute
   '/_authenticated/app/campaigns': typeof AuthenticatedAppCampaignsRoute
+  '/_authenticated/app/donations': typeof AuthenticatedAppDonationsRoute
   '/_authenticated/app/donors': typeof AuthenticatedAppDonorsRoute
+  '/_authenticated/app/reports': typeof AuthenticatedAppReportsRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
 }
 export interface FileRouteTypes {
@@ -105,7 +124,9 @@ export interface FileRouteTypes {
     | '/app'
     | '/give/$slug'
     | '/app/campaigns'
+    | '/app/donations'
     | '/app/donors'
+    | '/app/reports'
     | '/app/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -114,7 +135,9 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/give/$slug'
     | '/app/campaigns'
+    | '/app/donations'
     | '/app/donors'
+    | '/app/reports'
     | '/app'
   id:
     | '__root__'
@@ -125,7 +148,9 @@ export interface FileRouteTypes {
     | '/_authenticated/app'
     | '/give/$slug'
     | '/_authenticated/app/campaigns'
+    | '/_authenticated/app/donations'
     | '/_authenticated/app/donors'
+    | '/_authenticated/app/reports'
     | '/_authenticated/app/'
   fileRoutesById: FileRoutesById
 }
@@ -195,6 +220,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppCampaignsRouteImport
       parentRoute: typeof AuthenticatedAppRouteRoute
     }
+    '/_authenticated/app/donations': {
+      id: '/_authenticated/app/donations'
+      path: '/donations'
+      fullPath: '/app/donations'
+      preLoaderRoute: typeof AuthenticatedAppDonationsRouteImport
+      parentRoute: typeof AuthenticatedAppRouteRoute
+    }
     '/_authenticated/app/donors': {
       id: '/_authenticated/app/donors'
       path: '/donors'
@@ -202,18 +234,29 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppDonorsRouteImport
       parentRoute: typeof AuthenticatedAppRouteRoute
     }
+    '/_authenticated/app/reports': {
+      id: '/_authenticated/app/reports'
+      path: '/reports'
+      fullPath: '/app/reports'
+      preLoaderRoute: typeof AuthenticatedAppReportsRouteImport
+      parentRoute: typeof AuthenticatedAppRouteRoute
+    }
   }
 }
 
 interface AuthenticatedAppRouteRouteChildren {
   AuthenticatedAppCampaignsRoute: typeof AuthenticatedAppCampaignsRoute
+  AuthenticatedAppDonationsRoute: typeof AuthenticatedAppDonationsRoute
   AuthenticatedAppDonorsRoute: typeof AuthenticatedAppDonorsRoute
+  AuthenticatedAppReportsRoute: typeof AuthenticatedAppReportsRoute
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
 }
 
 const AuthenticatedAppRouteRouteChildren: AuthenticatedAppRouteRouteChildren = {
   AuthenticatedAppCampaignsRoute: AuthenticatedAppCampaignsRoute,
+  AuthenticatedAppDonationsRoute: AuthenticatedAppDonationsRoute,
   AuthenticatedAppDonorsRoute: AuthenticatedAppDonorsRoute,
+  AuthenticatedAppReportsRoute: AuthenticatedAppReportsRoute,
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
 }
 
