@@ -2,6 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import { Building2, Plus } from "lucide-react";
 import { PageHeader } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,8 @@ function AdminPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [newAdminEmail, setNewAdminEmail] = useState("");
+  const [newPartnerName, setNewPartnerName] = useState("");
+  const [newPartnerEmail, setNewPartnerEmail] = useState("");
   const [busy, setBusy] = useState(false);
 
   const orgsQuery = useQuery({
@@ -141,6 +144,61 @@ function AdminPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  const partnersQuery = useQuery({
+    queryKey: ["admin-partners"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("partners")
+        .select("id, name, slug, plan, status, billing_email, created_at")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  async function createPartner() {
+    if (!newPartnerName.trim()) return;
+    setBusy(true);
+    const slug = newPartnerName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    try {
+      const { data: partner, error: pErr } = await supabase
+        .from("partners")
+        .insert({ name: newPartnerName, slug, billing_email: newPartnerEmail || null } as never)
+        .select("id")
+        .single();
+      if (pErr) throw pErr;
+      // If an email is provided, look up the user and add them as owner
+      if (newPartnerEmail) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("email", newPartnerEmail)
+          .maybeSingle();
+        if (profile) {
+          await supabase
+            .from("partner_members")
+            .insert({ partner_id: (partner as { id: string }).id, user_id: profile.id, role: "owner" } as never);
+        }
+      }
+      toast.success(`Partner "${newPartnerName}" created`);
+      setNewPartnerName("");
+      setNewPartnerEmail("");
+      void qc.invalidateQueries({ queryKey: ["admin-partners"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not create partner");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function togglePartnerStatus(id: string, current: string) {
+    const next = current === "active" ? "suspended" : "active";
+    const { error } = await supabase.from("partners").update({ status: next } as never).eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success(`Partner ${next}`);
+    void qc.invalidateQueries({ queryKey: ["admin-partners"] });
   }
 
   async function removeAdmin(userId: string) {
@@ -236,6 +294,82 @@ function AdminPage() {
               )}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      {/* Partners / Resellers */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="size-4" /> Partners &amp; resellers
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead className="hidden md:table-cell">Billing email</TableHead>
+                <TableHead className="hidden sm:table-cell">Plan</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(partnersQuery.data ?? []).map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell className="font-medium">
+                    {p.name}
+                    <div className="text-xs text-muted-foreground">/partner/{p.slug}</div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                    {p.billing_email ?? "—"}
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell">{p.plan}</TableCell>
+                  <TableCell>
+                    <Badge variant={p.status === "active" ? "default" : "secondary"}>{p.status}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button size="sm" variant="ghost" onClick={() => void togglePartnerStatus(p.id, p.status)}>
+                      {p.status === "active" ? "Suspend" : "Activate"}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {(partnersQuery.data ?? []).length === 0 && !partnersQuery.isLoading && (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+                    No partner accounts yet.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+
+          <div className="grid gap-3 pt-2 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="new-partner-name">New partner name</Label>
+              <Input
+                id="new-partner-name"
+                value={newPartnerName}
+                onChange={(e) => setNewPartnerName(e.target.value)}
+                placeholder="Accounting Firm Ltd"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="new-partner-email">Owner email <span className="text-muted-foreground">(optional)</span></Label>
+              <Input
+                id="new-partner-email"
+                type="email"
+                value={newPartnerEmail}
+                onChange={(e) => setNewPartnerEmail(e.target.value)}
+                placeholder="owner@accountingfirm.co.uk"
+              />
+            </div>
+          </div>
+          <Button onClick={() => void createPartner()} disabled={busy || !newPartnerName.trim()}>
+            <Plus className="size-4" /> Create partner account
+          </Button>
         </CardContent>
       </Card>
 

@@ -26,6 +26,10 @@ import { Route as AuthenticatedAppSettingsRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAppAdminRouteImport } from './routes/_authenticated/app/admin'
 import { Route as AuthenticatedMyGivingRouteImport } from './routes/_authenticated/my-giving'
 import { Route as AuthenticatedAppQrRouteImport } from './routes/_authenticated/app/qr'
+import { Route as AuthenticatedPartnerRouteImport } from './routes/_authenticated/partner/route'
+import { Route as AuthenticatedPartnerIndexRouteImport } from './routes/_authenticated/partner/index'
+import { Route as AuthenticatedPartnerClientsRouteImport } from './routes/_authenticated/partner/clients'
+import { Route as AuthenticatedPartnerBrandingRouteImport } from './routes/_authenticated/partner/branding'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -114,6 +118,26 @@ const AuthenticatedAppQrRoute = AuthenticatedAppQrRouteImport.update({
   path: '/qr',
   getParentRoute: () => AuthenticatedAppRouteRoute,
 } as any)
+const AuthenticatedPartnerRoute = AuthenticatedPartnerRouteImport.update({
+  id: '/partner',
+  path: '/partner',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPartnerIndexRoute = AuthenticatedPartnerIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedPartnerRoute,
+} as any)
+const AuthenticatedPartnerClientsRoute = AuthenticatedPartnerClientsRouteImport.update({
+  id: '/clients',
+  path: '/clients',
+  getParentRoute: () => AuthenticatedPartnerRoute,
+} as any)
+const AuthenticatedPartnerBrandingRoute = AuthenticatedPartnerBrandingRouteImport.update({
+  id: '/branding',
+  path: '/branding',
+  getParentRoute: () => AuthenticatedPartnerRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -123,6 +147,10 @@ export interface FileRoutesByFullPath {
   '/give/$slug': typeof GiveSlugRoute
   '/invite/$token': typeof InviteTokenRoute
   '/my-giving': typeof AuthenticatedMyGivingRoute
+  '/partner': typeof AuthenticatedPartnerRouteWithChildren
+  '/partner/': typeof AuthenticatedPartnerIndexRoute
+  '/partner/clients': typeof AuthenticatedPartnerClientsRoute
+  '/partner/branding': typeof AuthenticatedPartnerBrandingRoute
   '/app/campaigns': typeof AuthenticatedAppCampaignsRoute
   '/app/donations': typeof AuthenticatedAppDonationsRoute
   '/app/donors': typeof AuthenticatedAppDonorsRoute
@@ -140,6 +168,9 @@ export interface FileRoutesByTo {
   '/give/$slug': typeof GiveSlugRoute
   '/invite/$token': typeof InviteTokenRoute
   '/my-giving': typeof AuthenticatedMyGivingRoute
+  '/partner/': typeof AuthenticatedPartnerIndexRoute
+  '/partner/clients': typeof AuthenticatedPartnerClientsRoute
+  '/partner/branding': typeof AuthenticatedPartnerBrandingRoute
   '/app/campaigns': typeof AuthenticatedAppCampaignsRoute
   '/app/donations': typeof AuthenticatedAppDonationsRoute
   '/app/donors': typeof AuthenticatedAppDonorsRoute
@@ -157,9 +188,13 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/pricing': typeof PricingRoute
   '/_authenticated/app': typeof AuthenticatedAppRouteRouteWithChildren
+  '/_authenticated/partner': typeof AuthenticatedPartnerRouteWithChildren
   '/give/$slug': typeof GiveSlugRoute
   '/invite/$token': typeof InviteTokenRoute
   '/_authenticated/my-giving': typeof AuthenticatedMyGivingRoute
+  '/_authenticated/partner/': typeof AuthenticatedPartnerIndexRoute
+  '/_authenticated/partner/clients': typeof AuthenticatedPartnerClientsRoute
+  '/_authenticated/partner/branding': typeof AuthenticatedPartnerBrandingRoute
   '/_authenticated/app/campaigns': typeof AuthenticatedAppCampaignsRoute
   '/_authenticated/app/donations': typeof AuthenticatedAppDonationsRoute
   '/_authenticated/app/donors': typeof AuthenticatedAppDonorsRoute
@@ -180,6 +215,10 @@ export interface FileRouteTypes {
     | '/give/$slug'
     | '/invite/$token'
     | '/my-giving'
+    | '/partner'
+    | '/partner/'
+    | '/partner/clients'
+    | '/partner/branding'
     | '/app/campaigns'
     | '/app/donations'
     | '/app/donors'
@@ -197,6 +236,9 @@ export interface FileRouteTypes {
     | '/give/$slug'
     | '/invite/$token'
     | '/my-giving'
+    | '/partner/'
+    | '/partner/clients'
+    | '/partner/branding'
     | '/app/campaigns'
     | '/app/donations'
     | '/app/donors'
@@ -213,9 +255,13 @@ export interface FileRouteTypes {
     | '/auth'
     | '/pricing'
     | '/_authenticated/app'
+    | '/_authenticated/partner'
     | '/give/$slug'
     | '/invite/$token'
     | '/_authenticated/my-giving'
+    | '/_authenticated/partner/'
+    | '/_authenticated/partner/clients'
+    | '/_authenticated/partner/branding'
     | '/_authenticated/app/campaigns'
     | '/_authenticated/app/donations'
     | '/_authenticated/app/donors'
@@ -357,6 +403,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMyGivingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/partner': {
+      id: '/_authenticated/partner'
+      path: '/partner'
+      fullPath: '/partner'
+      preLoaderRoute: typeof AuthenticatedPartnerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/partner/': {
+      id: '/_authenticated/partner/'
+      path: '/'
+      fullPath: '/partner/'
+      preLoaderRoute: typeof AuthenticatedPartnerIndexRouteImport
+      parentRoute: typeof AuthenticatedPartnerRoute
+    }
+    '/_authenticated/partner/clients': {
+      id: '/_authenticated/partner/clients'
+      path: '/clients'
+      fullPath: '/partner/clients'
+      preLoaderRoute: typeof AuthenticatedPartnerClientsRouteImport
+      parentRoute: typeof AuthenticatedPartnerRoute
+    }
+    '/_authenticated/partner/branding': {
+      id: '/_authenticated/partner/branding'
+      path: '/branding'
+      fullPath: '/partner/branding'
+      preLoaderRoute: typeof AuthenticatedPartnerBrandingRouteImport
+      parentRoute: typeof AuthenticatedPartnerRoute
+    }
   }
 }
 
@@ -389,13 +463,30 @@ const AuthenticatedAppRouteRouteWithChildren =
     AuthenticatedAppRouteRouteChildren,
   )
 
+interface AuthenticatedPartnerRouteChildren {
+  AuthenticatedPartnerIndexRoute: typeof AuthenticatedPartnerIndexRoute
+  AuthenticatedPartnerClientsRoute: typeof AuthenticatedPartnerClientsRoute
+  AuthenticatedPartnerBrandingRoute: typeof AuthenticatedPartnerBrandingRoute
+}
+
+const AuthenticatedPartnerRouteChildren: AuthenticatedPartnerRouteChildren = {
+  AuthenticatedPartnerIndexRoute: AuthenticatedPartnerIndexRoute,
+  AuthenticatedPartnerClientsRoute: AuthenticatedPartnerClientsRoute,
+  AuthenticatedPartnerBrandingRoute: AuthenticatedPartnerBrandingRoute,
+}
+
+const AuthenticatedPartnerRouteWithChildren =
+  AuthenticatedPartnerRoute._addFileChildren(AuthenticatedPartnerRouteChildren)
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAppRouteRoute: typeof AuthenticatedAppRouteRouteWithChildren
+  AuthenticatedPartnerRoute: typeof AuthenticatedPartnerRouteWithChildren
   AuthenticatedMyGivingRoute: typeof AuthenticatedMyGivingRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAppRouteRoute: AuthenticatedAppRouteRouteWithChildren,
+  AuthenticatedPartnerRoute: AuthenticatedPartnerRouteWithChildren,
   AuthenticatedMyGivingRoute: AuthenticatedMyGivingRoute,
 }
 
