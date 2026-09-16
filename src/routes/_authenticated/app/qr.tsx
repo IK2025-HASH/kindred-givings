@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Download, MapPin, Plus, Printer, QrCode, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell, PageHeader } from "@/components/app/AppShell";
+import { PageHeader } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -242,7 +242,7 @@ function QrBoxesPage() {
   const grandCount = Object.values(stats).reduce((s, b) => s + b.count, 0);
 
   return (
-    <AppShell>
+    <div className="space-y-6">
       <PageHeader
         title="QR Donation Boxes"
         description="Physical collection points with individual QR codes. See exactly how much each location raises."
@@ -414,6 +414,6 @@ function QrBoxesPage() {
           })}
         </div>
       )}
-    </AppShell>
+    </div>
   );
 }
