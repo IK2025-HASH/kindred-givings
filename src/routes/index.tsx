@@ -7,12 +7,14 @@ import {
   ChevronDown,
   Globe2,
   Megaphone,
+  Minus,
   QrCode,
   Receipt,
   ShieldCheck,
   Upload,
   Users,
   Wallet,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import { MarketingShell } from "@/components/site/MarketingShell";
@@ -38,6 +40,44 @@ export const Route = createFileRoute("/")({
   }),
   component: Home,
 });
+
+// ── Competitor comparison ─────────────────────────────────────────
+type CellValue = true | false | string;
+
+const COMPARISON_ROWS: { feature: string; givewell: CellValue; donorfy: CellValue; beacon: CellValue; spreadsheet: CellValue }[] = [
+  { feature: "UK Gift Aid tracking",      givewell: true,      donorfy: true,       beacon: true,        spreadsheet: "Manual" },
+  { feature: "Free plan available",       givewell: true,      donorfy: false,      beacon: false,       spreadsheet: true },
+  { feature: "Starting price",            givewell: "Free",    donorfy: "£69/mo",   beacon: "£45/mo",    spreadsheet: "Free" },
+  { feature: "Public giving page",        givewell: true,      donorfy: "Add-on",   beacon: false,       spreadsheet: false },
+  { feature: "QR donation boxes",         givewell: true,      donorfy: false,      beacon: false,       spreadsheet: false },
+  { feature: "Email campaigns",           givewell: true,      donorfy: true,       beacon: true,        spreadsheet: "Manual" },
+  { feature: "CRM / webhook integration", givewell: true,      donorfy: true,       beacon: true,        spreadsheet: false },
+  { feature: "CSV import & export",       givewell: true,      donorfy: true,       beacon: true,        spreadsheet: true },
+  { feature: "Campaign fundraising",      givewell: true,      donorfy: true,       beacon: true,        spreadsheet: false },
+  { feature: "Multi-charity accounts",    givewell: true,      donorfy: "Add-on",   beacon: false,       spreadsheet: false },
+  { feature: "Set up time",               givewell: "5 min",   donorfy: "Days",     beacon: "Hours",     spreadsheet: "—" },
+  { feature: "Onboarding required",       givewell: false,     donorfy: true,       beacon: true,        spreadsheet: false },
+];
+
+function Cell({ value, highlight }: { value: CellValue; highlight?: boolean }) {
+  if (value === true)
+    return (
+      <span className={`flex h-7 w-7 items-center justify-center rounded-full ${highlight ? "bg-primary text-primary-foreground" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"}`}>
+        <Check className="size-3.5" strokeWidth={2.5} />
+      </span>
+    );
+  if (value === false)
+    return (
+      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-muted-foreground/50">
+        <X className="size-3.5" strokeWidth={2} />
+      </span>
+    );
+  return (
+    <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-medium ${highlight ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
+      {value}
+    </span>
+  );
+}
 
 // ── FAQ ──────────────────────────────────────────────────────────
 const FAQS = [
@@ -718,6 +758,98 @@ function Home() {
             Prices are indicative. See the Pricing page for current plan details and limits.
           </p>
         </div>
+      </section>
+
+      {/* ── Competitor comparison ── */}
+      <section className="mx-auto w-full max-w-5xl px-4 py-20">
+        <div className="text-center">
+          <span className="inline-flex items-center rounded-full border border-border bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            How we compare
+          </span>
+          <h2 className="mt-4 font-display text-3xl font-bold">
+            Built for UK charities — at a fraction of the cost
+          </h2>
+          <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
+            Donorfy and Beacon are powerful but pricey and complex. Spreadsheets are free but fragile. Givewell sits in the sweet spot: purpose-built for small UK charities, set up in minutes, free to start.
+          </p>
+        </div>
+
+        {/* Desktop table */}
+        <div className="mt-10 hidden overflow-hidden rounded-2xl border border-border shadow-card sm:block">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/50">
+                <th className="py-4 pl-6 pr-4 text-left font-semibold text-foreground w-[38%]">Feature</th>
+                <th className="px-4 py-4 text-center font-bold text-primary w-[16%]">
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">Givewell</span>
+                  </div>
+                </th>
+                <th className="px-4 py-4 text-center font-medium text-muted-foreground w-[16%]">Donorfy</th>
+                <th className="px-4 py-4 text-center font-medium text-muted-foreground w-[16%]">Beacon</th>
+                <th className="px-4 py-4 text-center font-medium text-muted-foreground w-[14%]">Spreadsheet</th>
+              </tr>
+            </thead>
+            <tbody>
+              {COMPARISON_ROWS.map((row, i) => (
+                <tr
+                  key={row.feature}
+                  className={`border-b border-border last:border-0 ${i % 2 === 0 ? "" : "bg-muted/20"}`}
+                >
+                  <td className="py-3.5 pl-6 pr-4 font-medium text-foreground">{row.feature}</td>
+                  <td className="px-4 py-3.5 text-center">
+                    <div className="flex justify-center">
+                      <Cell value={row.givewell} highlight />
+                    </div>
+                  </td>
+                  <td className="px-4 py-3.5 text-center">
+                    <div className="flex justify-center">
+                      <Cell value={row.donorfy} />
+                    </div>
+                  </td>
+                  <td className="px-4 py-3.5 text-center">
+                    <div className="flex justify-center">
+                      <Cell value={row.beacon} />
+                    </div>
+                  </td>
+                  <td className="px-4 py-3.5 text-center">
+                    <div className="flex justify-center">
+                      <Cell value={row.spreadsheet} />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile cards */}
+        <div className="mt-8 space-y-3 sm:hidden">
+          {COMPARISON_ROWS.map((row) => (
+            <div key={row.feature} className="rounded-xl border border-border bg-card p-4 shadow-card">
+              <p className="mb-3 font-semibold">{row.feature}</p>
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    { label: "Givewell", value: row.givewell, highlight: true },
+                    { label: "Donorfy", value: row.donorfy },
+                    { label: "Beacon", value: row.beacon },
+                    { label: "Spreadsheet", value: row.spreadsheet },
+                  ] as { label: string; value: CellValue; highlight?: boolean }[]
+                ).map((col) => (
+                  <div key={col.label} className="flex items-center gap-2">
+                    <Cell value={col.value} highlight={col.highlight} />
+                    <span className="text-xs text-muted-foreground">{col.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          Competitor information based on publicly available pricing and feature pages as of mid-2025. Subject to change.
+        </p>
       </section>
 
       {/* ── FAQ ── */}
