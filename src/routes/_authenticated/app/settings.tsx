@@ -33,7 +33,53 @@ export const Route = createFileRoute("/_authenticated/app/settings")({
   component: SettingsPage,
 });
 
-const CURRENCIES = ["GBP", "USD", "EUR", "CAD", "AUD", "NZD"];
+const CURRENCIES: { code: string; name: string }[] = [
+  { code: "GBP", name: "British Pound" },
+  { code: "USD", name: "US Dollar" },
+  { code: "EUR", name: "Euro" },
+  { code: "AUD", name: "Australian Dollar" },
+  { code: "CAD", name: "Canadian Dollar" },
+  { code: "NZD", name: "New Zealand Dollar" },
+  { code: "SGD", name: "Singapore Dollar" },
+  { code: "HKD", name: "Hong Kong Dollar" },
+  { code: "JPY", name: "Japanese Yen" },
+  { code: "CHF", name: "Swiss Franc" },
+  { code: "SEK", name: "Swedish Krona" },
+  { code: "NOK", name: "Norwegian Krone" },
+  { code: "DKK", name: "Danish Krone" },
+  { code: "AED", name: "UAE Dirham" },
+  { code: "SAR", name: "Saudi Riyal" },
+  { code: "QAR", name: "Qatari Riyal" },
+  { code: "KWD", name: "Kuwaiti Dinar" },
+  { code: "BHD", name: "Bahraini Dinar" },
+  { code: "OMR", name: "Omani Rial" },
+  { code: "INR", name: "Indian Rupee" },
+  { code: "PKR", name: "Pakistani Rupee" },
+  { code: "BDT", name: "Bangladeshi Taka" },
+  { code: "LKR", name: "Sri Lankan Rupee" },
+  { code: "NPR", name: "Nepalese Rupee" },
+  { code: "MYR", name: "Malaysian Ringgit" },
+  { code: "IDR", name: "Indonesian Rupiah" },
+  { code: "PHP", name: "Philippine Peso" },
+  { code: "THB", name: "Thai Baht" },
+  { code: "VND", name: "Vietnamese Dong" },
+  { code: "ZAR", name: "South African Rand" },
+  { code: "NGN", name: "Nigerian Naira" },
+  { code: "KES", name: "Kenyan Shilling" },
+  { code: "GHS", name: "Ghanaian Cedi" },
+  { code: "TZS", name: "Tanzanian Shilling" },
+  { code: "UGX", name: "Ugandan Shilling" },
+  { code: "ETB", name: "Ethiopian Birr" },
+  { code: "EGP", name: "Egyptian Pound" },
+  { code: "MAD", name: "Moroccan Dirham" },
+  { code: "XOF", name: "West African CFA Franc" },
+  { code: "BRL", name: "Brazilian Real" },
+  { code: "MXN", name: "Mexican Peso" },
+  { code: "COP", name: "Colombian Peso" },
+  { code: "ARS", name: "Argentine Peso" },
+  { code: "CLP", name: "Chilean Peso" },
+  { code: "PEN", name: "Peruvian Sol" },
+];
 
 function SettingsPage() {
   const { currentOrg, currentRole, refreshMemberships } = useAuth();
@@ -244,8 +290,8 @@ function SettingsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {CURRENCIES.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
+                      <SelectItem key={c.code} value={c.code}>
+                        {c.code} — {c.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

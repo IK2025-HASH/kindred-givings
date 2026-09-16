@@ -125,6 +125,7 @@ function GivePage() {
           giftAid,
           anonymous,
           recurring,
+          sourceLocation: loc || undefined,
         },
       });
       setDone(true);

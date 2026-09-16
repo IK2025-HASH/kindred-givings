@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Globe2,
   Megaphone,
+  QrCode,
   Receipt,
   ShieldCheck,
   Upload,
@@ -333,6 +334,48 @@ function GivingPageMockup() {
   );
 }
 
+function QrBoxMockup() {
+  const boxes = [
+    { name: "Reception Desk", total: "£840", gifts: 14, pct: 68 },
+    { name: "Sunday Service Table", total: "£1,240", gifts: 31, pct: 100 },
+    { name: "Main Entrance Tin", total: "£320", gifts: 8, pct: 26 },
+    { name: "Community Fair Stand", total: "£480", gifts: 11, pct: 39 },
+  ];
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
+      <div className="flex items-center justify-between border-b border-border bg-muted/40 px-4 py-3">
+        <span className="text-sm font-semibold">QR Donation Boxes</span>
+        <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold text-primary">4 active</span>
+      </div>
+      <div className="divide-y divide-border">
+        {boxes.map((b) => (
+          <div key={b.name} className="px-4 py-3 space-y-1.5">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <div className="flex size-6 items-center justify-center rounded bg-primary/10 text-primary">
+                  <QrCode className="size-3.5" />
+                </div>
+                <span className="font-medium">{b.name}</span>
+              </div>
+              <div className="text-right">
+                <span className="font-bold tabular-nums">{b.total}</span>
+                <span className="ml-1.5 text-[10px] text-muted-foreground">{b.gifts} gifts</span>
+              </div>
+            </div>
+            <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-primary/70" style={{ width: `${b.pct}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="border-t border-border bg-muted/20 px-4 py-3 text-center">
+        <p className="text-xs text-muted-foreground">Total raised via QR boxes this month</p>
+        <p className="font-display text-xl font-bold">£2,880</p>
+      </div>
+    </div>
+  );
+}
+
 // ── Home ─────────────────────────────────────────────────────────
 function Home() {
   return (
@@ -523,6 +566,22 @@ function Home() {
               "Donors can create a free account to track their own giving history",
             ]}
             visual={<GivingPageMockup />}
+          />
+
+          <FeatureRow
+            icon={QrCode}
+            title="QR donation boxes — know exactly where every gift came from"
+            desc="Place a unique QR code at each physical collection point. Donors scan it on their phone and give instantly. You see live totals per location."
+            bullets={[
+              "Create named boxes: Reception Desk, Sunday Service Table, Main Entrance",
+              "Each gets its own scannable QR code — print it in seconds",
+              "Every donation records which box it came from",
+              "See totals and gift counts per location in real time",
+              "Works in any country — supports 40+ currencies",
+              "No app needed for donors — just a phone camera",
+            ]}
+            reverse
+            visual={<QrBoxMockup />}
           />
 
         </div>

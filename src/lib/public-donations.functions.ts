@@ -11,6 +11,7 @@ const schema = z.object({
   giftAid: z.boolean().optional(),
   anonymous: z.boolean().optional(),
   recurring: z.boolean().optional(),
+  sourceLocation: z.string().max(120).optional(),
 });
 
 export const submitPublicDonation = createServerFn({ method: "POST" })
@@ -54,6 +55,7 @@ export const submitPublicDonation = createServerFn({ method: "POST" })
       donor_name: data.anonymous ? null : (data.name ?? null),
       donor_email: data.email ?? null,
       message: data.message ?? null,
+      source_location: data.sourceLocation ?? null,
     });
 
     if (error) throw new Error("We could not record your donation. Please try again.");
