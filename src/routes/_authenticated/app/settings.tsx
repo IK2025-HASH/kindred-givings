@@ -102,6 +102,7 @@ function SettingsPage() {
   const [publicPageEnabled, setPublicPageEnabled] = useState(true);
   const [busy, setBusy] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [webhookUrl, setWebhookUrl] = useState("");
 
   useEffect(() => {
     if (!currentOrg) return;
@@ -118,6 +119,7 @@ function SettingsPage() {
     const ext = currentOrg as unknown as Record<string, string>;
     setBannerUrl(ext.banner_url ?? "");
     setPaymentLinkUrl(ext.payment_link_url ?? "");
+    setWebhookUrl(ext.webhook_url ?? "");
     setSuggestedAmounts((currentOrg.suggested_amounts ?? [10, 25, 50, 100]).join(","));
     setPublicPageEnabled(currentOrg.public_page_enabled);
   }, [currentOrg]);
@@ -148,6 +150,7 @@ function SettingsPage() {
           logo_url: logoUrl || null,
           banner_url: bannerUrl || null,
           payment_link_url: paymentLinkUrl || null,
+          webhook_url: webhookUrl || null,
           suggested_amounts: amounts.length ? amounts : [10, 25, 50, 100],
           public_page_enabled: publicPageEnabled,
         } as never)
@@ -363,6 +366,51 @@ function SettingsPage() {
               <p className="text-xs text-muted-foreground">
                 If set, a "Pay by card" button appears on your giving page. Use a Stripe Payment
                 Link or equivalent.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Integrations</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="s-webhook">Webhook URL</Label>
+              <Input
+                id="s-webhook"
+                type="url"
+                value={webhookUrl}
+                onChange={(e) => setWebhookUrl(e.target.value)}
+                placeholder="https://hooks.zapier.com/... or https://hook.eu1.make.com/..."
+                disabled={!canManage}
+              />
+              <p className="text-xs text-muted-foreground">
+                When a donation is recorded, Givewell sends a POST request to this URL with the
+                donation details. Use it to connect to Zapier, Make (Integromat), a custom CRM, or
+                any other automation platform.
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-border bg-muted/40 p-4 text-xs text-muted-foreground space-y-2">
+              <p className="font-medium text-foreground">Webhook payload (JSON)</p>
+              <pre className="overflow-x-auto rounded bg-muted p-2 text-xs leading-relaxed">{`{
+  "event": "donation.created",
+  "donation": {
+    "id": "uuid",
+    "amount": 50.00,
+    "currency": "GBP",
+    "donor_name": "Jane Smith",
+    "gift_aid": true,
+    "message": "...",
+    "created_at": "2025-01-01T10:00:00Z"
+  },
+  "organization": { "id": "uuid", "name": "My Charity" }
+}`}</pre>
+              <p>
+                To connect a CRM like HubSpot, Salesforce, or Airtable, create a Zapier/Make
+                automation that listens to this webhook and pushes the data to your CRM.
               </p>
             </div>
           </CardContent>

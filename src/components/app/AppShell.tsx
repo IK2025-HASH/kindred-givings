@@ -6,6 +6,7 @@ import {
   HeartHandshake,
   LayoutDashboard,
   LogOut,
+  Mail,
   Megaphone,
   Menu,
   QrCode,
@@ -40,6 +41,7 @@ const NAV = [
   { to: "/app/campaigns", label: "Campaigns", icon: Megaphone },
   { to: "/app/reports", label: "Reports", icon: BarChart3 },
   { to: "/app/qr", label: "QR Boxes", icon: QrCode },
+  { to: "/app/email", label: "Email", icon: Mail },
   { to: "/app/team", label: "Team", icon: Building2 },
   { to: "/app/settings", label: "Settings", icon: Settings },
 ] as const;
