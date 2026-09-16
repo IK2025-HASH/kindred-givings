@@ -25,6 +25,7 @@ import { Route as AuthenticatedAppTeamRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedAppSettingsRouteImport } from './routes/_authenticated/app/settings'
 import { Route as AuthenticatedAppAdminRouteImport } from './routes/_authenticated/app/admin'
 import { Route as AuthenticatedMyGivingRouteImport } from './routes/_authenticated/my-giving'
+import { Route as AuthenticatedAppQrRouteImport } from './routes/_authenticated/app/qr'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -108,6 +109,11 @@ const AuthenticatedMyGivingRoute = AuthenticatedMyGivingRouteImport.update({
   path: '/my-giving',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAppQrRoute = AuthenticatedAppQrRouteImport.update({
+  id: '/qr',
+  path: '/qr',
+  getParentRoute: () => AuthenticatedAppRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -124,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/app/team': typeof AuthenticatedAppTeamRoute
   '/app/settings': typeof AuthenticatedAppSettingsRoute
   '/app/admin': typeof AuthenticatedAppAdminRoute
+  '/app/qr': typeof AuthenticatedAppQrRoute
   '/app/': typeof AuthenticatedAppIndexRoute
 }
 export interface FileRoutesByTo {
@@ -140,6 +147,7 @@ export interface FileRoutesByTo {
   '/app/team': typeof AuthenticatedAppTeamRoute
   '/app/settings': typeof AuthenticatedAppSettingsRoute
   '/app/admin': typeof AuthenticatedAppAdminRoute
+  '/app/qr': typeof AuthenticatedAppQrRoute
   '/app': typeof AuthenticatedAppIndexRoute
 }
 export interface FileRoutesById {
@@ -159,6 +167,7 @@ export interface FileRoutesById {
   '/_authenticated/app/team': typeof AuthenticatedAppTeamRoute
   '/_authenticated/app/settings': typeof AuthenticatedAppSettingsRoute
   '/_authenticated/app/admin': typeof AuthenticatedAppAdminRoute
+  '/_authenticated/app/qr': typeof AuthenticatedAppQrRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
 }
 export interface FileRouteTypes {
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/app/team'
     | '/app/settings'
     | '/app/admin'
+    | '/app/qr'
     | '/app/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -194,6 +204,7 @@ export interface FileRouteTypes {
     | '/app/team'
     | '/app/settings'
     | '/app/admin'
+    | '/app/qr'
     | '/app'
   id:
     | '__root__'
@@ -212,6 +223,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/team'
     | '/_authenticated/app/settings'
     | '/_authenticated/app/admin'
+    | '/_authenticated/app/qr'
     | '/_authenticated/app/'
   fileRoutesById: FileRoutesById
 }
@@ -331,6 +343,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppAdminRouteImport
       parentRoute: typeof AuthenticatedAppRouteRoute
     }
+    '/_authenticated/app/qr': {
+      id: '/_authenticated/app/qr'
+      path: '/qr'
+      fullPath: '/app/qr'
+      preLoaderRoute: typeof AuthenticatedAppQrRouteImport
+      parentRoute: typeof AuthenticatedAppRouteRoute
+    }
     '/_authenticated/my-giving': {
       id: '/_authenticated/my-giving'
       path: '/my-giving'
@@ -349,6 +368,7 @@ interface AuthenticatedAppRouteRouteChildren {
   AuthenticatedAppTeamRoute: typeof AuthenticatedAppTeamRoute
   AuthenticatedAppSettingsRoute: typeof AuthenticatedAppSettingsRoute
   AuthenticatedAppAdminRoute: typeof AuthenticatedAppAdminRoute
+  AuthenticatedAppQrRoute: typeof AuthenticatedAppQrRoute
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
 }
 
@@ -360,6 +380,7 @@ const AuthenticatedAppRouteRouteChildren: AuthenticatedAppRouteRouteChildren = {
   AuthenticatedAppTeamRoute: AuthenticatedAppTeamRoute,
   AuthenticatedAppSettingsRoute: AuthenticatedAppSettingsRoute,
   AuthenticatedAppAdminRoute: AuthenticatedAppAdminRoute,
+  AuthenticatedAppQrRoute: AuthenticatedAppQrRoute,
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
 }
 

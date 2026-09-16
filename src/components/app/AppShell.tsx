@@ -8,6 +8,7 @@ import {
   LogOut,
   Megaphone,
   Menu,
+  QrCode,
   Settings,
   Users,
   Wallet,
@@ -38,6 +39,7 @@ const NAV = [
   { to: "/app/donations", label: "Donations", icon: Wallet },
   { to: "/app/campaigns", label: "Campaigns", icon: Megaphone },
   { to: "/app/reports", label: "Reports", icon: BarChart3 },
+  { to: "/app/qr", label: "QR Boxes", icon: QrCode },
   { to: "/app/team", label: "Team", icon: Building2 },
   { to: "/app/settings", label: "Settings", icon: Settings },
 ] as const;

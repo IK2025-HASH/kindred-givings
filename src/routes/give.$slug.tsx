@@ -1,8 +1,8 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, HeartHandshake } from "lucide-react";
+import { CheckCircle2, HeartHandshake, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,9 @@ import { formatDate, formatMoney } from "@/lib/format";
 import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/give/$slug")({
+  validateSearch: (s: Record<string, unknown>) => ({
+    loc: typeof s["loc"] === "string" ? s["loc"] : undefined,
+  }),
   head: ({ params }) => ({
     meta: [
       { title: `Donate — ${params.slug.replace(/-/g, " ")} on Givewell` },
@@ -37,15 +40,11 @@ export const Route = createFileRoute("/give/$slug")({
       This giving page could not be loaded.
     </div>
   ),
-  notFoundComponent: () => (
-    <div className="flex min-h-screen items-center justify-center p-6 text-center text-muted-foreground">
-      We couldn't find that charity.
-    </div>
-  ),
 });
 
 function GivePage() {
   const { slug } = Route.useParams();
+  const { loc } = Route.useSearch();
   const { user } = useAuth();
   const [amount, setAmount] = useState<number | "">("");
   const [campaignId, setCampaignId] = useState<string | null>(null);
@@ -68,8 +67,7 @@ function GivePage() {
         .eq("public_page_enabled", true)
         .maybeSingle();
       if (error) throw error;
-      if (!data) throw notFound();
-      return data;
+      return data ?? null;
     },
   });
 
@@ -146,6 +144,22 @@ function GivePage() {
     );
   }
 
+  if (orgQuery.isSuccess && !org) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
+        <HeartHandshake className="size-12 text-muted-foreground/50" />
+        <h1 className="font-display text-2xl font-bold">We couldn't find that charity</h1>
+        <p className="max-w-sm text-muted-foreground">
+          The giving page for <span className="font-medium">{slug}</span> doesn't exist or is not
+          currently active.
+        </p>
+        <Link to="/" className="text-sm underline underline-offset-2">
+          Go to Givewell home
+        </Link>
+      </div>
+    );
+  }
+
   if (!org) return null;
 
   const suggested = org.suggested_amounts ?? [10, 25, 50, 100];
@@ -168,6 +182,12 @@ function GivePage() {
           <div>
             <h1 className="font-display text-3xl font-extrabold">{org.name}</h1>
             {org.tagline && <p className="text-navy-foreground/75">{org.tagline}</p>}
+            {loc && (
+              <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-sm font-medium text-white">
+                <MapPin className="size-3.5" />
+                {loc}
+              </div>
+            )}
           </div>
         </div>
       </header>
