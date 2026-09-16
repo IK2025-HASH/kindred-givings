@@ -26,6 +26,7 @@ export type Campaign = {
   starts_on: string | null;
   ends_on: string | null;
   status: "draft" | "active" | "completed" | "archived";
+  media_url: string | null;
 };
 
 export type Donation = {
@@ -102,6 +103,7 @@ export type SubscriptionPlan = {
   max_donors: number;
   max_campaigns: number;
   max_members: number;
+  max_qr_boxes: number;
 };
 
 export function useSubscription(orgId: string | null) {
@@ -111,7 +113,7 @@ export function useSubscription(orgId: string | null) {
     queryFn: async (): Promise<{ plan: SubscriptionPlan | null } | null> => {
       const { data, error } = await supabase
         .from("subscriptions")
-        .select("status, plans(max_donors, max_campaigns, max_members)")
+        .select("status, plans(max_donors, max_campaigns, max_members, max_qr_boxes)")
         .eq("organization_id", orgId!)
         .eq("status", "active")
         .maybeSingle();

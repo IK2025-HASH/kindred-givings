@@ -19,6 +19,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useOrgData";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney } from "@/lib/format";
 
@@ -173,6 +174,7 @@ function QrBoxesPage() {
   const orgSlug = currentOrg?.slug ?? "";
   const orgCurrency = currentOrg?.currency ?? "GBP";
   const base = typeof window !== "undefined" ? window.location.origin : "";
+  const subscription = useSubscription(orgId || null);
 
   const [boxes, setBoxes] = useState<Box[]>(() => loadBoxes(orgId));
   const [name, setName] = useState("");
@@ -206,6 +208,11 @@ function QrBoxesPage() {
   function addBox(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
+    const limit = subscription.data?.plan?.max_qr_boxes;
+    if (limit !== undefined && boxes.length >= limit) {
+      toast.error(`Your plan allows ${limit} QR box${limit === 1 ? "" : "es"}. Upgrade to add more.`);
+      return;
+    }
     const next: Box[] = [
       ...boxes,
       {
@@ -245,7 +252,11 @@ function QrBoxesPage() {
     <div className="space-y-6">
       <PageHeader
         title="QR Donation Boxes"
-        description="Physical collection points with individual QR codes. See exactly how much each location raises."
+        description={
+          subscription.data?.plan?.max_qr_boxes !== undefined
+            ? `${boxes.length} of ${subscription.data.plan.max_qr_boxes} boxes used — physical collection points with individual QR codes.`
+            : "Physical collection points with individual QR codes. See exactly how much each location raises."
+        }
         action={
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>

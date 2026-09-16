@@ -84,6 +84,7 @@ function CampaignsPage() {
       starts_on: draft.starts_on || null,
       ends_on: draft.ends_on || null,
       status: (draft.status ?? "active") as Campaign["status"],
+      media_url: (draft as Campaign).media_url || null,
     };
     const res = draft.id
       ? await supabase.from("campaigns").update(payload).eq("id", draft.id)
@@ -183,6 +184,19 @@ function CampaignsPage() {
                 value={draft?.description ?? ""}
                 onChange={(e) => setDraft({ ...draft, description: e.target.value })}
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="media_url">Campaign image or video URL</Label>
+              <Input
+                id="media_url"
+                type="url"
+                value={(draft as Campaign)?.media_url ?? ""}
+                onChange={(e) => setDraft({ ...draft, media_url: e.target.value } as Campaign)}
+                placeholder="https://... (image URL or YouTube link)"
+              />
+              <p className="text-xs text-muted-foreground">
+                Shown on the public giving page for this campaign.
+              </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">

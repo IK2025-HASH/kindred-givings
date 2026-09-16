@@ -90,6 +90,11 @@ function Pricing() {
                   <li className="flex gap-2">
                     <Check className="size-4 text-success" /> {plan.max_campaigns} active campaigns
                   </li>
+                  {(plan as unknown as Record<string,unknown>).max_qr_boxes !== undefined && (
+                    <li className="flex gap-2">
+                      <Check className="size-4 text-success" /> {String((plan as unknown as Record<string,unknown>).max_qr_boxes)} QR donation boxes
+                    </li>
+                  )}
                   {(Array.isArray(plan.features) ? (plan.features as unknown[]) : []).map((f, i) => (
                     <li key={i} className="flex gap-2">
                       <Check className="size-4 text-success" /> {String(f)}

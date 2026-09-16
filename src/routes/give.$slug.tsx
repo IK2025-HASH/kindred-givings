@@ -355,6 +355,27 @@ function GivePage() {
                         )}
                       </div>
 
+                      {/* Per-campaign media */}
+                      {c.media_url && (
+                        <div className="mt-3 overflow-hidden rounded-lg">
+                          {isYouTube(c.media_url) && youtubeEmbed(c.media_url) ? (
+                            <iframe
+                              src={youtubeEmbed(c.media_url)!}
+                              title={c.title}
+                              className="h-40 w-full"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                            />
+                          ) : (
+                            <img
+                              src={c.media_url}
+                              alt={c.title}
+                              className="h-40 w-full object-cover"
+                            />
+                          )}
+                        </div>
+                      )}
+
                       <div className="mt-4 space-y-2">
                         <div className="flex items-baseline justify-between text-sm">
                           <span className="font-display text-lg font-bold tabular-nums">
