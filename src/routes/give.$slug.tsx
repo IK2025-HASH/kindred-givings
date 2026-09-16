@@ -2,14 +2,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, HeartHandshake, MapPin } from "lucide-react";
+import { CheckCircle2, Heart, HeartHandshake, MapPin, Share2, Users } from "lucide-react";
+import QRCode from "react-qr-code";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { submitPublicDonation } from "@/lib/public-donations.functions";
@@ -42,10 +42,33 @@ export const Route = createFileRoute("/give/$slug")({
   ),
 });
 
+function initials(name: string) {
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+}
+
+function isYouTube(url: string) {
+  return /youtu\.?be/.test(url);
+}
+
+function youtubeEmbed(url: string) {
+  const m =
+    url.match(/youtube\.com\/watch\?v=([^&]+)/) ??
+    url.match(/youtu\.be\/([^?]+)/) ??
+    url.match(/youtube\.com\/embed\/([^?]+)/);
+  return m ? `https://www.youtube.com/embed/${m[1]}` : null;
+}
+
 function GivePage() {
   const { slug } = Route.useParams();
   const { loc } = Route.useSearch();
   const { user } = useAuth();
+  const pageUrl = typeof window !== "undefined" ? window.location.href.split("?")[0] : "";
+
   const [amount, setAmount] = useState<number | "">("");
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -72,6 +95,7 @@ function GivePage() {
   });
 
   const org = orgQuery.data;
+  const orgExt = org as unknown as Record<string, unknown>;
 
   const campaignsQuery = useQuery({
     queryKey: ["public-campaigns", org?.id],
@@ -85,6 +109,27 @@ function GivePage() {
         .order("created_at");
       if (error) throw error;
       return data;
+    },
+  });
+
+  // Real per-campaign raised amounts
+  const campaignStatsQuery = useQuery({
+    queryKey: ["public-campaign-stats", org?.id],
+    enabled: !!org?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("donations")
+        .select("campaign_id, amount")
+        .eq("organization_id", org!.id)
+        .in("status", ["confirmed", "pending"]);
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      for (const d of data ?? []) {
+        if (d.campaign_id) {
+          map[d.campaign_id] = (map[d.campaign_id] ?? 0) + Number(d.amount);
+        }
+      }
+      return map;
     },
   });
 
@@ -138,8 +183,8 @@ function GivePage() {
 
   if (orgQuery.isLoading) {
     return (
-      <div className="mx-auto max-w-4xl space-y-4 p-8">
-        <Skeleton className="h-40 w-full" />
+      <div className="mx-auto max-w-5xl space-y-4 p-8">
+        <Skeleton className="h-64 w-full rounded-2xl" />
         <Skeleton className="h-72 w-full" />
       </div>
     );
@@ -164,286 +209,472 @@ function GivePage() {
   if (!org) return null;
 
   const suggested = org.suggested_amounts ?? [10, 25, 50, 100];
+  const totalRaised = Number(statsQuery.data?.total_raised ?? 0);
+  const supporters = Number(statsQuery.data?.supporters ?? 0);
+  const campaigns = campaignsQuery.data ?? [];
+  const campaignRaised = campaignStatsQuery.data ?? {};
+  const supportersList = supportersQuery.data ?? [];
+
+  // Media: banner_url or media_url field if set via Settings
+  const mediaUrl = String(orgExt.banner_url ?? orgExt.media_url ?? "");
+  const hasMedia = mediaUrl.length > 0;
+  const embedUrl = hasMedia && isYouTube(mediaUrl) ? youtubeEmbed(mediaUrl) : null;
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="bg-navy text-navy-foreground">
-        <div className="mx-auto flex w-full max-w-5xl items-center gap-4 px-4 py-10">
-          {org.logo_url ? (
-            <img
-              src={org.logo_url}
-              alt={`${org.name} logo`}
-              className="size-14 rounded-lg bg-card object-contain p-1"
-            />
-          ) : (
-            <span className="flex size-14 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <HeartHandshake className="size-7" />
-            </span>
-          )}
-          <div>
-            <h1 className="font-display text-3xl font-extrabold">{org.name}</h1>
-            {org.tagline && <p className="text-navy-foreground/75">{org.tagline}</p>}
-            {loc && (
-              <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-sm font-medium text-white">
-                <MapPin className="size-3.5" />
-                {loc}
+      {/* ── HERO ── */}
+      <div className="bg-navy text-navy-foreground">
+        {/* Banner image/video */}
+        {hasMedia && (
+          <div className="w-full overflow-hidden" style={{ maxHeight: 340 }}>
+            {embedUrl ? (
+              <iframe
+                src={embedUrl}
+                title="Campaign video"
+                className="h-[340px] w-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            ) : (
+              <img
+                src={mediaUrl}
+                alt="Campaign banner"
+                className="h-[340px] w-full object-cover"
+              />
+            )}
+          </div>
+        )}
+
+        <div className="mx-auto w-full max-w-5xl px-4 py-10">
+          <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+            {org.logo_url ? (
+              <img
+                src={org.logo_url}
+                alt={`${org.name} logo`}
+                className="size-16 shrink-0 rounded-xl bg-white/10 object-contain p-1.5"
+              />
+            ) : (
+              <span className="flex size-16 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                <HeartHandshake className="size-8" />
+              </span>
+            )}
+            <div className="min-w-0">
+              <h1 className="font-display text-3xl font-extrabold leading-tight sm:text-4xl">
+                {org.name}
+              </h1>
+              {org.tagline && (
+                <p className="mt-1 text-base text-navy-foreground/75">{org.tagline}</p>
+              )}
+              {loc && (
+                <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-sm font-medium">
+                  <MapPin className="size-3.5" />
+                  Donating at: {loc}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Stats strip */}
+          <div className="mt-8 grid grid-cols-2 gap-4 border-t border-white/10 pt-6 sm:grid-cols-3">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-navy-foreground/50">
+                Total raised
+              </p>
+              <p className="mt-1 font-display text-2xl font-bold tabular-nums">
+                {formatMoney(totalRaised, org.currency)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-navy-foreground/50">
+                Supporters
+              </p>
+              <p className="mt-1 font-display text-2xl font-bold tabular-nums">
+                {supporters.toLocaleString()}
+              </p>
+            </div>
+            {campaigns.length > 0 && (
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-navy-foreground/50">
+                  Active appeals
+                </p>
+                <p className="mt-1 font-display text-2xl font-bold tabular-nums">
+                  {campaigns.length}
+                </p>
               </div>
             )}
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="mx-auto grid w-full max-w-5xl gap-8 px-4 py-10 lg:grid-cols-[1fr_1.1fr]">
+      {/* ── MAIN ── */}
+      <main className="mx-auto grid w-full max-w-5xl gap-8 px-4 py-10 lg:grid-cols-[1fr_400px]">
+        {/* LEFT */}
         <div className="space-y-6">
+          {/* Story */}
           {org.story && (
             <Card className="shadow-card">
               <CardHeader>
                 <CardTitle>Our story</CardTitle>
               </CardHeader>
-              <CardContent className="text-sm whitespace-pre-line text-muted-foreground">
+              <CardContent className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
                 {org.story}
               </CardContent>
             </Card>
           )}
 
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle>Impact so far</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-muted-foreground">Total raised</p>
-                <p className="font-display text-2xl font-bold">
-                  {formatMoney(Number(statsQuery.data?.total_raised ?? 0), org.currency)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Supporters</p>
-                <p className="font-display text-2xl font-bold">
-                  {Number(statsQuery.data?.supporters ?? 0)}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Campaigns with real progress */}
+          {campaigns.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="font-display text-lg font-semibold">Current appeals</h2>
+              {campaigns.map((c) => {
+                const raised = campaignRaised[c.id] ?? 0;
+                const target = Number(c.target_amount ?? 0);
+                const pct = target > 0 ? Math.min(Math.round((raised / target) * 100), 100) : null;
+                return (
+                  <Card
+                    key={c.id}
+                    className={`cursor-pointer shadow-card ring-2 transition-all ${
+                      campaignId === c.id
+                        ? "ring-primary"
+                        : "ring-transparent hover:ring-primary/30"
+                    }`}
+                    onClick={() => setCampaignId(campaignId === c.id ? null : c.id)}
+                  >
+                    <CardContent className="p-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold">{c.title}</p>
+                          {c.description && (
+                            <p className="mt-0.5 text-sm text-muted-foreground">{c.description}</p>
+                          )}
+                        </div>
+                        {campaignId === c.id && (
+                          <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary">
+                            Selected
+                          </span>
+                        )}
+                      </div>
 
-          {(campaignsQuery.data?.length ?? 0) > 0 && (
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle>Current appeals</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {campaignsQuery.data?.map((c) => (
-                  <div key={c.id}>
-                    <div className="flex justify-between text-sm font-medium">
-                      <span>{c.title}</span>
-                      {c.target_amount && (
-                        <span className="text-muted-foreground">
-                          target {formatMoney(Number(c.target_amount), org.currency)}
-                        </span>
-                      )}
-                    </div>
-                    {c.description && (
-                      <p className="mt-1 text-sm text-muted-foreground">{c.description}</p>
-                    )}
-                    <Progress className="mt-2" value={campaignId === c.id ? 100 : 35} />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+                      <div className="mt-4 space-y-2">
+                        <div className="flex items-baseline justify-between text-sm">
+                          <span className="font-display text-lg font-bold tabular-nums">
+                            {formatMoney(raised, org.currency)}
+                          </span>
+                          {target > 0 && (
+                            <span className="text-muted-foreground">
+                              of {formatMoney(target, org.currency)} goal
+                            </span>
+                          )}
+                        </div>
+                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full bg-primary transition-all"
+                            style={{ width: `${pct ?? 0}%` }}
+                          />
+                        </div>
+                        {pct !== null && (
+                          <p className="text-xs text-muted-foreground">{pct}% of goal reached</p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           )}
 
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle>Recent supporters</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              {(supportersQuery.data ?? []).length === 0 && (
-                <p className="text-muted-foreground">Be the first to give.</p>
+          {/* Supporter wall */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-lg font-semibold">Supporters</h2>
+              {supporters > 0 && (
+                <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <Users className="size-3.5" />
+                  {supporters.toLocaleString()} people gave
+                </span>
               )}
-              {(supportersQuery.data ?? []).map((s, i) => (
-                <div key={i} className="flex items-start justify-between gap-3 border-b pb-2 last:border-0">
-                  <div>
-                    <p className="font-medium">{s.display_name}</p>
-                    {s.message && <p className="text-muted-foreground">{s.message}</p>}
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{formatMoney(Number(s.amount), org.currency)}</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(s.donated_on)}</p>
-                  </div>
-                </div>
-              ))}
+            </div>
+
+            {supportersList.length === 0 ? (
+              <Card className="shadow-card">
+                <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+                  <Heart className="size-8 text-muted-foreground/30" />
+                  <p className="text-sm text-muted-foreground">
+                    Be the first to support {org.name}.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {supportersList.map((s, i) => (
+                  <Card key={i} className="shadow-card">
+                    <CardContent className="flex items-start gap-3 p-4">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                        {s.display_name && s.display_name !== "Anonymous"
+                          ? initials(s.display_name)
+                          : "♥"}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <p className="font-medium">{s.display_name}</p>
+                          <p className="shrink-0 font-bold tabular-nums">
+                            {formatMoney(Number(s.amount), org.currency)}
+                          </p>
+                        </div>
+                        {s.message && (
+                          <p className="mt-1 text-sm italic text-muted-foreground">
+                            "{s.message}"
+                          </p>
+                        )}
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {formatDate(s.donated_on)}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT — sticky */}
+        <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+          {/* Donation form */}
+          <Card className="shadow-lift">
+            {done ? (
+              <CardContent className="space-y-4 py-12 text-center">
+                <CheckCircle2 className="mx-auto size-12 text-success" />
+                <h2 className="font-display text-2xl font-bold">Thank you!</h2>
+                <p className="text-sm text-muted-foreground">
+                  Your pledge has been sent to {org.name}. They will confirm it shortly.
+                </p>
+                <Button variant="outline" className="w-full" onClick={() => setDone(false)}>
+                  Make another gift
+                </Button>
+                {user ? (
+                  <Link
+                    to="/my-giving"
+                    className="block text-sm underline underline-offset-2 text-muted-foreground"
+                  >
+                    View your giving history
+                  </Link>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    <Link
+                      to="/auth"
+                      search={{ mode: "signup" }}
+                      className="underline underline-offset-2"
+                    >
+                      Create a free account
+                    </Link>{" "}
+                    to track your giving across all charities.
+                  </p>
+                )}
+              </CardContent>
+            ) : (
+              <>
+                <CardHeader className="pb-3">
+                  <CardTitle className="font-display text-xl">Make a donation</CardTitle>
+                  {(orgExt.payment_link_url as string) && (
+                    <a
+                      href={String(orgExt.payment_link_url)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                    >
+                      Pay by card instantly
+                    </a>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Complete the form and {org.name} will be in touch to arrange payment.
+                  </p>
+                </CardHeader>
+
+                <CardContent>
+                  <form className="space-y-4" onSubmit={submit}>
+                    {/* Amount buttons */}
+                    <div className="grid grid-cols-4 gap-2">
+                      {suggested.map((a) => (
+                        <button
+                          key={a}
+                          type="button"
+                          onClick={() => setAmount(a)}
+                          className={`rounded-lg border py-2.5 text-sm font-semibold transition-all ${
+                            amount === a
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-background hover:border-primary/50"
+                          }`}
+                        >
+                          {formatMoney(a, org.currency)}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="amount">Or enter amount</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                          {org.currency}
+                        </span>
+                        <Input
+                          id="amount"
+                          type="number"
+                          min={1}
+                          step="0.01"
+                          value={amount}
+                          onChange={(e) =>
+                            setAmount(e.target.value === "" ? "" : Number(e.target.value))
+                          }
+                          className="pl-12"
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Campaign selector */}
+                    {campaigns.length > 0 && (
+                      <div className="space-y-1.5">
+                        <Label>Give to</Label>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setCampaignId(null)}
+                            className={`rounded-full border px-3 py-1 text-xs font-medium transition-all ${
+                              campaignId === null
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border hover:border-primary/50"
+                            }`}
+                          >
+                            Where most needed
+                          </button>
+                          {campaigns.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => setCampaignId(c.id)}
+                              className={`rounded-full border px-3 py-1 text-xs font-medium transition-all ${
+                                campaignId === c.id
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-border hover:border-primary/50"
+                              }`}
+                            >
+                              {c.title}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="donor-name">Your name</Label>
+                        <Input
+                          id="donor-name"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          placeholder="Jane Smith"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="donor-email">Email</Label>
+                        <Input
+                          id="donor-email"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="jane@example.com"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="donor-message">Leave a message</Label>
+                      <Textarea
+                        id="donor-message"
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        rows={2}
+                        placeholder="Say something to inspire others…"
+                      />
+                    </div>
+
+                    <div className="space-y-2.5 rounded-xl bg-secondary p-3.5 text-sm">
+                      <label className="flex cursor-pointer items-start gap-2.5">
+                        <Checkbox
+                          checked={recurring}
+                          onCheckedChange={(v) => setRecurring(v === true)}
+                          className="mt-0.5"
+                        />
+                        <span>Make this a regular monthly gift</span>
+                      </label>
+                      <label className="flex cursor-pointer items-start gap-2.5">
+                        <Checkbox
+                          checked={giftAid}
+                          onCheckedChange={(v) => setGiftAid(v === true)}
+                          className="mt-0.5"
+                        />
+                        <span>
+                          Add Gift Aid — I'm a UK taxpayer and want {org.name} to claim 25% extra.
+                        </span>
+                      </label>
+                      <label className="flex cursor-pointer items-start gap-2.5">
+                        <Checkbox
+                          checked={anonymous}
+                          onCheckedChange={(v) => setAnonymous(v === true)}
+                          className="mt-0.5"
+                        />
+                        <span>Keep my gift anonymous</span>
+                      </label>
+                    </div>
+
+                    <Button type="submit" size="lg" className="w-full" disabled={busy}>
+                      {busy ? "Sending…" : `Give now`}
+                    </Button>
+                  </form>
+                </CardContent>
+              </>
+            )}
+          </Card>
+
+          {/* Share / QR */}
+          <Card className="shadow-card">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Share2 className="size-4 text-primary" />
+                Share this page
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Scan or share the link to help {org.name} reach more supporters.
+              </p>
+              <div className="mt-4 flex justify-center rounded-xl bg-white p-4">
+                <QRCode value={pageUrl} size={140} level="M" />
+              </div>
+              <p className="mt-3 break-all text-center text-[10px] text-muted-foreground">
+                {pageUrl}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(pageUrl);
+                  toast.success("Link copied!");
+                }}
+                className="mt-3 w-full rounded-lg border border-border py-2 text-xs font-medium hover:bg-muted transition-colors"
+              >
+                Copy link
+              </button>
             </CardContent>
           </Card>
         </div>
-
-        <Card className="h-fit shadow-lift lg:sticky lg:top-8">
-          {done ? (
-            <CardContent className="space-y-3 py-12 text-center">
-              <CheckCircle2 className="mx-auto size-12 text-success" />
-              <h2 className="font-display text-2xl font-bold">Thank you</h2>
-              <p className="text-muted-foreground">
-                Your pledge has been sent to {org.name}. They will confirm it shortly and be in
-                touch about payment.
-              </p>
-              <Button variant="outline" onClick={() => setDone(false)}>
-                Make another gift
-              </Button>
-              {user ? (
-                <p className="text-sm text-muted-foreground">
-                  <Link to="/my-giving" className="underline underline-offset-2">
-                    View your giving history
-                  </Link>
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  <Link
-                    to="/auth"
-                    search={{ mode: "signup" }}
-                    className="underline underline-offset-2"
-                  >
-                    Create a free account
-                  </Link>{" "}
-                  to track your giving history across all charities.
-                </p>
-              )}
-            </CardContent>
-          ) : (
-            <>
-              <CardHeader>
-                <CardTitle className="font-display text-2xl">Make a donation</CardTitle>
-                {(org as Record<string, unknown>).payment_link_url && (
-                  <a
-                    href={String((org as Record<string, unknown>).payment_link_url)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-1 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-                  >
-                    Pay by card
-                  </a>
-                )}
-                <p className="text-sm text-muted-foreground">
-                  Fill in the form below and the charity will be in touch to complete your gift.
-                </p>
-              </CardHeader>
-              <CardContent>
-                <form className="space-y-5" onSubmit={submit}>
-                  <div className="flex flex-wrap gap-2">
-                    {suggested.map((a) => (
-                      <Button
-                        key={a}
-                        type="button"
-                        variant={amount === a ? "default" : "outline"}
-                        onClick={() => setAmount(a)}
-                      >
-                        {formatMoney(a, org.currency)}
-                      </Button>
-                    ))}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="amount">Amount</Label>
-                    <Input
-                      id="amount"
-                      type="number"
-                      min={1}
-                      step="0.01"
-                      value={amount}
-                      onChange={(e) =>
-                        setAmount(e.target.value === "" ? "" : Number(e.target.value))
-                      }
-                      required
-                    />
-                  </div>
-
-                  {(campaignsQuery.data?.length ?? 0) > 0 && (
-                    <div className="space-y-2">
-                      <Label>Give to</Label>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={campaignId === null ? "default" : "outline"}
-                          onClick={() => setCampaignId(null)}
-                        >
-                          Where most needed
-                        </Button>
-                        {campaignsQuery.data?.map((c) => (
-                          <Button
-                            key={c.id}
-                            type="button"
-                            size="sm"
-                            variant={campaignId === c.id ? "default" : "outline"}
-                            onClick={() => setCampaignId(c.id)}
-                          >
-                            {c.title}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="donor-name">Your name</Label>
-                      <Input
-                        id="donor-name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="donor-email">Email</Label>
-                      <Input
-                        id="donor-email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="donor-message">Message (optional)</Label>
-                    <Textarea
-                      id="donor-message"
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="space-y-3 rounded-lg bg-secondary p-4 text-sm">
-                    <label className="flex items-start gap-3">
-                      <Checkbox
-                        checked={recurring}
-                        onCheckedChange={(v) => setRecurring(v === true)}
-                      />
-                      <span>Make this a regular monthly gift</span>
-                    </label>
-                    <label className="flex items-start gap-3">
-                      <Checkbox checked={giftAid} onCheckedChange={(v) => setGiftAid(v === true)} />
-                      <span>
-                        Add Gift Aid — I am a UK taxpayer and want {org.name} to reclaim tax on this
-                        gift.
-                      </span>
-                    </label>
-                    <label className="flex items-start gap-3">
-                      <Checkbox
-                        checked={anonymous}
-                        onCheckedChange={(v) => setAnonymous(v === true)}
-                      />
-                      <span>Keep my gift anonymous on the supporters wall</span>
-                    </label>
-                  </div>
-
-                  <Button type="submit" size="lg" className="w-full" disabled={busy}>
-                    {busy ? "Sending…" : "Give now"}
-                  </Button>
-                </form>
-              </CardContent>
-            </>
-          )}
-        </Card>
       </main>
+
+      <footer className="border-t border-border py-6 text-center text-xs text-muted-foreground">
+        Powered by{" "}
+        <Link to="/" className="underline underline-offset-2">
+          Givewell
+        </Link>{" "}
+        · Donation management for charities
+      </footer>
     </div>
   );
 }

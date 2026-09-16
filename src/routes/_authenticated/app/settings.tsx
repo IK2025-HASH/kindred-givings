@@ -96,6 +96,7 @@ function SettingsPage() {
   const [website, setWebsite] = useState("");
   const [charityNumber, setCharityNumber] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [bannerUrl, setBannerUrl] = useState("");
   const [paymentLinkUrl, setPaymentLinkUrl] = useState("");
   const [suggestedAmounts, setSuggestedAmounts] = useState("10,25,50,100");
   const [publicPageEnabled, setPublicPageEnabled] = useState(true);
@@ -114,7 +115,9 @@ function SettingsPage() {
     setWebsite(currentOrg.website ?? "");
     setCharityNumber(currentOrg.charity_number ?? "");
     setLogoUrl(currentOrg.logo_url ?? "");
-    setPaymentLinkUrl((currentOrg as unknown as Record<string, string>).payment_link_url ?? "");
+    const ext = currentOrg as unknown as Record<string, string>;
+    setBannerUrl(ext.banner_url ?? "");
+    setPaymentLinkUrl(ext.payment_link_url ?? "");
     setSuggestedAmounts((currentOrg.suggested_amounts ?? [10, 25, 50, 100]).join(","));
     setPublicPageEnabled(currentOrg.public_page_enabled);
   }, [currentOrg]);
@@ -143,6 +146,7 @@ function SettingsPage() {
           website: website || null,
           charity_number: charityNumber || null,
           logo_url: logoUrl || null,
+          banner_url: bannerUrl || null,
           payment_link_url: paymentLinkUrl || null,
           suggested_amounts: amounts.length ? amounts : [10, 25, 50, 100],
           public_page_enabled: publicPageEnabled,
@@ -281,6 +285,20 @@ function SettingsPage() {
                   placeholder="https://..."
                   disabled={!canManage}
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="s-banner">Banner image or video URL</Label>
+                <Input
+                  id="s-banner"
+                  type="url"
+                  value={bannerUrl}
+                  onChange={(e) => setBannerUrl(e.target.value)}
+                  placeholder="https://... (image URL or YouTube link)"
+                  disabled={!canManage}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Shown at the top of your giving page. Paste an image URL or a YouTube video link.
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label>Currency</Label>
