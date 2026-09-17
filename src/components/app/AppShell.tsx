@@ -118,6 +118,33 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
           Platform admin
         </Link>
       )}
+
+      <div className="mt-auto flex flex-wrap gap-x-3 gap-y-1 pt-2">
+        <Link
+          to="/legal/$doc"
+          params={{ doc: "terms" }}
+          onClick={onNavigate}
+          className="text-[11px] text-sidebar-foreground/40 hover:text-sidebar-foreground/70 transition-colors"
+        >
+          Terms
+        </Link>
+        <Link
+          to="/legal/$doc"
+          params={{ doc: "privacy" }}
+          onClick={onNavigate}
+          className="text-[11px] text-sidebar-foreground/40 hover:text-sidebar-foreground/70 transition-colors"
+        >
+          Privacy
+        </Link>
+        <Link
+          to="/legal/$doc"
+          params={{ doc: "data-retention" }}
+          onClick={onNavigate}
+          className="text-[11px] text-sidebar-foreground/40 hover:text-sidebar-foreground/70 transition-colors"
+        >
+          Data Retention
+        </Link>
+      </div>
     </div>
   );
 }
