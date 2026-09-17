@@ -59,11 +59,24 @@ export function MarketingShell({ children }: { children: ReactNode }) {
       </header>
       <main className="flex-1">{children}</main>
       <footer className="border-t border-border bg-navy text-navy-foreground">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-10 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 sm:flex-row sm:items-center sm:justify-between">
           <Logo inverted />
-          <p className="text-sm text-navy-foreground/70">
-            © {new Date().getFullYear()} Givewell. Donation management for charities.
-          </p>
+          <div className="flex flex-col gap-2 sm:items-end">
+            <nav className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-navy-foreground/70">
+              <Link to="/legal/$doc" params={{ doc: "terms" }} className="hover:text-navy-foreground transition-colors">
+                Terms of Service
+              </Link>
+              <Link to="/legal/$doc" params={{ doc: "privacy" }} className="hover:text-navy-foreground transition-colors">
+                Privacy Policy
+              </Link>
+              <Link to="/legal/$doc" params={{ doc: "data-retention" }} className="hover:text-navy-foreground transition-colors">
+                Data Retention
+              </Link>
+            </nav>
+            <p className="text-sm text-navy-foreground/50">
+              © {new Date().getFullYear()} Givewell. Donation management for charities.
+            </p>
+          </div>
         </div>
       </footer>
     </div>
