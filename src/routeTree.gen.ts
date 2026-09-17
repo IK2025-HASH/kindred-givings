@@ -31,6 +31,7 @@ import { Route as AuthenticatedPartnerRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedPartnerIndexRouteImport } from './routes/_authenticated/partner/index'
 import { Route as AuthenticatedPartnerClientsRouteImport } from './routes/_authenticated/partner/clients'
 import { Route as AuthenticatedPartnerBrandingRouteImport } from './routes/_authenticated/partner/branding'
+import { Route as AuthenticatedAppApiRouteImport } from './routes/_authenticated/app/api'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -144,6 +145,11 @@ const AuthenticatedPartnerBrandingRoute = AuthenticatedPartnerBrandingRouteImpor
   path: '/branding',
   getParentRoute: () => AuthenticatedPartnerRoute,
 } as any)
+const AuthenticatedAppApiRoute = AuthenticatedAppApiRouteImport.update({
+  id: '/api',
+  path: '/api',
+  getParentRoute: () => AuthenticatedAppRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -166,6 +172,7 @@ export interface FileRoutesByFullPath {
   '/app/admin': typeof AuthenticatedAppAdminRoute
   '/app/qr': typeof AuthenticatedAppQrRoute
   '/app/email': typeof AuthenticatedAppEmailRoute
+  '/app/api': typeof AuthenticatedAppApiRoute
   '/app/': typeof AuthenticatedAppIndexRoute
 }
 export interface FileRoutesByTo {
@@ -187,6 +194,7 @@ export interface FileRoutesByTo {
   '/app/admin': typeof AuthenticatedAppAdminRoute
   '/app/qr': typeof AuthenticatedAppQrRoute
   '/app/email': typeof AuthenticatedAppEmailRoute
+  '/app/api': typeof AuthenticatedAppApiRoute
   '/app': typeof AuthenticatedAppIndexRoute
 }
 export interface FileRoutesById {
@@ -212,6 +220,7 @@ export interface FileRoutesById {
   '/_authenticated/app/admin': typeof AuthenticatedAppAdminRoute
   '/_authenticated/app/qr': typeof AuthenticatedAppQrRoute
   '/_authenticated/app/email': typeof AuthenticatedAppEmailRoute
+  '/_authenticated/app/api': typeof AuthenticatedAppApiRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
 }
 export interface FileRouteTypes {
@@ -237,6 +246,7 @@ export interface FileRouteTypes {
     | '/app/admin'
     | '/app/qr'
     | '/app/email'
+    | '/app/api'
     | '/app/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -258,6 +268,7 @@ export interface FileRouteTypes {
     | '/app/admin'
     | '/app/qr'
     | '/app/email'
+    | '/app/api'
     | '/app'
   id:
     | '__root__'
@@ -282,6 +293,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/admin'
     | '/_authenticated/app/qr'
     | '/_authenticated/app/email'
+    | '/_authenticated/app/api'
     | '/_authenticated/app/'
   fileRoutesById: FileRoutesById
 }
@@ -415,6 +427,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppEmailRouteImport
       parentRoute: typeof AuthenticatedAppRouteRoute
     }
+    '/_authenticated/app/api': {
+      id: '/_authenticated/app/api'
+      path: '/api'
+      fullPath: '/app/api'
+      preLoaderRoute: typeof AuthenticatedAppApiRouteImport
+      parentRoute: typeof AuthenticatedAppRouteRoute
+    }
     '/_authenticated/my-giving': {
       id: '/_authenticated/my-giving'
       path: '/my-giving'
@@ -463,6 +482,7 @@ interface AuthenticatedAppRouteRouteChildren {
   AuthenticatedAppAdminRoute: typeof AuthenticatedAppAdminRoute
   AuthenticatedAppQrRoute: typeof AuthenticatedAppQrRoute
   AuthenticatedAppEmailRoute: typeof AuthenticatedAppEmailRoute
+  AuthenticatedAppApiRoute: typeof AuthenticatedAppApiRoute
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
 }
 
@@ -476,6 +496,7 @@ const AuthenticatedAppRouteRouteChildren: AuthenticatedAppRouteRouteChildren = {
   AuthenticatedAppAdminRoute: AuthenticatedAppAdminRoute,
   AuthenticatedAppQrRoute: AuthenticatedAppQrRoute,
   AuthenticatedAppEmailRoute: AuthenticatedAppEmailRoute,
+  AuthenticatedAppApiRoute: AuthenticatedAppApiRoute,
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
 }
 

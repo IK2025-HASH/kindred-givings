@@ -3,6 +3,7 @@ import {
   BarChart3,
   Building2,
   Check,
+  Code2,
   HeartHandshake,
   LayoutDashboard,
   LogOut,
@@ -42,6 +43,7 @@ const NAV = [
   { to: "/app/reports", label: "Reports", icon: BarChart3 },
   { to: "/app/qr", label: "QR Boxes", icon: QrCode },
   { to: "/app/email", label: "Email", icon: Mail },
+  { to: "/app/api", label: "API", icon: Code2 },
   { to: "/app/team", label: "Team", icon: Building2 },
   { to: "/app/settings", label: "Settings", icon: Settings },
 ] as const;
