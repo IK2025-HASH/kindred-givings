@@ -21,7 +21,7 @@ export const submitPublicDonation = createServerFn({ method: "POST" })
 
     const { data: org, error: orgError } = await supabaseAdmin
       .from("organizations")
-      .select("id, currency, public_page_enabled, status")
+      .select("id, name, currency, contact_email, public_page_enabled, status")
       .eq("slug", data.slug)
       .maybeSingle();
 
@@ -59,5 +59,66 @@ export const submitPublicDonation = createServerFn({ method: "POST" })
     });
 
     if (error) throw new Error("We could not record your donation. Please try again.");
+
+    // Send donor receipt email — fails gracefully (donation already recorded above)
+    if (data.email && !data.anonymous) {
+      void sendDonorReceipt({
+        to: data.email,
+        donorName: data.name ?? "Supporter",
+        orgName: org.name,
+        orgEmail: org.contact_email ?? undefined,
+        amount: data.amount,
+        currency: org.currency,
+      });
+    }
+
     return { ok: true as const };
   });
+
+async function sendDonorReceipt({
+  to,
+  donorName,
+  orgName,
+  orgEmail,
+  amount,
+  currency,
+}: {
+  to: string;
+  donorName: string;
+  orgName: string;
+  orgEmail?: string;
+  amount: number;
+  currency: string;
+}) {
+  const apiKey = process.env["RESEND_API_KEY"];
+  if (!apiKey) return; // not configured — skip silently
+
+  const formatted = new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(amount);
+
+  const html = `
+    <p>Dear ${donorName},</p>
+    <p>Thank you for your gift of <strong>${formatted}</strong> to <strong>${orgName}</strong>.</p>
+    <p>Your pledge has been recorded. ${orgName} will be in touch to confirm receipt.</p>
+    <p style="color:#6b7280;font-size:13px;">
+      If you have questions, reply to this email or contact ${orgName} directly.
+    </p>
+  `;
+
+  await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: `${orgName} via Givewell <noreply@givewell.app>`,
+      reply_to: orgEmail,
+      to: [to],
+      subject: `Thank you for your gift to ${orgName}`,
+      html,
+    }),
+  }).catch(() => {/* swallow — donation is already saved */});
+}
