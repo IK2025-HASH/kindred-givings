@@ -32,6 +32,7 @@ import { Route as AuthenticatedPartnerIndexRouteImport } from './routes/_authent
 import { Route as AuthenticatedPartnerClientsRouteImport } from './routes/_authenticated/partner/clients'
 import { Route as AuthenticatedPartnerBrandingRouteImport } from './routes/_authenticated/partner/branding'
 import { Route as AuthenticatedAppApiRouteImport } from './routes/_authenticated/app/api'
+import { Route as LegalDocRouteImport } from './routes/legal.$doc'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -150,6 +151,11 @@ const AuthenticatedAppApiRoute = AuthenticatedAppApiRouteImport.update({
   path: '/api',
   getParentRoute: () => AuthenticatedAppRouteRoute,
 } as any)
+const LegalDocRoute = LegalDocRouteImport.update({
+  id: '/legal/$doc',
+  path: '/legal/$doc',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -174,6 +180,7 @@ export interface FileRoutesByFullPath {
   '/app/email': typeof AuthenticatedAppEmailRoute
   '/app/api': typeof AuthenticatedAppApiRoute
   '/app/': typeof AuthenticatedAppIndexRoute
+  '/legal/$doc': typeof LegalDocRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -196,6 +203,7 @@ export interface FileRoutesByTo {
   '/app/email': typeof AuthenticatedAppEmailRoute
   '/app/api': typeof AuthenticatedAppApiRoute
   '/app': typeof AuthenticatedAppIndexRoute
+  '/legal/$doc': typeof LegalDocRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -222,6 +230,7 @@ export interface FileRoutesById {
   '/_authenticated/app/email': typeof AuthenticatedAppEmailRoute
   '/_authenticated/app/api': typeof AuthenticatedAppApiRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
+  '/legal/$doc': typeof LegalDocRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -248,6 +257,7 @@ export interface FileRouteTypes {
     | '/app/email'
     | '/app/api'
     | '/app/'
+    | '/legal/$doc'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -270,6 +280,7 @@ export interface FileRouteTypes {
     | '/app/email'
     | '/app/api'
     | '/app'
+    | '/legal/$doc'
   id:
     | '__root__'
     | '/'
@@ -295,6 +306,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/email'
     | '/_authenticated/app/api'
     | '/_authenticated/app/'
+    | '/legal/$doc'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -304,6 +316,7 @@ export interface RootRouteChildren {
   PricingRoute: typeof PricingRoute
   GiveSlugRoute: typeof GiveSlugRoute
   InviteTokenRoute: typeof InviteTokenRoute
+  LegalDocRoute: typeof LegalDocRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -469,6 +482,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPartnerBrandingRouteImport
       parentRoute: typeof AuthenticatedPartnerRoute
     }
+    '/legal/$doc': {
+      id: '/legal/$doc'
+      path: '/legal/$doc'
+      fullPath: '/legal/$doc'
+      preLoaderRoute: typeof LegalDocRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -542,6 +562,7 @@ const rootRouteChildren: RootRouteChildren = {
   PricingRoute: PricingRoute,
   GiveSlugRoute: GiveSlugRoute,
   InviteTokenRoute: InviteTokenRoute,
+  LegalDocRoute: LegalDocRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

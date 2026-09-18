@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
+const TERMS_VERSION = "2025-09";
+
 type Mode = "signin" | "signup" | "reset";
 
 export const Route = createFileRoute("/auth")({
@@ -35,6 +37,7 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
   const { user, loading } = useAuth();
@@ -48,7 +51,7 @@ function AuthPage() {
     setBusy(true);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -57,6 +60,12 @@ function AuthPage() {
           },
         });
         if (error) throw error;
+        if (data.user) {
+          await supabase.from("profiles").update({
+            terms_accepted_at: new Date().toISOString(),
+            terms_version: TERMS_VERSION,
+          }).eq("id", data.user.id);
+        }
         toast.success("Account created. Check your email if confirmation is required.");
         navigate({ to: "/app" });
       } else if (mode === "signin") {
@@ -145,7 +154,32 @@ function AuthPage() {
                   />
                 </div>
               )}
-              <Button type="submit" className="w-full" disabled={busy}>
+              {mode === "signup" && (
+                <label className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 shrink-0"
+                    checked={termsAccepted}
+                    onChange={(e) => setTermsAccepted(e.target.checked)}
+                    required
+                  />
+                  <span>
+                    I have read and agree to the{" "}
+                    <Link to="/legal/$doc" params={{ doc: "terms" }} target="_blank" className="underline text-foreground">
+                      Terms of Service
+                    </Link>
+                    ,{" "}
+                    <Link to="/legal/$doc" params={{ doc: "privacy" }} target="_blank" className="underline text-foreground">
+                      Privacy Policy
+                    </Link>
+                    , and{" "}
+                    <Link to="/legal/$doc" params={{ doc: "data-retention" }} target="_blank" className="underline text-foreground">
+                      Data Retention Policy
+                    </Link>
+                  </span>
+                </label>
+              )}
+              <Button type="submit" className="w-full" disabled={busy || (mode === "signup" && !termsAccepted)}>
                 {mode === "signup" ? "Create account" : mode === "reset" ? "Send link" : "Sign in"}
               </Button>
             </form>
