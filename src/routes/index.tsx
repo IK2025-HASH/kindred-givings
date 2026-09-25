@@ -458,8 +458,12 @@ function Home() {
                 </Link>
               </Button>
             </div>
-            <p className="mt-5 text-sm text-navy-foreground/55">
-              Free plan available · Donations go direct to your charity · Set up in under 5 minutes
+            <div className="mt-5 flex items-center gap-2.5 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3.5 py-2.5">
+              <Check className="size-4 shrink-0 text-emerald-400" />
+              <span className="text-sm font-semibold text-emerald-100">Donations go direct to the charity — we never touch the money</span>
+            </div>
+            <p className="mt-3 text-sm text-navy-foreground/55">
+              Free plan available · Set up in under 5 minutes
             </p>
           </div>
 
