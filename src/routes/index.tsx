@@ -809,6 +809,66 @@ function Home() {
         </div>
       </section>
 
+      {/* ── Roadmap ── */}
+      <section className="border-b border-border bg-muted/30">
+        <div className="mx-auto w-full max-w-6xl px-4 py-16">
+          <div className="text-center mb-10">
+            <span className="inline-flex items-center rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Roadmap
+            </span>
+            <h2 className="mt-3 font-display text-2xl font-extrabold">What's coming next</h2>
+            <p className="mt-2 text-sm text-muted-foreground max-w-xl mx-auto">
+              Givewell is growing fast. Here's what we're building — free plan users keep everything they have today.
+            </p>
+          </div>
+          <div className="grid gap-6 sm:grid-cols-2">
+            {/* MVP1 */}
+            <div className="rounded-xl border border-border bg-background p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">MVP 1 · Coming soon</span>
+              </div>
+              <p className="font-display text-lg font-bold mb-4">Online card payments</p>
+              <ul className="space-y-2.5">
+                {[
+                  "Donors pay by card — confirmed automatically, no manual step",
+                  "Stripe Connect direct charge — money goes straight to your charity account",
+                  "Webhook auto-confirm: pledge becomes confirmed the moment payment clears",
+                  "No FCA licence needed — charity is merchant of record",
+                  "Platform donation option for free-plan charities to support Givewell",
+                ].map((f) => (
+                  <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <Check className="size-3.5 shrink-0 text-primary mt-0.5" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {/* MVP2 */}
+            <div className="rounded-xl border border-border bg-background p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground border border-border">MVP 2 · Partner tier</span>
+              </div>
+              <p className="font-display text-lg font-bold mb-4">Partner & advanced features</p>
+              <ul className="space-y-2.5">
+                {[
+                  "Recurring giving & standing order management",
+                  "Automated Gift Aid claim submissions to HMRC",
+                  "Multi-charity federation — one login, many workspaces",
+                  "White-label giving pages with custom domain",
+                  "Advanced reporting & donor segmentation",
+                  "Dedicated partner onboarding & SLA",
+                ].map((f) => (
+                  <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <Check className="size-3.5 shrink-0 text-muted-foreground mt-0.5" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── Competitor comparison ── */}
       <section className="mx-auto w-full max-w-5xl px-4 py-20">
         <div className="text-center">
