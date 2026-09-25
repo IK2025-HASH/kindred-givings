@@ -6,6 +6,7 @@ import {
   Check,
   ChevronDown,
   Globe2,
+  Landmark,
   Megaphone,
   Minus,
   QrCode,
@@ -45,6 +46,8 @@ export const Route = createFileRoute("/")({
 type CellValue = true | false | string;
 
 const COMPARISON_ROWS: { feature: string; givewell: CellValue; donorfy: CellValue; beacon: CellValue; spreadsheet: CellValue }[] = [
+  { feature: "Money goes direct to charity", givewell: true,    donorfy: true,       beacon: true,        spreadsheet: true },
+  { feature: "Platform donation fee",      givewell: "0%",      donorfy: "0%",       beacon: "0%",        spreadsheet: "0%" },
   { feature: "UK Gift Aid tracking",      givewell: true,      donorfy: true,       beacon: true,        spreadsheet: "Manual" },
   { feature: "Free plan available",       givewell: true,      donorfy: false,      beacon: false,       spreadsheet: true },
   { feature: "Starting price",            givewell: "Free",    donorfy: "£69/mo",   beacon: "£45/mo",    spreadsheet: "Free" },
@@ -82,8 +85,12 @@ function Cell({ value, highlight }: { value: CellValue; highlight?: boolean }) {
 // ── FAQ ──────────────────────────────────────────────────────────
 const FAQS = [
   {
-    q: "Do you process card payments?",
-    a: "Givewell doesn't take a cut of payments or hold funds. Instead, you paste your own Stripe Payment Link (or any payment page) into Settings and a 'Pay by card' button appears on your giving page — the money goes directly to your Stripe account. For other gifts (bank transfer, cheque, cash) you record them in Givewell once received.",
+    q: "Do donations go directly to the charity?",
+    a: "Yes — always. Givewell never holds, processes or touches donor money. When a supporter gives online, they pay into the charity's own payment account. We record the gift and send the receipt. That's where our involvement ends. There is no platform fee on donations and no holding period — the money arrives in the charity's account, not ours.",
+  },
+  {
+    q: "How does online card payment work?",
+    a: "Paste your own Stripe Payment Link (or any payment page URL) into Settings and a 'Pay by card' button appears on your giving page. The donor pays Stripe directly into your Stripe account. For all other gifts — bank transfer, cheque, cash — record them in Givewell once the payment has arrived.",
   },
   {
     q: "Does it track Gift Aid?",
@@ -452,7 +459,7 @@ function Home() {
               </Button>
             </div>
             <p className="mt-5 text-sm text-navy-foreground/55">
-              Free plan available · No credit card required · Set up in under 5 minutes
+              Free plan available · Donations go direct to your charity · Set up in under 5 minutes
             </p>
           </div>
 
@@ -487,6 +494,43 @@ function Home() {
             Most small charities manage donors in spreadsheets, record donations in separate files and
             send thank-you letters by hand. Givewell connects all of that in one place.
           </p>
+        </div>
+      </section>
+
+      {/* ── Direct-to-charity trust strip ── */}
+      <section className="border-b border-border bg-primary text-primary-foreground">
+        <div className="mx-auto w-full max-w-6xl px-4 py-12">
+          <div className="mb-8 text-center">
+            <p className="text-xs font-bold uppercase tracking-widest text-primary-foreground/60">How Givewell is different</p>
+            <h2 className="mt-2 font-display text-2xl font-extrabold">
+              Donations go straight to the charity. We never touch the money.
+            </h2>
+          </div>
+          <div className="grid gap-6 sm:grid-cols-3">
+            {[
+              {
+                icon: Landmark,
+                title: "Direct to your account",
+                body: "When a donor gives online, the money goes into the charity's own payment account — not ours. Givewell records the gift and sends the receipt. That's where our involvement ends.",
+              },
+              {
+                icon: ShieldCheck,
+                title: "No donation percentage",
+                body: "We charge a flat subscription. We take zero percent of any donation, ever. Every pound a donor gives arrives in full — no platform deduction on the way through.",
+              },
+              {
+                icon: Wallet,
+                title: "No FCA complexity",
+                body: "Because we never hold or process donor funds, we're not an e-money institution. Charities deal with their own payment provider directly, keeping the regulatory picture simple.",
+              },
+            ].map(({ icon: Icon, title, body }) => (
+              <div key={title} className="rounded-xl bg-primary-foreground/10 p-6">
+                <Icon className="size-6 text-primary-foreground/70" />
+                <h3 className="mt-3 font-display text-lg font-bold">{title}</h3>
+                <p className="mt-2 text-sm text-primary-foreground/75 leading-relaxed">{body}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -598,6 +642,7 @@ function Home() {
             title="A public giving page that's yours to share"
             desc="Every charity gets a hosted giving page with your story, campaign progress and a donation form. No web developer needed."
             bullets={[
+              "Donations go directly to your charity — we never hold or process donor funds",
               "Your URL: /give/your-charity-name — share it anywhere",
               "Shows total raised, number of supporters and a recent supporters wall",
               "Donors can choose a suggested amount or type their own",
