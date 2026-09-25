@@ -292,6 +292,11 @@ export type Database = {
       }
       organizations: {
         Row: {
+          bank_account_name: string | null
+          bank_account_number: string | null
+          bank_reference_hint: string | null
+          bank_sort_code: string | null
+          banner_url: string | null
           charity_number: string | null
           contact_email: string | null
           contact_phone: string | null
@@ -301,6 +306,7 @@ export type Database = {
           id: string
           logo_url: string | null
           name: string
+          payment_link_url: string | null
           public_page_enabled: boolean
           slug: string
           status: Database["public"]["Enums"]["org_status"]
@@ -311,6 +317,11 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          bank_account_name?: string | null
+          bank_account_number?: string | null
+          bank_reference_hint?: string | null
+          bank_sort_code?: string | null
+          banner_url?: string | null
           charity_number?: string | null
           contact_email?: string | null
           contact_phone?: string | null
@@ -320,6 +331,7 @@ export type Database = {
           id?: string
           logo_url?: string | null
           name: string
+          payment_link_url?: string | null
           public_page_enabled?: boolean
           slug: string
           status?: Database["public"]["Enums"]["org_status"]
@@ -330,6 +342,11 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          bank_account_name?: string | null
+          bank_account_number?: string | null
+          bank_reference_hint?: string | null
+          bank_sort_code?: string | null
+          banner_url?: string | null
           charity_number?: string | null
           contact_email?: string | null
           contact_phone?: string | null
@@ -339,6 +356,7 @@ export type Database = {
           id?: string
           logo_url?: string | null
           name?: string
+          payment_link_url?: string | null
           public_page_enabled?: boolean
           slug?: string
           status?: Database["public"]["Enums"]["org_status"]

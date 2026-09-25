@@ -95,7 +95,6 @@ function GivePage() {
   });
 
   const org = orgQuery.data;
-  const orgExt = org as unknown as Record<string, unknown>;
 
   const campaignsQuery = useQuery({
     queryKey: ["public-campaigns", org?.id],
@@ -215,8 +214,8 @@ function GivePage() {
   const campaignRaised = campaignStatsQuery.data ?? {};
   const supportersList = supportersQuery.data ?? [];
 
-  // Media: banner_url or media_url field if set via Settings
-  const mediaUrl = String(orgExt.banner_url ?? orgExt.media_url ?? "");
+  // Media: banner_url if set via Settings
+  const mediaUrl = org?.banner_url ?? "";
   const hasMedia = mediaUrl.length > 0;
   const embedUrl = hasMedia && isYouTube(mediaUrl) ? youtubeEmbed(mediaUrl) : null;
 
@@ -464,12 +463,41 @@ function GivePage() {
           {/* Donation form */}
           <Card className="shadow-lift">
             {done ? (
-              <CardContent className="space-y-4 py-12 text-center">
+              <CardContent className="space-y-4 py-10 text-center">
                 <CheckCircle2 className="mx-auto size-12 text-success" />
                 <h2 className="font-display text-2xl font-bold">Thank you!</h2>
                 <p className="text-sm text-muted-foreground">
-                  Your pledge has been sent to {org.name}. They will confirm it shortly.
+                  Your pledge of{" "}
+                  <strong>{typeof amount === "number" ? new Intl.NumberFormat("en", { style: "currency", currency: org.currency.toUpperCase() }).format(amount) : ""}</strong>{" "}
+                  has been sent to {org.name}.
                 </p>
+                {org.bank_account_number && (
+                  <div className="rounded-lg border border-border bg-muted/40 px-4 py-4 text-left space-y-2">
+                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Bank transfer details</p>
+                    {org.bank_account_name && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Account name</span>
+                        <span className="font-medium">{org.bank_account_name}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Account / IBAN</span>
+                      <span className="font-medium font-mono">{org.bank_account_number}</span>
+                    </div>
+                    {org.bank_sort_code && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Sort code / BIC</span>
+                        <span className="font-medium font-mono">{org.bank_sort_code}</span>
+                      </div>
+                    )}
+                    {org.bank_reference_hint && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Reference</span>
+                        <span className="font-medium">{org.bank_reference_hint}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <Button variant="outline" className="w-full" onClick={() => setDone(false)}>
                   Make another gift
                 </Button>
@@ -497,9 +525,9 @@ function GivePage() {
               <>
                 <CardHeader className="pb-3">
                   <CardTitle className="font-display text-xl">Make a donation</CardTitle>
-                  {(orgExt.payment_link_url as string) && (
+                  {org.payment_link_url && (
                     <a
-                      href={String(orgExt.payment_link_url)}
+                      href={org.payment_link_url}
                       target="_blank"
                       rel="noreferrer"
                       className="mt-2 flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"

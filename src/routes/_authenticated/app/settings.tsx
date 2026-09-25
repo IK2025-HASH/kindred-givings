@@ -98,6 +98,10 @@ function SettingsPage() {
   const [logoUrl, setLogoUrl] = useState("");
   const [bannerUrl, setBannerUrl] = useState("");
   const [paymentLinkUrl, setPaymentLinkUrl] = useState("");
+  const [bankAccountName, setBankAccountName] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankSortCode, setBankSortCode] = useState("");
+  const [bankReferenceHint, setBankReferenceHint] = useState("");
   const [suggestedAmounts, setSuggestedAmounts] = useState("10,25,50,100");
   const [publicPageEnabled, setPublicPageEnabled] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -115,9 +119,12 @@ function SettingsPage() {
     setWebsite(currentOrg.website ?? "");
     setCharityNumber(currentOrg.charity_number ?? "");
     setLogoUrl(currentOrg.logo_url ?? "");
-    const ext = currentOrg as unknown as Record<string, string>;
-    setBannerUrl(ext.banner_url ?? "");
-    setPaymentLinkUrl(ext.payment_link_url ?? "");
+    setBannerUrl(currentOrg.banner_url ?? "");
+    setPaymentLinkUrl(currentOrg.payment_link_url ?? "");
+    setBankAccountName(currentOrg.bank_account_name ?? "");
+    setBankAccountNumber(currentOrg.bank_account_number ?? "");
+    setBankSortCode(currentOrg.bank_sort_code ?? "");
+    setBankReferenceHint(currentOrg.bank_reference_hint ?? "");
     setSuggestedAmounts((currentOrg.suggested_amounts ?? [10, 25, 50, 100]).join(","));
     setPublicPageEnabled(currentOrg.public_page_enabled);
   }, [currentOrg]);
@@ -148,9 +155,13 @@ function SettingsPage() {
           logo_url: logoUrl || null,
           banner_url: bannerUrl || null,
           payment_link_url: paymentLinkUrl || null,
+          bank_account_name: bankAccountName || null,
+          bank_account_number: bankAccountNumber || null,
+          bank_sort_code: bankSortCode || null,
+          bank_reference_hint: bankReferenceHint || null,
           suggested_amounts: amounts.length ? amounts : [10, 25, 50, 100],
           public_page_enabled: publicPageEnabled,
-        } as never)
+        })
         .eq("id", currentOrg.id);
       if (error) throw error;
       toast.success("Settings saved");
@@ -364,6 +375,62 @@ function SettingsPage() {
                 If set, a "Pay by card" button appears on your giving page. Use a Stripe Payment
                 Link or equivalent.
               </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Bank account</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Donors who make a bank transfer will see these details on the thank-you screen after pledging.
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="s-bank-name">Account name</Label>
+                <Input
+                  id="s-bank-name"
+                  value={bankAccountName}
+                  onChange={(e) => setBankAccountName(e.target.value)}
+                  placeholder="e.g. Sunrise Children's Foundation"
+                  disabled={!canManage}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="s-bank-number">Account number / IBAN</Label>
+                <Input
+                  id="s-bank-number"
+                  value={bankAccountNumber}
+                  onChange={(e) => setBankAccountNumber(e.target.value)}
+                  placeholder="e.g. 12345678 or AE070331234567890123456"
+                  disabled={!canManage}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="s-bank-sort">Sort code / BIC / Routing</Label>
+                <Input
+                  id="s-bank-sort"
+                  value={bankSortCode}
+                  onChange={(e) => setBankSortCode(e.target.value)}
+                  placeholder="e.g. 20-00-00 or NBADAEAAXXXX"
+                  disabled={!canManage}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="s-bank-ref">Payment reference for donors</Label>
+                <Input
+                  id="s-bank-ref"
+                  value={bankReferenceHint}
+                  onChange={(e) => setBankReferenceHint(e.target.value)}
+                  placeholder="e.g. Your name + GIVE"
+                  disabled={!canManage}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Shown as a hint so donors use a reference you can reconcile.
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>

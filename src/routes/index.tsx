@@ -433,15 +433,19 @@ function Home() {
         <div className="mx-auto grid w-full max-w-6xl gap-12 px-4 py-20 lg:grid-cols-[1.1fr_1fr] lg:items-center">
           <div>
             <span className="inline-flex items-center rounded-full border border-navy-foreground/25 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
-              Built for UK charities
+              For charities worldwide
             </span>
-            <h1 className="mt-5 font-display text-4xl font-extrabold leading-tight sm:text-5xl">
+            <h1 className="mt-4 font-display text-4xl font-extrabold leading-tight sm:text-5xl">
               One place for every donor, gift and appeal
             </h1>
-            <p className="mt-5 max-w-xl text-lg text-navy-foreground/80">
-              Givewell replaces spreadsheets and scattered email threads with a clean workspace: donor records, Gift Aid tracking, fundraising campaigns and a public giving page — all connected.
+            <div className="mt-4 flex items-center gap-2.5 rounded-lg bg-emerald-500 px-4 py-3">
+              <Check className="size-5 shrink-0 text-white" />
+              <span className="text-sm font-bold text-white">Donations go direct to the charity — we never touch the money</span>
+            </div>
+            <p className="mt-4 max-w-xl text-base text-navy-foreground/80 sm:text-lg">
+              Donor records, Gift Aid tracking, fundraising campaigns and a public giving page — all in one place.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-6 flex flex-wrap gap-3">
               <Button asChild size="lg">
                 <Link to="/auth" search={{ mode: "signup" }}>
                   Start free <ArrowRight className="size-4" />
@@ -458,11 +462,7 @@ function Home() {
                 </Link>
               </Button>
             </div>
-            <div className="mt-5 flex items-center gap-2.5 rounded-lg bg-emerald-500 px-4 py-3">
-              <Check className="size-5 shrink-0 text-white" />
-              <span className="text-sm font-bold text-white">Donations go direct to the charity — we never touch the money</span>
-            </div>
-            <p className="mt-3 text-sm text-navy-foreground/55">
+            <p className="mt-4 text-sm text-navy-foreground/55">
               Free plan available · Set up in under 5 minutes
             </p>
           </div>
