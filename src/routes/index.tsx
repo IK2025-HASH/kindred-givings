@@ -438,9 +438,15 @@ function Home() {
             <h1 className="mt-4 font-display text-4xl font-extrabold leading-tight sm:text-5xl">
               One place for every donor, gift and appeal
             </h1>
-            <div className="mt-4 flex items-center gap-2.5 rounded-lg bg-emerald-500 px-4 py-3">
-              <Check className="size-5 shrink-0 text-white" />
-              <span className="text-sm font-bold text-white">Donations go direct to the charity — we never touch the money</span>
+            <div className="mt-4 rounded-lg bg-emerald-500 px-4 py-3 space-y-2">
+              <div className="flex items-center gap-2.5">
+                <Check className="size-4 shrink-0 text-white" />
+                <span className="text-sm font-bold text-white">Donations go direct to the charity — we never touch the money</span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <Check className="size-4 shrink-0 text-white" />
+                <span className="text-sm font-bold text-white">0% commission on every donation — we never take a cut</span>
+              </div>
             </div>
             <p className="mt-4 max-w-xl text-base text-navy-foreground/80 sm:text-lg">
               Donor records, Gift Aid tracking, fundraising campaigns and a public giving page — all in one place.
