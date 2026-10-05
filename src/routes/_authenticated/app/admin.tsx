@@ -87,6 +87,19 @@ function AdminPage() {
     },
   });
 
+  const growthQuery = useQuery({
+    queryKey: ["admin-growth"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("platform_daily_metrics")
+        .select("*")
+        .order("report_date", { ascending: false })
+        .limit(30);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const statsQuery = useQuery({
     queryKey: ["admin-stats"],
     queryFn: async () => {
@@ -176,6 +189,57 @@ function AdminPage() {
           </Card>
         ))}
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Platform growth — daily snapshot</CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-x-auto p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead className="text-right">Orgs (new)</TableHead>
+                <TableHead className="text-right">Orgs total</TableHead>
+                <TableHead className="text-right">Donations (new)</TableHead>
+                <TableHead className="text-right">Raised today</TableHead>
+                <TableHead className="text-right">Total raised</TableHead>
+                <TableHead className="text-right hidden sm:table-cell">Donors</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(growthQuery.data ?? []).map((row) => (
+                <TableRow key={row.report_date}>
+                  <TableCell className="font-medium tabular-nums">{row.report_date}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {row.new_orgs_today > 0
+                      ? <span className="text-emerald-600 font-semibold">+{row.new_orgs_today}</span>
+                      : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{row.total_orgs}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {row.new_donations_today > 0
+                      ? <span className="text-emerald-600 font-semibold">+{row.new_donations_today}</span>
+                      : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums font-semibold">
+                    {Number(row.raised_today) > 0 ? formatMoney(Number(row.raised_today)) : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{formatMoney(Number(row.total_raised))}</TableCell>
+                  <TableCell className="text-right tabular-nums hidden sm:table-cell">{row.unique_donors}</TableCell>
+                </TableRow>
+              ))}
+              {(growthQuery.data ?? []).length === 0 && !growthQuery.isLoading && (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                    No data yet — first row will appear at 09:00 UTC tomorrow.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
