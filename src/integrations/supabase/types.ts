@@ -311,6 +311,8 @@ export type Database = {
           slug: string
           status: Database["public"]["Enums"]["org_status"]
           story: string | null
+          stripe_account_id: string | null
+          stripe_onboarding_complete: boolean | null
           suggested_amounts: number[]
           tagline: string | null
           updated_at: string
@@ -336,6 +338,8 @@ export type Database = {
           slug: string
           status?: Database["public"]["Enums"]["org_status"]
           story?: string | null
+          stripe_account_id?: string | null
+          stripe_onboarding_complete?: boolean | null
           suggested_amounts?: number[]
           tagline?: string | null
           updated_at?: string
@@ -361,6 +365,8 @@ export type Database = {
           slug?: string
           status?: Database["public"]["Enums"]["org_status"]
           story?: string | null
+          stripe_account_id?: string | null
+          stripe_onboarding_complete?: boolean | null
           suggested_amounts?: number[]
           tagline?: string | null
           updated_at?: string

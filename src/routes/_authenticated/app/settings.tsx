@@ -1,7 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { CheckCircle2, ExternalLink } from "lucide-react";
 import { PageHeader } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,8 +20,15 @@ import {
 import { canManageOrg, useAuth } from "@/hooks/useAuth";
 import { slugify } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  createConnectOnboardingLink,
+  checkStripeOnboarding,
+} from "@/lib/stripe.functions";
 
 export const Route = createFileRoute("/_authenticated/app/settings")({
+  validateSearch: (s: Record<string, unknown>) => ({
+    stripe: typeof s["stripe"] === "string" ? s["stripe"] : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Settings — Givewell workspace" },
@@ -85,6 +93,9 @@ function SettingsPage() {
   const { currentOrg, currentRole, refreshMemberships } = useAuth();
   const qc = useQueryClient();
   const canManage = canManageOrg(currentRole);
+  const { stripe: stripeReturn } = useSearch({ from: "/_authenticated/app/settings" });
+  const [stripeConnected, setStripeConnected] = useState<boolean | null>(null);
+  const [stripeBusy, setStripeBusy] = useState(false);
 
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -106,6 +117,31 @@ function SettingsPage() {
   const [publicPageEnabled, setPublicPageEnabled] = useState(true);
   const [busy, setBusy] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
+
+  // Initialise Stripe connected state from org data
+  useEffect(() => {
+    if (!currentOrg) return;
+    setStripeConnected(currentOrg.stripe_onboarding_complete ?? false);
+  }, [currentOrg]);
+
+  // Handle return from Stripe onboarding (?stripe=connected / ?stripe=refresh)
+  useEffect(() => {
+    if (!stripeReturn || !currentOrg) return;
+    if (stripeReturn === "connected") {
+      void checkStripeOnboarding({ data: { orgId: currentOrg.id } }).then((r) => {
+        if (r.complete) {
+          setStripeConnected(true);
+          toast.success("Stripe connected — card payments are live on your giving page.");
+          refreshMemberships();
+        } else {
+          toast.error("Stripe onboarding is not complete yet. Please finish all steps.");
+        }
+      });
+    } else if (stripeReturn === "refresh") {
+      toast("Stripe onboarding session expired — please try connecting again.");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stripeReturn, currentOrg?.id]);
 
   useEffect(() => {
     if (!currentOrg) return;
@@ -171,6 +207,18 @@ function SettingsPage() {
       toast.error(err instanceof Error ? err.message : "Could not save settings");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function connectStripe() {
+    if (!currentOrg) return;
+    setStripeBusy(true);
+    try {
+      const { url } = await createConnectOnboardingLink({ data: { orgId: currentOrg.id } });
+      window.location.href = url;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not start Stripe onboarding");
+      setStripeBusy(false);
     }
   }
 
@@ -441,6 +489,61 @@ function SettingsPage() {
           </Button>
         )}
       </form>
+
+      {/* Stripe Connect — outside the main form, it's an OAuth redirect action */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Stripe card payments</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Connect a Stripe account so donors can pay by card on your giving page. Funds go
+            directly to your Stripe account — Givewell takes 0% commission.
+          </p>
+          {stripeConnected ? (
+            <div className="flex items-center gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-800 dark:bg-emerald-950/30">
+              <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+                  Stripe connected
+                </p>
+                <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                  Card payments are live on your giving page.
+                </p>
+              </div>
+              {canManage && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                  onClick={() => void connectStripe()}
+                  disabled={stripeBusy}
+                >
+                  <ExternalLink className="mr-1.5 size-3.5" />
+                  Stripe dashboard
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                Card payments are not yet enabled. Connect Stripe to activate the "Pay by card"
+                button on your giving page.
+              </div>
+              {canManage && (
+                <Button
+                  onClick={() => void connectStripe()}
+                  disabled={stripeBusy}
+                  className="gap-2"
+                >
+                  <ExternalLink className="size-4" />
+                  {stripeBusy ? "Redirecting to Stripe…" : "Connect Stripe account"}
+                </Button>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {currentRole === "owner" && (
         <Card className="border-destructive/40">

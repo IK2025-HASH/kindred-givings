@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, Heart, HeartHandshake, MapPin, Share2, Users } from "lucide-react";
+import { CheckCircle2, CreditCard, Heart, HeartHandshake, MapPin, Share2, Users } from "lucide-react";
 import QRCode from "react-qr-code";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,12 +13,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { submitPublicDonation } from "@/lib/public-donations.functions";
+import { createDonationCheckout } from "@/lib/stripe.functions";
 import { formatDate, formatMoney } from "@/lib/format";
 import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/give/$slug")({
   validateSearch: (s: Record<string, unknown>) => ({
     loc: typeof s["loc"] === "string" ? s["loc"] : undefined,
+    payment: typeof s["payment"] === "string" ? s["payment"] : undefined,
+    session_id: typeof s["session_id"] === "string" ? s["session_id"] : undefined,
   }),
   head: ({ params }) => ({
     meta: [
@@ -65,7 +68,7 @@ function youtubeEmbed(url: string) {
 
 function GivePage() {
   const { slug } = Route.useParams();
-  const { loc } = Route.useSearch();
+  const { loc, payment } = Route.useSearch();
   const { user } = useAuth();
   const pageUrl = typeof window !== "undefined" ? window.location.href.split("?")[0] : "";
 
@@ -77,8 +80,10 @@ function GivePage() {
   const [giftAid, setGiftAid] = useState(false);
   const [anonymous, setAnonymous] = useState(false);
   const [recurring, setRecurring] = useState(false);
-  const [done, setDone] = useState(false);
+  // done=true when bank-transfer pledge submitted OR stripe payment succeeded
+  const [done, setDone] = useState(payment === "success");
   const [busy, setBusy] = useState(false);
+  const [stripeBusy, setStripeBusy] = useState(false);
 
   const orgQuery = useQuery({
     queryKey: ["public-org", slug],
@@ -177,6 +182,34 @@ function GivePage() {
       toast.error(err instanceof Error ? err.message : "We couldn't record that donation");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function payByStripe() {
+    if (!amount || Number(amount) <= 0) {
+      toast.error("Please choose an amount first");
+      return;
+    }
+    setStripeBusy(true);
+    try {
+      const { url } = await createDonationCheckout({
+        data: {
+          slug,
+          amount: Number(amount),
+          campaignId: campaignId ?? undefined,
+          donorName: anonymous ? undefined : (name || undefined),
+          donorEmail: email || undefined,
+          message: message || undefined,
+          giftAid,
+          anonymous,
+          recurring,
+          sourceLocation: loc || undefined,
+        },
+      });
+      window.location.href = url;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not start card payment");
+      setStripeBusy(false);
     }
   }
 
@@ -467,9 +500,17 @@ function GivePage() {
                 <CheckCircle2 className="mx-auto size-12 text-success" />
                 <h2 className="font-display text-2xl font-bold">Thank you!</h2>
                 <p className="text-sm text-muted-foreground">
-                  Your pledge of{" "}
-                  <strong>{typeof amount === "number" ? new Intl.NumberFormat("en", { style: "currency", currency: org.currency.toUpperCase() }).format(amount) : ""}</strong>{" "}
-                  has been sent to {org.name}.
+                  {payment === "success"
+                    ? `Your card payment to ${org.name} was successful. The funds are on their way.`
+                    : <>
+                        Your pledge of{" "}
+                        <strong>
+                          {typeof amount === "number"
+                            ? new Intl.NumberFormat("en", { style: "currency", currency: org.currency.toUpperCase() }).format(amount)
+                            : ""}
+                        </strong>{" "}
+                        has been recorded. {org.name} will be in touch to confirm receipt.
+                      </>}
                 </p>
                 {org.bank_account_number && (
                   <div className="rounded-lg border border-border bg-muted/40 px-4 py-4 text-left space-y-2">
@@ -678,8 +719,22 @@ function GivePage() {
                     </div>
 
                     <Button type="submit" size="lg" className="w-full" disabled={busy}>
-                      {busy ? "Sending…" : `Give now`}
+                      {busy ? "Sending…" : "Pledge via bank transfer"}
                     </Button>
+
+                    {org.stripe_onboarding_complete && (
+                      <Button
+                        type="button"
+                        size="lg"
+                        variant="outline"
+                        className="w-full gap-2"
+                        onClick={() => void payByStripe()}
+                        disabled={stripeBusy}
+                      >
+                        <CreditCard className="size-4" />
+                        {stripeBusy ? "Redirecting to payment…" : "Pay by card instantly"}
+                      </Button>
+                    )}
                   </form>
                 </CardContent>
               </>
