@@ -864,6 +864,7 @@ function Home() {
                   "Automated Gift Aid claim submissions to HMRC",
                   "Multi-charity federation — one login, many workspaces",
                   "Advanced reporting & donor segmentation",
+                  "Paid REST API — integrate Givewell data into your own systems",
                   "Dedicated partner onboarding & SLA",
                 ].map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
