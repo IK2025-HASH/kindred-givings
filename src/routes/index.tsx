@@ -833,14 +833,14 @@ function Home() {
               <div className="flex items-center gap-2 mb-4">
                 <span className="rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">MVP 1 · Coming soon</span>
               </div>
-              <p className="font-display text-lg font-bold mb-4">Online card payments</p>
+              <p className="font-display text-lg font-bold mb-4">Android mobile app</p>
               <ul className="space-y-2.5">
                 {[
-                  "Donors pay by card — confirmed automatically, no manual step",
-                  "Stripe Connect direct charge — money goes straight to your charity account",
-                  "Webhook auto-confirm: pledge becomes confirmed the moment payment clears",
-                  "No FCA licence needed — charity is merchant of record",
-                  "Platform donation option for free-plan charities to support Givewell",
+                  "Native Android app (.apk) for charity staff and donors",
+                  "Full giving flow — browse, donate, and track campaigns on mobile",
+                  "Push notifications for new donations and campaign milestones",
+                  "In-person QR code scanner for event donations",
+                  "Offline-capable: queue donations and sync when back online",
                 ].map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
                     <Check className="size-3.5 shrink-0 text-primary mt-0.5" />
@@ -854,13 +854,15 @@ function Home() {
               <div className="flex items-center gap-2 mb-4">
                 <span className="rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground border border-border">MVP 2 · Partner tier</span>
               </div>
-              <p className="font-display text-lg font-bold mb-4">Partner & advanced features</p>
+              <p className="font-display text-lg font-bold mb-4">Partner & white-label</p>
               <ul className="space-y-2.5">
                 {[
+                  "Full white-label — your brand, your domain, zero Givewell branding",
+                  "Custom domain for giving pages (give.yourcharity.org)",
+                  "Branded mobile app with your logo and colour scheme",
                   "Recurring giving & standing order management",
                   "Automated Gift Aid claim submissions to HMRC",
                   "Multi-charity federation — one login, many workspaces",
-                  "White-label giving pages with custom domain",
                   "Advanced reporting & donor segmentation",
                   "Dedicated partner onboarding & SLA",
                 ].map((f) => (
