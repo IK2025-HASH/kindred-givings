@@ -1,16 +1,23 @@
-export function formatMoney(amount: number | string | null | undefined, currency = "GBP") {
+export function formatMoney(amount: number | string | null | undefined, currency?: string) {
   const value = typeof amount === "string" ? Number(amount) : (amount ?? 0);
-  return new Intl.NumberFormat("en-GB", {
+  const num = Number.isFinite(value) ? value : 0;
+  if (!currency) {
+    return new Intl.NumberFormat(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(num);
+  }
+  return new Intl.NumberFormat(undefined, {
     style: "currency",
     currency,
-    maximumFractionDigits: value % 1 === 0 ? 0 : 2,
-  }).format(Number.isFinite(value) ? value : 0);
+    maximumFractionDigits: num % 1 === 0 ? 0 : 2,
+  }).format(num);
 }
 
 export function formatDate(value: string | Date | null | undefined) {
   if (!value) return "—";
   const date = typeof value === "string" ? new Date(value) : value;
-  return new Intl.DateTimeFormat("en-GB", {
+  return new Intl.DateTimeFormat(undefined, {
     day: "numeric",
     month: "short",
     year: "numeric",

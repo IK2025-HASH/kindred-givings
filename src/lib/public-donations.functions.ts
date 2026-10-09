@@ -93,7 +93,7 @@ async function sendDonorReceipt({
   const apiKey = process.env["RESEND_API_KEY"];
   if (!apiKey) return; // not configured — skip silently
 
-  const formatted = new Intl.NumberFormat("en-GB", {
+  const formatted = new Intl.NumberFormat(undefined, {
     style: "currency",
     currency: currency.toUpperCase(),
   }).format(amount);
@@ -114,7 +114,7 @@ async function sendDonorReceipt({
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: `${orgName} via Givewell <noreply@givewell.app>`,
+      from: `${orgName} via ${process.env["VITE_APP_NAME"] ?? "Givewell"} <${process.env["RESEND_FROM_EMAIL"] ?? "noreply@givewell.app"}>`,
       reply_to: orgEmail,
       to: [to],
       subject: `Thank you for your gift to ${orgName}`,

@@ -25,7 +25,7 @@ export const Route = createFileRoute("/give/$slug")({
   }),
   head: ({ params }) => ({
     meta: [
-      { title: `Donate — ${params.slug.replace(/-/g, " ")} on Givewell` },
+      { title: `Donate — ${params.slug.replace(/-/g, " ")} on ${import.meta.env.VITE_APP_NAME ?? "Givewell"}` },
       {
         name: "description",
         content: "Support this charity with a one-off or regular gift through its Givewell page.",
@@ -506,7 +506,7 @@ function GivePage() {
                         Your pledge of{" "}
                         <strong>
                           {typeof amount === "number"
-                            ? new Intl.NumberFormat("en", { style: "currency", currency: org.currency.toUpperCase() }).format(amount)
+                            ? new Intl.NumberFormat(undefined, { style: "currency", currency: org.currency.toUpperCase() }).format(amount)
                             : ""}
                         </strong>{" "}
                         has been recorded. {org.name} will be in touch to confirm receipt.
@@ -775,7 +775,7 @@ function GivePage() {
       <footer className="border-t border-border py-6 text-center text-xs text-muted-foreground">
         Powered by{" "}
         <Link to="/" className="underline underline-offset-2">
-          Givewell
+          {import.meta.env.VITE_APP_NAME ?? "Givewell"}
         </Link>{" "}
         · Donation management for charities
       </footer>

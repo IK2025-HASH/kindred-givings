@@ -101,7 +101,7 @@ function SettingsPage() {
   const [slug, setSlug] = useState("");
   const [tagline, setTagline] = useState("");
   const [story, setStory] = useState("");
-  const [currency, setCurrency] = useState("GBP");
+  const [currency, setCurrency] = useState(import.meta.env.VITE_PLATFORM_CURRENCY ?? "GBP");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [website, setWebsite] = useState("");

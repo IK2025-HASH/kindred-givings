@@ -1,15 +1,18 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { STRIPE_API_VERSION } from "@/lib/stripe-config";
 
 function appOrigin() {
-  return process.env["VITE_APP_URL"] ?? "https://kindred-givings.nl-product-factory.com";
+  const url = process.env["VITE_APP_URL"];
+  if (!url) throw new Error("VITE_APP_URL is not set — Stripe redirects cannot be built.");
+  return url;
 }
 
 async function getStripe() {
   const key = process.env["STRIPE_SECRET_KEY"];
   if (!key) throw new Error("Stripe is not configured on this server.");
   const { default: Stripe } = await import("stripe");
-  return new Stripe(key, { apiVersion: "2025-06-30.basil" });
+  return new Stripe(key, { apiVersion: STRIPE_API_VERSION });
 }
 
 // ── 1. Create/resume Stripe Connect Express onboarding link ──────────────────

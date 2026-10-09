@@ -25,7 +25,7 @@ import { Badge } from "@/components/ui/badge";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Givewell — donation management software for UK charities" },
+      { title: `${import.meta.env.VITE_APP_NAME ?? "Givewell"} — donation management software for charities` },
       {
         name: "description",
         content:
@@ -463,7 +463,7 @@ function Home() {
                 variant="outline"
                 className="border-navy-foreground/30 bg-transparent text-navy-foreground hover:bg-navy-foreground/10 hover:text-navy-foreground"
               >
-                <Link to="/give/$slug" params={{ slug: "sunrise-childrens-foundation" }}>
+                <Link to="/give/$slug" params={{ slug: import.meta.env.VITE_DEMO_SLUG ?? "sunrise-childrens-foundation" }}>
                   See a live giving page
                 </Link>
               </Button>
@@ -885,10 +885,10 @@ function Home() {
             How we compare
           </span>
           <h2 className="mt-4 font-display text-3xl font-bold">
-            Built for UK charities — at a fraction of the cost
+            Built for charities — at a fraction of the cost
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-            Donorfy and Beacon are powerful but pricey and complex. Spreadsheets are free but fragile. Givewell sits in the sweet spot: purpose-built for small UK charities, set up in minutes, free to start.
+            Donorfy and Beacon are powerful but pricey and complex. Spreadsheets are free but fragile. {import.meta.env.VITE_APP_NAME ?? "Givewell"} sits in the sweet spot: purpose-built for small charities, set up in minutes, free to start.
           </p>
         </div>
 
@@ -996,7 +996,7 @@ function Home() {
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline">
-              <Link to="/give/$slug" params={{ slug: "sunrise-childrens-foundation" }}>
+              <Link to="/give/$slug" params={{ slug: import.meta.env.VITE_DEMO_SLUG ?? "sunrise-childrens-foundation" }}>
                 View demo giving page
               </Link>
             </Button>

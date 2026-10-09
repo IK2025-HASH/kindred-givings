@@ -83,7 +83,7 @@ function Dashboard() {
       if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + d.amount);
     }
     return [...buckets.entries()].map(([key, total]) => ({
-      month: new Date(`${key}-01`).toLocaleDateString("en-GB", { month: "short" }),
+      month: new Date(`${key}-01`).toLocaleDateString(undefined, { month: "short" }),
       total,
     }));
   }, [rows]);

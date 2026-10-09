@@ -1,4 +1,5 @@
 import { createAPIFileRoute } from "@tanstack/react-start/api";
+import { STRIPE_API_VERSION } from "@/lib/stripe-config";
 
 export const APIRoute = createAPIFileRoute("/api/stripe-webhook")({
   POST: async ({ request }) => {
@@ -15,7 +16,7 @@ export const APIRoute = createAPIFileRoute("/api/stripe-webhook")({
     try {
       const { default: Stripe } = await import("stripe");
       const stripe = new Stripe(process.env["STRIPE_SECRET_KEY"]!, {
-        apiVersion: "2025-06-30.basil",
+        apiVersion: STRIPE_API_VERSION,
       });
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
     } catch {

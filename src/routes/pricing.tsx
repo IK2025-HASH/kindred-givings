@@ -67,14 +67,14 @@ function Pricing() {
                 <p className="mt-4 font-display text-4xl font-extrabold">
                   {Number(plan.price_monthly) === 0
                     ? "Free"
-                    : formatMoney(Number(plan.price_monthly))}
+                    : formatMoney(Number(plan.price_monthly), import.meta.env.VITE_PLATFORM_CURRENCY ?? "GBP")}
                   {Number(plan.price_monthly) > 0 && (
                     <span className="text-base font-medium text-muted-foreground">/month</span>
                   )}
                 </p>
                 {Number(plan.price_yearly) > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    or {formatMoney(Number(plan.price_yearly))} billed yearly
+                    or {formatMoney(Number(plan.price_yearly), import.meta.env.VITE_PLATFORM_CURRENCY ?? "GBP")} billed yearly
                   </p>
                 )}
               </CardHeader>
