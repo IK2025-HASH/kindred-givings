@@ -25,7 +25,7 @@ import { formatMoney } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/app/qr")({
   head: () => ({
-    meta: [{ title: "QR Donation Boxes — Givewell" }],
+    meta: [{ title: "QR Donation Boxes — Donorbook" }],
   }),
   component: QrBoxesPage,
 });
@@ -55,11 +55,20 @@ function makeId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
-const STORAGE_KEY = "givewell_qr_boxes";
+const STORAGE_KEY = "donorbook_qr_boxes";
+const STORAGE_KEY_LEGACY = "givewell_qr_boxes";
 
 function loadBoxes(orgId: string): Box[] {
   try {
-    const raw = localStorage.getItem(`${STORAGE_KEY}_${orgId}`);
+    const key = `${STORAGE_KEY}_${orgId}`;
+    const legacyKey = `${STORAGE_KEY_LEGACY}_${orgId}`;
+    // Migrate from legacy key if present
+    const legacyRaw = localStorage.getItem(legacyKey);
+    if (legacyRaw && !localStorage.getItem(key)) {
+      localStorage.setItem(key, legacyRaw);
+      localStorage.removeItem(legacyKey);
+    }
+    const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];

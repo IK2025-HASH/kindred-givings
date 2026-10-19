@@ -11,8 +11,8 @@ import { useAuth } from "@/hooks/useAuth";
 export const Route = createFileRoute("/invite/$token")({
   head: () => ({
     meta: [
-      { title: "Accept invitation — Givewell" },
-      { name: "description", content: "Accept your invitation to join a charity workspace on Givewell." },
+      { title: "Accept invitation — Donorbook" },
+      { name: "description", content: "Accept your invitation to join a charity workspace on Donorbook." },
     ],
   }),
   component: InvitePage,
@@ -120,7 +120,7 @@ function InvitePage() {
               Ask the person who invited you to send a fresh link.
             </p>
             <Button asChild variant="outline" className="mt-2">
-              <Link to="/">Go to Givewell</Link>
+              <Link to="/">Go to Donorbook</Link>
             </Button>
           </CardContent>
         )}

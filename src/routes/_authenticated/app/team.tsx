@@ -39,7 +39,7 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/_authenticated/app/team")({
   head: () => ({
     meta: [
-      { title: "Team — Givewell workspace" },
+      { title: "Team — Donorbook workspace" },
       {
         name: "description",
         content: "Invite team members and manage roles for your charity workspace.",

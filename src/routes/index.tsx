@@ -6,7 +6,6 @@ import {
   Check,
   ChevronDown,
   Globe2,
-  Landmark,
   Megaphone,
   Minus,
   QrCode,
@@ -19,19 +18,20 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { MarketingShell } from "@/components/site/MarketingShell";
+import { usePlatformSettings } from "@/hooks/usePlatformSettings";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: `${import.meta.env.VITE_APP_NAME ?? "Givewell"} — donation management software for charities` },
+      { title: "Donorbook — donor management software for UK charities" },
       {
         name: "description",
         content:
           "Run your charity's fundraising in one place: donor records, campaigns, Gift Aid tracking, online giving pages and live reporting. Set up in minutes.",
       },
-      { property: "og:title", content: "Givewell — donation management for charities" },
+      { property: "og:title", content: "Donorbook — donor management for charities" },
       {
         property: "og:description",
         content:
@@ -45,21 +45,19 @@ export const Route = createFileRoute("/")({
 // ── Competitor comparison ─────────────────────────────────────────
 type CellValue = true | false | string;
 
-const COMPARISON_ROWS: { feature: string; givewell: CellValue; donorfy: CellValue; beacon: CellValue; spreadsheet: CellValue }[] = [
-  { feature: "Money goes direct to charity", givewell: true,    donorfy: true,       beacon: true,        spreadsheet: true },
-  { feature: "Platform donation fee",      givewell: "0%",      donorfy: "0%",       beacon: "0%",        spreadsheet: "0%" },
-  { feature: "UK Gift Aid tracking",      givewell: true,      donorfy: true,       beacon: true,        spreadsheet: "Manual" },
-  { feature: "Free plan available",       givewell: true,      donorfy: false,      beacon: false,       spreadsheet: true },
-  { feature: "Starting price",            givewell: "Free",    donorfy: "£69/mo",   beacon: "£45/mo",    spreadsheet: "Free" },
-  { feature: "Public giving page",        givewell: true,      donorfy: "Add-on",   beacon: false,       spreadsheet: false },
-  { feature: "QR donation boxes",         givewell: true,      donorfy: false,      beacon: false,       spreadsheet: false },
-  { feature: "Email campaigns",           givewell: true,      donorfy: true,       beacon: true,        spreadsheet: "Manual" },
-  { feature: "CRM / webhook integration", givewell: true,      donorfy: true,       beacon: true,        spreadsheet: false },
-  { feature: "CSV import & export",       givewell: true,      donorfy: true,       beacon: true,        spreadsheet: true },
-  { feature: "Campaign fundraising",      givewell: true,      donorfy: true,       beacon: true,        spreadsheet: false },
-  { feature: "Multi-charity accounts",    givewell: true,      donorfy: "Add-on",   beacon: false,       spreadsheet: false },
-  { feature: "Set up time",               givewell: "5 min",   donorfy: "Days",     beacon: "Hours",     spreadsheet: "—" },
-  { feature: "Onboarding required",       givewell: false,     donorfy: true,       beacon: true,        spreadsheet: false },
+const COMPARISON_ROWS: { feature: string; donorbook: CellValue; donorfy: CellValue; beacon: CellValue; spreadsheet: CellValue }[] = [
+  { feature: "UK Gift Aid tracking",      donorbook: true,     donorfy: true,       beacon: true,        spreadsheet: "Manual" },
+  { feature: "Free plan available",       donorbook: true,     donorfy: false,      beacon: false,       spreadsheet: true },
+  { feature: "Starting price",            donorbook: "Free",   donorfy: "£69/mo",   beacon: "£45/mo",    spreadsheet: "Free" },
+  { feature: "Public giving page",        donorbook: true,     donorfy: "Add-on",   beacon: false,       spreadsheet: false },
+  { feature: "QR donation boxes",         donorbook: true,     donorfy: false,      beacon: false,       spreadsheet: false },
+  { feature: "Email campaigns",           donorbook: true,     donorfy: true,       beacon: true,        spreadsheet: "Manual" },
+  { feature: "CRM / webhook integration", donorbook: true,     donorfy: true,       beacon: true,        spreadsheet: false },
+  { feature: "CSV import & export",       donorbook: true,     donorfy: true,       beacon: true,        spreadsheet: true },
+  { feature: "Campaign fundraising",      donorbook: true,     donorfy: true,       beacon: true,        spreadsheet: false },
+  { feature: "Multi-charity accounts",    donorbook: true,     donorfy: "Add-on",   beacon: false,       spreadsheet: false },
+  { feature: "Set up time",               donorbook: "5 min",  donorfy: "Days",     beacon: "Hours",     spreadsheet: "—" },
+  { feature: "Onboarding required",       donorbook: false,    donorfy: true,       beacon: true,        spreadsheet: false },
 ];
 
 function Cell({ value, highlight }: { value: CellValue; highlight?: boolean }) {
@@ -85,12 +83,8 @@ function Cell({ value, highlight }: { value: CellValue; highlight?: boolean }) {
 // ── FAQ ──────────────────────────────────────────────────────────
 const FAQS = [
   {
-    q: "Do donations go directly to the charity?",
-    a: "Yes — always. Givewell never holds, processes or touches donor money. When a supporter gives online, they pay into the charity's own payment account. We record the gift and send the receipt. That's where our involvement ends. There is no platform fee on donations and no holding period — the money arrives in the charity's account, not ours.",
-  },
-  {
-    q: "How does online card payment work?",
-    a: "Paste your own Stripe Payment Link (or any payment page URL) into Settings and a 'Pay by card' button appears on your giving page. The donor pays Stripe directly into your Stripe account. For all other gifts — bank transfer, cheque, cash — record them in Givewell once the payment has arrived.",
+    q: "Do you process card payments?",
+    a: "Donorbook doesn't take a cut of payments or hold funds. Instead, you paste your own Stripe Payment Link (or any payment page) into Settings and a 'Pay by card' button appears on your giving page — the money goes directly to your Stripe account. For other gifts (bank transfer, cheque, cash) you record them in Donorbook once received.",
   },
   {
     q: "Does it track Gift Aid?",
@@ -114,7 +108,7 @@ const FAQS = [
   },
   {
     q: "Can donors see their giving history?",
-    a: "Yes. After donating on your giving page, donors are invited to create a free Givewell account. Once signed in, they can see every gift they have made across all charities, including Gift Aid status and confirmation.",
+    a: "Yes. After donating on your giving page, donors are invited to create a free Donorbook account. Once signed in, they can see every gift they have made across all charities, including Gift Aid status and confirmation.",
   },
 ];
 
@@ -425,6 +419,7 @@ function QrBoxMockup() {
 
 // ── Home ─────────────────────────────────────────────────────────
 function Home() {
+  const settings = usePlatformSettings();
   return (
     <MarketingShell>
 
@@ -433,25 +428,15 @@ function Home() {
         <div className="mx-auto grid w-full max-w-6xl gap-12 px-4 py-20 lg:grid-cols-[1.1fr_1fr] lg:items-center">
           <div>
             <span className="inline-flex items-center rounded-full border border-navy-foreground/25 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
-              For charities worldwide
+              Built for UK charities
             </span>
-            <h1 className="mt-4 font-display text-4xl font-extrabold leading-tight sm:text-5xl">
+            <h1 className="mt-5 font-display text-4xl font-extrabold leading-tight sm:text-5xl">
               One place for every donor, gift and appeal
             </h1>
-            <div className="mt-4 rounded-lg bg-emerald-500 px-4 py-3 space-y-2">
-              <div className="flex items-center gap-2.5">
-                <Check className="size-4 shrink-0 text-white" />
-                <span className="text-sm font-bold text-white">Donations go direct to the charity — we never touch the money</span>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <Check className="size-4 shrink-0 text-white" />
-                <span className="text-sm font-bold text-white">0% commission on every donation — we never take a cut</span>
-              </div>
-            </div>
-            <p className="mt-4 max-w-xl text-base text-navy-foreground/80 sm:text-lg">
-              Donor records, Gift Aid tracking, fundraising campaigns and a public giving page — all in one place.
+            <p className="mt-5 max-w-xl text-lg text-navy-foreground/80">
+              {settings.app_name} replaces spreadsheets and scattered email threads with a clean workspace: donor records, Gift Aid tracking, fundraising campaigns and a public giving page — all connected.
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild size="lg">
                 <Link to="/auth" search={{ mode: "signup" }}>
                   Start free <ArrowRight className="size-4" />
@@ -463,13 +448,13 @@ function Home() {
                 variant="outline"
                 className="border-navy-foreground/30 bg-transparent text-navy-foreground hover:bg-navy-foreground/10 hover:text-navy-foreground"
               >
-                <Link to="/give/$slug" params={{ slug: import.meta.env.VITE_DEMO_SLUG ?? "sunrise-childrens-foundation" }}>
+                <Link to="/give/$slug" params={{ slug: "sunrise-childrens-foundation" }}>
                   See a live giving page
                 </Link>
               </Button>
             </div>
-            <p className="mt-4 text-sm text-navy-foreground/55">
-              Free plan available · Set up in under 5 minutes
+            <p className="mt-5 text-sm text-navy-foreground/55">
+              Free plan available · No credit card required · Set up in under 5 minutes
             </p>
           </div>
 
@@ -502,45 +487,8 @@ function Home() {
         <div className="mx-auto w-full max-w-6xl px-4 py-8">
           <p className="text-center text-sm font-medium text-muted-foreground">
             Most small charities manage donors in spreadsheets, record donations in separate files and
-            send thank-you letters by hand. Givewell connects all of that in one place.
+            send thank-you letters by hand. {settings.app_name} connects all of that in one place.
           </p>
-        </div>
-      </section>
-
-      {/* ── Direct-to-charity trust strip ── */}
-      <section className="border-b border-border bg-primary text-primary-foreground">
-        <div className="mx-auto w-full max-w-6xl px-4 py-12">
-          <div className="mb-8 text-center">
-            <p className="text-xs font-bold uppercase tracking-widest text-primary-foreground/60">How Givewell is different</p>
-            <h2 className="mt-2 font-display text-2xl font-extrabold">
-              Donations go straight to the charity. We never touch the money.
-            </h2>
-          </div>
-          <div className="grid gap-6 sm:grid-cols-3">
-            {[
-              {
-                icon: Landmark,
-                title: "Direct to your account",
-                body: "When a donor gives online, the money goes into the charity's own payment account — not ours. Givewell records the gift and sends the receipt. That's where our involvement ends.",
-              },
-              {
-                icon: ShieldCheck,
-                title: "No donation percentage",
-                body: "We charge a flat subscription. We take zero percent of any donation, ever. Every pound a donor gives arrives in full — no platform deduction on the way through.",
-              },
-              {
-                icon: Wallet,
-                title: "No FCA complexity",
-                body: "Because we never hold or process donor funds, we're not an e-money institution. Charities deal with their own payment provider directly, keeping the regulatory picture simple.",
-              },
-            ].map(({ icon: Icon, title, body }) => (
-              <div key={title} className="rounded-xl bg-primary-foreground/10 p-6">
-                <Icon className="size-6 text-primary-foreground/70" />
-                <h3 className="mt-3 font-display text-lg font-bold">{title}</h3>
-                <p className="mt-2 text-sm text-primary-foreground/75 leading-relaxed">{body}</p>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -652,7 +600,6 @@ function Home() {
             title="A public giving page that's yours to share"
             desc="Every charity gets a hosted giving page with your story, campaign progress and a donation form. No web developer needed."
             bullets={[
-              "Donations go directly to your charity — we never hold or process donor funds",
               "Your URL: /give/your-charity-name — share it anywhere",
               "Shows total raised, number of supporters and a recent supporters wall",
               "Donors can choose a suggested amount or type their own",
@@ -758,7 +705,7 @@ function Home() {
             </span>
             <h3 className="mt-4 font-display text-2xl font-bold">Manage multiple charities</h3>
             <p className="mt-3 text-muted-foreground">
-              Running more than one charity? Each has its own private workspace, its own team, its own giving page and its own data — all accessible under a single Givewell login. Switch between them from the sidebar.
+              Running more than one charity? Each has its own private workspace, its own team, its own giving page and its own data — all accessible under a single {settings.app_name} login. Switch between them from the sidebar.
             </p>
           </div>
         </div>
@@ -815,69 +762,6 @@ function Home() {
         </div>
       </section>
 
-      {/* ── Roadmap ── */}
-      <section className="border-b border-border bg-muted/30">
-        <div className="mx-auto w-full max-w-6xl px-4 py-16">
-          <div className="text-center mb-10">
-            <span className="inline-flex items-center rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Roadmap
-            </span>
-            <h2 className="mt-3 font-display text-2xl font-extrabold">What's coming next</h2>
-            <p className="mt-2 text-sm text-muted-foreground max-w-xl mx-auto">
-              Givewell is growing fast. Here's what we're building — free plan users keep everything they have today.
-            </p>
-          </div>
-          <div className="grid gap-6 sm:grid-cols-2">
-            {/* MVP1 */}
-            <div className="rounded-xl border border-border bg-background p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">MVP 1 · Coming soon</span>
-              </div>
-              <p className="font-display text-lg font-bold mb-4">Android mobile app</p>
-              <ul className="space-y-2.5">
-                {[
-                  "Native Android app (.apk) for charity staff and donors",
-                  "Full giving flow — browse, donate, and track campaigns on mobile",
-                  "Push notifications for new donations and campaign milestones",
-                  "In-person QR code scanner for event donations",
-                  "Offline-capable: queue donations and sync when back online",
-                ].map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <Check className="size-3.5 shrink-0 text-primary mt-0.5" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            {/* MVP2 */}
-            <div className="rounded-xl border border-border bg-background p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground border border-border">MVP 2 · Partner tier</span>
-              </div>
-              <p className="font-display text-lg font-bold mb-4">Partner & white-label</p>
-              <ul className="space-y-2.5">
-                {[
-                  "Full white-label — your brand, your domain, zero Givewell branding",
-                  "Custom domain for giving pages (give.yourcharity.org)",
-                  "Branded mobile app with your logo and colour scheme",
-                  "Recurring giving & standing order management",
-                  "Automated Gift Aid claim submissions to HMRC",
-                  "Multi-charity federation — one login, many workspaces",
-                  "Advanced reporting & donor segmentation",
-                  "Paid REST API — integrate Givewell data into your own systems",
-                  "Dedicated partner onboarding & SLA",
-                ].map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <Check className="size-3.5 shrink-0 text-muted-foreground mt-0.5" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* ── Competitor comparison ── */}
       <section className="mx-auto w-full max-w-5xl px-4 py-20">
         <div className="text-center">
@@ -885,10 +769,10 @@ function Home() {
             How we compare
           </span>
           <h2 className="mt-4 font-display text-3xl font-bold">
-            Built for charities — at a fraction of the cost
+            Built for UK charities — at a fraction of the cost
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-            Donorfy and Beacon are powerful but pricey and complex. Spreadsheets are free but fragile. {import.meta.env.VITE_APP_NAME ?? "Givewell"} sits in the sweet spot: purpose-built for small charities, set up in minutes, free to start.
+            Donorfy and Beacon are powerful but pricey and complex. Spreadsheets are free but fragile. {settings.app_name} sits in the sweet spot: purpose-built for small UK charities, set up in minutes, free to start.
           </p>
         </div>
 
@@ -900,7 +784,7 @@ function Home() {
                 <th className="py-4 pl-6 pr-4 text-left font-semibold text-foreground w-[38%]">Feature</th>
                 <th className="px-4 py-4 text-center font-bold text-primary w-[16%]">
                   <div className="flex flex-col items-center gap-1">
-                    <span className="rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">Givewell</span>
+                    <span className="rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">{settings.app_name}</span>
                   </div>
                 </th>
                 <th className="px-4 py-4 text-center font-medium text-muted-foreground w-[16%]">Donorfy</th>
@@ -917,7 +801,7 @@ function Home() {
                   <td className="py-3.5 pl-6 pr-4 font-medium text-foreground">{row.feature}</td>
                   <td className="px-4 py-3.5 text-center">
                     <div className="flex justify-center">
-                      <Cell value={row.givewell} highlight />
+                      <Cell value={row.donorbook} highlight />
                     </div>
                   </td>
                   <td className="px-4 py-3.5 text-center">
@@ -949,7 +833,7 @@ function Home() {
               <div className="grid grid-cols-2 gap-2">
                 {(
                   [
-                    { label: "Givewell", value: row.givewell, highlight: true },
+                    { label: settings.app_name, value: row.donorbook, highlight: true },
                     { label: "Donorfy", value: row.donorfy },
                     { label: "Beacon", value: row.beacon },
                     { label: "Spreadsheet", value: row.spreadsheet },
@@ -996,7 +880,7 @@ function Home() {
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline">
-              <Link to="/give/$slug" params={{ slug: import.meta.env.VITE_DEMO_SLUG ?? "sunrise-childrens-foundation" }}>
+              <Link to="/give/$slug" params={{ slug: "sunrise-childrens-foundation" }}>
                 View demo giving page
               </Link>
             </Button>

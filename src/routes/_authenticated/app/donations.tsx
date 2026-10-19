@@ -39,12 +39,12 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/_authenticated/app/donations")({
   head: () => ({
     meta: [
-      { title: "Donations — Givewell workspace" },
+      { title: "Donations — Donorbook workspace" },
       {
         name: "description",
         content: "Record gifts, confirm online donations and export your giving history.",
       },
-      { property: "og:title", content: "Donation records in Givewell" },
+      { property: "og:title", content: "Donation records in Donorbook" },
       { property: "og:description", content: "Record, confirm and export donations." },
     ],
   }),

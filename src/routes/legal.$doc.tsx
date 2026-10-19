@@ -1,29 +1,28 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { MarketingShell } from "@/components/site/MarketingShell";
+import { usePlatformSettings } from "@/hooks/usePlatformSettings";
 
 const CURRENT_VERSION = "2025-09";
-const COMPANY = "Givewell";
-const COMPANY_EMAIL = "legal@givewell.charity";
-const COMPANY_ADDRESS = "Givewell, England, United Kingdom";
 const GOVERNING_LAW = "England and Wales";
 
 type DocId = "terms" | "privacy" | "data-retention";
+type LegalProps = { company: string; email: string; address: string };
 
-const DOCS: Record<DocId, { title: string; subtitle: string; content: () => JSX.Element }> = {
+const DOCS: Record<DocId, { title: string; subtitle: string; content: (p: LegalProps) => JSX.Element }> = {
   terms: {
     title: "Terms of Service",
     subtitle: `Effective ${CURRENT_VERSION} · Version ${CURRENT_VERSION}`,
-    content: TermsContent,
+    content: (p) => <TermsContent {...p} />,
   },
   privacy: {
     title: "Privacy Policy",
     subtitle: `Effective ${CURRENT_VERSION} · Compliant with UK GDPR`,
-    content: PrivacyContent,
+    content: (p) => <PrivacyContent {...p} />,
   },
   "data-retention": {
     title: "Data Retention Policy",
     subtitle: `Effective ${CURRENT_VERSION} · Includes HMRC Gift Aid requirements`,
-    content: DataRetentionContent,
+    content: (p) => <DataRetentionContent {...p} />,
   },
 };
 
@@ -32,7 +31,7 @@ export const Route = createFileRoute("/legal/$doc")({
     const doc = DOCS[params.doc as DocId];
     return {
       meta: [
-        { title: doc ? `${doc.title} — Givewell` : "Legal — Givewell" },
+        { title: doc ? `${doc.title} — Donorbook` : "Legal — Donorbook" },
       ],
     };
   },
@@ -41,11 +40,16 @@ export const Route = createFileRoute("/legal/$doc")({
 
 function LegalPage() {
   const { doc: docId } = Route.useParams();
+  const settings = usePlatformSettings();
   const doc = DOCS[docId as DocId];
 
   if (!doc) throw notFound();
 
-  const Content = doc.content;
+  const legalProps: LegalProps = {
+    company: settings.company_name,
+    email: settings.legal_email,
+    address: settings.company_address,
+  };
 
   return (
     <MarketingShell>
@@ -77,15 +81,15 @@ function LegalPage() {
         </div>
 
         <div className="prose prose-sm max-w-none [&_h2]:font-display [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-10 [&_h2]:mb-3 [&_h3]:font-semibold [&_h3]:mt-6 [&_h3]:mb-2 [&_p]:text-muted-foreground [&_p]:leading-relaxed [&_ul]:text-muted-foreground [&_li]:leading-relaxed [&_strong]:text-foreground">
-          <Content />
+          {doc.content(legalProps)}
         </div>
 
         <div className="mt-16 rounded-xl border border-border bg-muted/40 px-6 py-5">
           <p className="text-sm font-medium">Questions or requests?</p>
           <p className="mt-1 text-sm text-muted-foreground">
             Contact us at{" "}
-            <a href={`mailto:${COMPANY_EMAIL}`} className="font-medium text-foreground underline underline-offset-2">
-              {COMPANY_EMAIL}
+            <a href={`mailto:${legalProps.email}`} className="font-medium text-foreground underline underline-offset-2">
+              {legalProps.email}
             </a>
             {" "}for any data, privacy, or legal enquiries.
           </p>
@@ -97,7 +101,7 @@ function LegalPage() {
 
 /* ─── Terms of Service ─────────────────────────────────────────────────── */
 
-function TermsContent() {
+function TermsContent({ company: COMPANY, email: COMPANY_EMAIL, address: COMPANY_ADDRESS }: LegalProps) {
   return (
     <>
       <h2>1. Acceptance of Terms</h2>
@@ -209,7 +213,7 @@ function TermsContent() {
 
 /* ─── Privacy Policy ───────────────────────────────────────────────────── */
 
-function PrivacyContent() {
+function PrivacyContent({ company: COMPANY, email: COMPANY_EMAIL, address: _address }: LegalProps) {
   return (
     <>
       <h2>1. Who We Are</h2>
@@ -312,7 +316,7 @@ function PrivacyContent() {
 
 /* ─── Data Retention Policy ────────────────────────────────────────────── */
 
-function DataRetentionContent() {
+function DataRetentionContent({ company: COMPANY, email: COMPANY_EMAIL, address: _address }: LegalProps) {
   return (
     <>
       <h2>1. Purpose</h2>

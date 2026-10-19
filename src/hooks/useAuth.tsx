@@ -39,7 +39,8 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-const ORG_KEY = "givewell.currentOrg";
+const ORG_KEY = "donorbook.currentOrg";
+const ORG_KEY_LEGACY = "givewell.currentOrg";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -56,6 +57,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(data.session);
       setLoading(false);
     });
+    // Migrate from legacy key if present
+    const legacyValue = localStorage.getItem(ORG_KEY_LEGACY);
+    if (legacyValue && !localStorage.getItem(ORG_KEY)) {
+      localStorage.setItem(ORG_KEY, legacyValue);
+      localStorage.removeItem(ORG_KEY_LEGACY);
+    }
     setOrgId(localStorage.getItem(ORG_KEY));
     return () => sub.subscription.unsubscribe();
   }, []);

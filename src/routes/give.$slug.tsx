@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, CreditCard, Heart, HeartHandshake, MapPin, Share2, Users } from "lucide-react";
+import { CheckCircle2, Heart, HeartHandshake, MapPin, Share2, Users } from "lucide-react";
 import QRCode from "react-qr-code";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,22 +13,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { submitPublicDonation } from "@/lib/public-donations.functions";
-import { createDonationCheckout } from "@/lib/stripe.functions";
 import { formatDate, formatMoney } from "@/lib/format";
 import { useAuth } from "@/hooks/useAuth";
+import { usePlatformSettings } from "@/hooks/usePlatformSettings";
 
 export const Route = createFileRoute("/give/$slug")({
   validateSearch: (s: Record<string, unknown>) => ({
     loc: typeof s["loc"] === "string" ? s["loc"] : undefined,
-    payment: typeof s["payment"] === "string" ? s["payment"] : undefined,
-    session_id: typeof s["session_id"] === "string" ? s["session_id"] : undefined,
   }),
   head: ({ params }) => ({
     meta: [
-      { title: `Donate — ${params.slug.replace(/-/g, " ")} on ${import.meta.env.VITE_APP_NAME ?? "Givewell"}` },
+      { title: `Donate — ${params.slug.replace(/-/g, " ")} on Donorbook` },
       {
         name: "description",
-        content: "Support this charity with a one-off or regular gift through its Givewell page.",
+        content: "Support this charity with a one-off or regular gift through its Donorbook page.",
       },
       { property: "og:title", content: "Support this charity" },
       {
@@ -68,8 +66,9 @@ function youtubeEmbed(url: string) {
 
 function GivePage() {
   const { slug } = Route.useParams();
-  const { loc, payment } = Route.useSearch();
+  const { loc } = Route.useSearch();
   const { user } = useAuth();
+  const settings = usePlatformSettings();
   const pageUrl = typeof window !== "undefined" ? window.location.href.split("?")[0] : "";
 
   const [amount, setAmount] = useState<number | "">("");
@@ -80,10 +79,8 @@ function GivePage() {
   const [giftAid, setGiftAid] = useState(false);
   const [anonymous, setAnonymous] = useState(false);
   const [recurring, setRecurring] = useState(false);
-  // done=true when bank-transfer pledge submitted OR stripe payment succeeded
-  const [done, setDone] = useState(payment === "success");
+  const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [stripeBusy, setStripeBusy] = useState(false);
 
   const orgQuery = useQuery({
     queryKey: ["public-org", slug],
@@ -100,6 +97,7 @@ function GivePage() {
   });
 
   const org = orgQuery.data;
+  const orgExt = org as unknown as Record<string, unknown>;
 
   const campaignsQuery = useQuery({
     queryKey: ["public-campaigns", org?.id],
@@ -185,34 +183,6 @@ function GivePage() {
     }
   }
 
-  async function payByStripe() {
-    if (!amount || Number(amount) <= 0) {
-      toast.error("Please choose an amount first");
-      return;
-    }
-    setStripeBusy(true);
-    try {
-      const { url } = await createDonationCheckout({
-        data: {
-          slug,
-          amount: Number(amount),
-          campaignId: campaignId ?? undefined,
-          donorName: anonymous ? undefined : (name || undefined),
-          donorEmail: email || undefined,
-          message: message || undefined,
-          giftAid,
-          anonymous,
-          recurring,
-          sourceLocation: loc || undefined,
-        },
-      });
-      window.location.href = url;
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not start card payment");
-      setStripeBusy(false);
-    }
-  }
-
   if (orgQuery.isLoading) {
     return (
       <div className="mx-auto max-w-5xl space-y-4 p-8">
@@ -232,7 +202,7 @@ function GivePage() {
           currently active.
         </p>
         <Link to="/" className="text-sm underline underline-offset-2">
-          Go to Givewell home
+          Go to {settings.app_name} home
         </Link>
       </div>
     );
@@ -247,8 +217,8 @@ function GivePage() {
   const campaignRaised = campaignStatsQuery.data ?? {};
   const supportersList = supportersQuery.data ?? [];
 
-  // Media: banner_url if set via Settings
-  const mediaUrl = org?.banner_url ?? "";
+  // Media: banner_url or media_url field if set via Settings
+  const mediaUrl = String(orgExt.banner_url ?? orgExt.media_url ?? "");
   const hasMedia = mediaUrl.length > 0;
   const embedUrl = hasMedia && isYouTube(mediaUrl) ? youtubeEmbed(mediaUrl) : null;
 
@@ -496,49 +466,12 @@ function GivePage() {
           {/* Donation form */}
           <Card className="shadow-lift">
             {done ? (
-              <CardContent className="space-y-4 py-10 text-center">
+              <CardContent className="space-y-4 py-12 text-center">
                 <CheckCircle2 className="mx-auto size-12 text-success" />
                 <h2 className="font-display text-2xl font-bold">Thank you!</h2>
                 <p className="text-sm text-muted-foreground">
-                  {payment === "success"
-                    ? `Your card payment to ${org.name} was successful. The funds are on their way.`
-                    : <>
-                        Your pledge of{" "}
-                        <strong>
-                          {typeof amount === "number"
-                            ? new Intl.NumberFormat(undefined, { style: "currency", currency: org.currency.toUpperCase() }).format(amount)
-                            : ""}
-                        </strong>{" "}
-                        has been recorded. {org.name} will be in touch to confirm receipt.
-                      </>}
+                  Your pledge has been sent to {org.name}. They will confirm it shortly.
                 </p>
-                {org.bank_account_number && (
-                  <div className="rounded-lg border border-border bg-muted/40 px-4 py-4 text-left space-y-2">
-                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Bank transfer details</p>
-                    {org.bank_account_name && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Account name</span>
-                        <span className="font-medium">{org.bank_account_name}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Account / IBAN</span>
-                      <span className="font-medium font-mono">{org.bank_account_number}</span>
-                    </div>
-                    {org.bank_sort_code && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Sort code / BIC</span>
-                        <span className="font-medium font-mono">{org.bank_sort_code}</span>
-                      </div>
-                    )}
-                    {org.bank_reference_hint && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Reference</span>
-                        <span className="font-medium">{org.bank_reference_hint}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
                 <Button variant="outline" className="w-full" onClick={() => setDone(false)}>
                   Make another gift
                 </Button>
@@ -566,9 +499,9 @@ function GivePage() {
               <>
                 <CardHeader className="pb-3">
                   <CardTitle className="font-display text-xl">Make a donation</CardTitle>
-                  {org.payment_link_url && (
+                  {(orgExt.payment_link_url as string) && (
                     <a
-                      href={org.payment_link_url}
+                      href={String(orgExt.payment_link_url)}
                       target="_blank"
                       rel="noreferrer"
                       className="mt-2 flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
@@ -719,22 +652,8 @@ function GivePage() {
                     </div>
 
                     <Button type="submit" size="lg" className="w-full" disabled={busy}>
-                      {busy ? "Sending…" : "Pledge via bank transfer"}
+                      {busy ? "Sending…" : `Give now`}
                     </Button>
-
-                    {org.stripe_onboarding_complete && (
-                      <Button
-                        type="button"
-                        size="lg"
-                        variant="outline"
-                        className="w-full gap-2"
-                        onClick={() => void payByStripe()}
-                        disabled={stripeBusy}
-                      >
-                        <CreditCard className="size-4" />
-                        {stripeBusy ? "Redirecting to payment…" : "Pay by card instantly"}
-                      </Button>
-                    )}
                   </form>
                 </CardContent>
               </>
@@ -775,9 +694,9 @@ function GivePage() {
       <footer className="border-t border-border py-6 text-center text-xs text-muted-foreground">
         Powered by{" "}
         <Link to="/" className="underline underline-offset-2">
-          {import.meta.env.VITE_APP_NAME ?? "Givewell"}
+          {settings.app_name}
         </Link>{" "}
-        · Donation management for charities
+        · {settings.app_tagline}
       </footer>
     </div>
   );

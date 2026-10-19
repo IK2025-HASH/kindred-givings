@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthProvider } from "@/hooks/useAuth";
+import { PlatformSettingsProvider } from "@/hooks/usePlatformSettings";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -80,13 +81,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Givewell — donation management for charities" },
+      { title: "Donorbook — donor management for charities" },
       {
         name: "description",
         content:
-          "Givewell is a multi-charity donation management platform: donors, campaigns, giving pages and reporting in one place.",
+          "Donorbook is a multi-charity donor management platform: donors, campaigns, giving pages and reporting in one place.",
       },
-      { property: "og:title", content: "Givewell — donation management for charities" },
+      { property: "og:title", content: "Donorbook — donor management for charities" },
       {
         property: "og:description",
         content: "Donors, campaigns, giving pages and reporting in one place.",
@@ -141,11 +142,13 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
-        <Toaster />
-      </AuthProvider>
+      <PlatformSettingsProvider>
+        <AuthProvider>
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <Outlet />
+          <Toaster />
+        </AuthProvider>
+      </PlatformSettingsProvider>
     </QueryClientProvider>
   );
 }

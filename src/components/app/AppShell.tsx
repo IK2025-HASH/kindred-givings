@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
+import { usePlatformSettings } from "@/hooks/usePlatformSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { slugify } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -73,13 +74,14 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 
 function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
   const { memberships, currentOrg, setCurrentOrgId, isPlatformAdmin } = useAuth();
+  const settings = usePlatformSettings();
   return (
     <div className="flex h-full flex-col gap-6 bg-sidebar p-4 text-sidebar-foreground">
       <Link to="/app" onClick={onNavigate} className="flex items-center gap-2">
         <span className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
           <HeartHandshake className="size-4" />
         </span>
-        <span className="font-display text-lg font-extrabold tracking-tight">Givewell</span>
+        <span className="font-display text-lg font-extrabold tracking-tight">{settings.app_name}</span>
       </Link>
 
       {currentOrg && (

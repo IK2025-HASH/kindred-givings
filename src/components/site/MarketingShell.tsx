@@ -3,8 +3,10 @@ import { HeartHandshake } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { usePlatformSettings } from "@/hooks/usePlatformSettings";
 
 export function Logo({ inverted = false }: { inverted?: boolean }) {
+  const settings = usePlatformSettings();
   return (
     <span className="inline-flex items-center gap-2 font-display text-lg font-extrabold tracking-tight">
       <span
@@ -16,13 +18,14 @@ export function Logo({ inverted = false }: { inverted?: boolean }) {
       >
         <HeartHandshake className="size-4" />
       </span>
-      Givewell
+      {settings.app_name}
     </span>
   );
 }
 
 export function MarketingShell({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const settings = usePlatformSettings();
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -74,7 +77,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
               </Link>
             </nav>
             <p className="text-sm text-navy-foreground/50">
-              © {new Date().getFullYear()} Givewell. Donation management for charities.
+              © {new Date().getFullYear()} {settings.company_name}. {settings.app_tagline}.
             </p>
           </div>
         </div>

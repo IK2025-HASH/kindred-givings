@@ -17,6 +17,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/hooks/useAuth";
+import { usePlatformSettingsQuery } from "@/hooks/usePlatformSettings";
+import { DEFAULTS, type PlatformSettings } from "@/lib/platform-settings.functions";
 import { formatDate, formatMoney } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -33,8 +35,8 @@ export const Route = createFileRoute("/_authenticated/app/admin")({
   },
   head: () => ({
     meta: [
-      { title: "Platform Admin — Givewell" },
-      { name: "description", content: "Platform administration for Givewell." },
+      { title: "Platform Admin — Donorbook" },
+      { name: "description", content: "Platform administration for Donorbook." },
     ],
   }),
   component: AdminPage,
@@ -50,6 +52,87 @@ type OrgRow = {
   donation_total: number;
   created_at: string;
 };
+
+const SETTING_LABELS: Record<keyof PlatformSettings, string> = {
+  app_name: "App name",
+  app_tagline: "Tagline",
+  app_url: "App URL",
+  support_email: "Support email",
+  from_email: "Sending email (noreply)",
+  legal_email: "Legal email",
+  company_name: "Legal company name",
+  company_address: "Company address",
+  platform_currency: "Default currency",
+  demo_slug: "Demo org slug",
+};
+
+function PlatformSettingsSection() {
+  const { data: settings, refetch } = usePlatformSettingsQuery();
+  const current = settings ?? DEFAULTS;
+  const [editing, setEditing] = useState<Partial<PlatformSettings>>({});
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    setBusy(true);
+    try {
+      const entries = Object.entries(editing) as [keyof PlatformSettings, string][];
+      for (const [key, value] of entries) {
+        const { error } = await supabase
+          .from("platform_settings")
+          .upsert({ key, value, updated_at: new Date().toISOString() });
+        if (error) throw error;
+      }
+      toast.success("Platform settings saved");
+      setEditing({});
+      void refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save settings");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const keys = Object.keys(DEFAULTS) as (keyof PlatformSettings)[];
+  const hasChanges = Object.keys(editing).length > 0;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Platform settings</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          {keys.map((key) => (
+            <div key={key} className="space-y-1.5">
+              <Label htmlFor={`ps-${key}`}>{SETTING_LABELS[key]}</Label>
+              <Input
+                id={`ps-${key}`}
+                value={editing[key] ?? current[key]}
+                onChange={(e) =>
+                  setEditing((prev) => ({ ...prev, [key]: e.target.value }))
+                }
+              />
+            </div>
+          ))}
+        </div>
+        {hasChanges && (
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="ghost"
+              onClick={() => setEditing({})}
+              disabled={busy}
+            >
+              Discard
+            </Button>
+            <Button onClick={() => void save()} disabled={busy}>
+              Save changes
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function AdminPage() {
   const { user } = useAuth();
@@ -82,19 +165,6 @@ function AdminPage() {
         .from("platform_admins")
         .select("user_id, created_at, profiles:user_id(email, full_name)")
         .order("created_at");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  const growthQuery = useQuery({
-    queryKey: ["admin-growth"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("platform_daily_metrics")
-        .select("*")
-        .order("report_date", { ascending: false })
-        .limit(30);
       if (error) throw error;
       return data ?? [];
     },
@@ -171,7 +241,7 @@ function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Platform Admin" description="Givewell platform management." />
+      <PageHeader title="Platform Admin" description="Donorbook platform management." />
 
       <div className="grid gap-4 sm:grid-cols-3">
         {[
@@ -189,57 +259,6 @@ function AdminPage() {
           </Card>
         ))}
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Platform growth — daily snapshot</CardTitle>
-        </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead className="text-right">Orgs (new)</TableHead>
-                <TableHead className="text-right">Orgs total</TableHead>
-                <TableHead className="text-right">Donations (new)</TableHead>
-                <TableHead className="text-right">Raised today</TableHead>
-                <TableHead className="text-right">Total raised</TableHead>
-                <TableHead className="text-right hidden sm:table-cell">Donors</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(growthQuery.data ?? []).map((row) => (
-                <TableRow key={row.report_date}>
-                  <TableCell className="font-medium tabular-nums">{row.report_date}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {row.new_orgs_today > 0
-                      ? <span className="text-emerald-600 font-semibold">+{row.new_orgs_today}</span>
-                      : <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{row.total_orgs}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {row.new_donations_today > 0
-                      ? <span className="text-emerald-600 font-semibold">+{row.new_donations_today}</span>
-                      : <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums font-semibold">
-                    {Number(row.raised_today) > 0 ? formatMoney(Number(row.raised_today)) : <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{formatMoney(Number(row.total_raised))}</TableCell>
-                  <TableCell className="text-right tabular-nums hidden sm:table-cell">{row.unique_donors}</TableCell>
-                </TableRow>
-              ))}
-              {(growthQuery.data ?? []).length === 0 && !growthQuery.isLoading && (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
-                    No data yet — first row will appear at 09:00 UTC tomorrow.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
@@ -365,6 +384,8 @@ function AdminPage() {
           </div>
         </CardContent>
       </Card>
+
+      <PlatformSettingsSection />
     </div>
   );
 }

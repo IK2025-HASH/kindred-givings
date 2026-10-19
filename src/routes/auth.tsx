@@ -19,12 +19,12 @@ export const Route = createFileRoute("/auth")({
   }),
   head: () => ({
     meta: [
-      { title: "Sign in — Givewell" },
+      { title: "Sign in — Donorbook" },
       {
         name: "description",
-        content: "Sign in to your Givewell charity workspace or create a new one.",
+        content: "Sign in to your Donorbook charity workspace or create a new one.",
       },
-      { property: "og:title", content: "Sign in to Givewell" },
+      { property: "og:title", content: "Sign in to Donorbook" },
       { property: "og:description", content: "Access your charity's donation workspace." },
     ],
   }),
@@ -101,7 +101,7 @@ function AuthPage() {
             Create your charity workspace, invite your team and start recording donations today.
           </p>
         </div>
-        <p className="text-xs text-navy-foreground/50">© {new Date().getFullYear()} Givewell</p>
+        <p className="text-xs text-navy-foreground/50">© {new Date().getFullYear()} Donorbook</p>
       </div>
 
       <div className="flex items-center justify-center bg-background px-4 py-12">

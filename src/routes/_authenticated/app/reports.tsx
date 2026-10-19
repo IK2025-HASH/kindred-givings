@@ -13,12 +13,12 @@ import { downloadCsv, formatMoney } from "@/lib/format";
 export const Route = createFileRoute("/_authenticated/app/reports")({
   head: () => ({
     meta: [
-      { title: "Reports — Givewell workspace" },
+      { title: "Reports — Donorbook workspace" },
       {
         name: "description",
         content: "Filter giving by date, compare campaigns and methods, and export the numbers.",
       },
-      { property: "og:title", content: "Fundraising reports in Givewell" },
+      { property: "og:title", content: "Fundraising reports in Donorbook" },
       { property: "og:description", content: "Giving by campaign, method and top donors." },
     ],
   }),

@@ -19,7 +19,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const FROM_EMAIL = Deno.env.get("FROM_EMAIL") ?? "noreply@givewell.app";
+const FROM_EMAIL = Deno.env.get("FROM_EMAIL") ?? "noreply@donorbook.co.uk";
+const APP_NAME = Deno.env.get("APP_NAME") ?? "Donorbook";
 
 Deno.serve(async (req) => {
   try {
@@ -55,10 +56,10 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ skipped: "no contact email" }), { status: 200 });
     }
 
-    const currency = org.currency ?? "GBP";
-    const amount = new Intl.NumberFormat("en-GB", {
-      style: "currency",
-      currency,
+    const currency = org.currency ?? undefined;
+    const amount = new Intl.NumberFormat(undefined, {
+      style: currency ? "currency" : "decimal",
+      ...(currency ? { currency } : {}),
       maximumFractionDigits: 0,
     }).format(Number(donation.amount));
 
@@ -68,15 +69,15 @@ Deno.serve(async (req) => {
     const messageLine = donation.message ? `\n\nTheir message: "${donation.message}"` : "";
 
     const emailBody = `
-A new donation has been received on your Givewell giving page.
+A new donation has been received on your ${APP_NAME} giving page.
 
 Donor: ${donorLine}
 Amount: ${amount}${giftAidLine}${recurringLine}${messageLine}
 
-This donation is pending — please confirm it in your Givewell dashboard:
+This donation is pending — please confirm it in your ${APP_NAME} dashboard:
 ${SUPABASE_URL.replace(".supabase.co", ".app")}/app/donations
 
-— Givewell
+— ${APP_NAME}
     `.trim();
 
     if (!RESEND_API_KEY) {

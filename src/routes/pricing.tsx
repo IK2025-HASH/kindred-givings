@@ -11,13 +11,13 @@ import { formatMoney } from "@/lib/format";
 export const Route = createFileRoute("/pricing")({
   head: () => ({
     meta: [
-      { title: "Pricing — Givewell donation management" },
+      { title: "Pricing — Donorbook" },
       {
         name: "description",
         content:
           "Simple monthly plans for charities of every size, with limits on team members, donors and campaigns.",
       },
-      { property: "og:title", content: "Givewell pricing" },
+      { property: "og:title", content: "Donorbook pricing" },
       {
         property: "og:description",
         content: "Simple monthly plans for charities of every size.",
@@ -67,14 +67,14 @@ function Pricing() {
                 <p className="mt-4 font-display text-4xl font-extrabold">
                   {Number(plan.price_monthly) === 0
                     ? "Free"
-                    : formatMoney(Number(plan.price_monthly), import.meta.env.VITE_PLATFORM_CURRENCY ?? "GBP")}
+                    : formatMoney(Number(plan.price_monthly))}
                   {Number(plan.price_monthly) > 0 && (
                     <span className="text-base font-medium text-muted-foreground">/month</span>
                   )}
                 </p>
                 {Number(plan.price_yearly) > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    or {formatMoney(Number(plan.price_yearly), import.meta.env.VITE_PLATFORM_CURRENCY ?? "GBP")} billed yearly
+                    or {formatMoney(Number(plan.price_yearly))} billed yearly
                   </p>
                 )}
               </CardHeader>

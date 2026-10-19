@@ -13,12 +13,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/hooks/useAuth";
+import { usePlatformSettings } from "@/hooks/usePlatformSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate, formatMoney } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/my-giving")({
   head: () => ({
-    meta: [{ title: `My giving — ${import.meta.env.VITE_APP_NAME ?? "Givewell"}` }],
+    meta: [{ title: "My giving — Donorbook" }],
   }),
   component: MyGivingPage,
 });
@@ -39,6 +40,7 @@ type GiftRow = {
 
 function MyGivingPage() {
   const { user, memberships, signOut } = useAuth();
+  const settings = usePlatformSettings();
   const navigate = useNavigate();
 
   const historyQuery = useQuery({
@@ -63,7 +65,7 @@ function MyGivingPage() {
             <span className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <HeartHandshake className="size-4" />
             </span>
-            <span className="font-display text-lg font-extrabold tracking-tight">{import.meta.env.VITE_APP_NAME ?? "Givewell"}</span>
+            <span className="font-display text-lg font-extrabold tracking-tight">{settings.app_name}</span>
           </Link>
           <div className="flex items-center gap-3">
             {memberships.length > 0 && (
@@ -92,7 +94,7 @@ function MyGivingPage() {
         <div>
           <h1 className="font-display text-2xl font-bold">My giving</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            All donations you have made through {import.meta.env.VITE_APP_NAME ?? "Givewell"}, matched to {user?.email}.
+            All donations you have made through {settings.app_name}, matched to {user?.email}.
           </p>
         </div>
 
@@ -103,7 +105,7 @@ function MyGivingPage() {
                 Total given
               </p>
               <p className="mt-2 font-display text-2xl font-bold">
-                {formatMoney(total)}
+                {formatMoney(total, settings.platform_currency || undefined)}
               </p>
             </CardContent>
           </Card>
@@ -150,7 +152,7 @@ function MyGivingPage() {
                       </a>
                     </TableCell>
                     <TableCell className="font-semibold">
-                      {formatMoney(Number(d.amount), d.org_currency ?? undefined)}
+                      {formatMoney(Number(d.amount), d.org_currency || "GBP")}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
                       {d.gift_aid ? <Badge variant="secondary">Gift Aid</Badge> : "—"}

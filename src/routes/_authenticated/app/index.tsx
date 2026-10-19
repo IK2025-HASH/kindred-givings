@@ -21,12 +21,12 @@ import { formatDate, formatMoney } from "@/lib/format";
 export const Route = createFileRoute("/_authenticated/app/")({
   head: () => ({
     meta: [
-      { title: "Dashboard — Givewell workspace" },
+      { title: "Dashboard — Donorbook workspace" },
       {
         name: "description",
         content: "Track money raised, donors, average gift and campaign progress for your charity.",
       },
-      { property: "og:title", content: "Givewell charity dashboard" },
+      { property: "og:title", content: "Donorbook charity dashboard" },
       { property: "og:description", content: "Money raised, donors and campaign progress." },
     ],
   }),
@@ -83,7 +83,7 @@ function Dashboard() {
       if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + d.amount);
     }
     return [...buckets.entries()].map(([key, total]) => ({
-      month: new Date(`${key}-01`).toLocaleDateString(undefined, { month: "short" }),
+      month: new Date(`${key}-01`).toLocaleDateString("en-GB", { month: "short" }),
       total,
     }));
   }, [rows]);
