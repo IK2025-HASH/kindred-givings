@@ -183,7 +183,12 @@ function CreateOrg() {
       refreshMemberships();
       toast.success("Charity workspace created");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not create the workspace");
+      console.error("CreateOrg error:", err);
+      const msg =
+        err instanceof Error
+          ? err.message
+          : (err as { message?: string })?.message ?? "Could not create the workspace";
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
