@@ -189,6 +189,18 @@ CREATE POLICY "members view own org memberships" ON public.organization_members
     OR public.is_platform_admin(auth.uid())
   );
 
+-- Allows the org creator to insert themselves as first member (no members exist yet to satisfy has_org_role)
+DROP POLICY IF EXISTS "org creator inserts first member" ON public.organization_members;
+CREATE POLICY "org creator inserts first member" ON public.organization_members
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    user_id = auth.uid()
+    AND EXISTS (
+      SELECT 1 FROM public.organizations
+      WHERE id = organization_id AND created_by = auth.uid()
+    )
+  );
+
 DROP POLICY IF EXISTS "org admins manage members" ON public.organization_members;
 CREATE POLICY "org admins manage members" ON public.organization_members
   FOR ALL TO authenticated
@@ -233,6 +245,15 @@ CREATE POLICY "owners delete org" ON public.organizations
   USING (
     public.has_org_role(auth.uid(), id, ARRAY['owner']::public.org_role[])
     OR public.is_platform_admin(auth.uid())
+  );
+
+-- Allows creator to clean up a memberless org (e.g. after a failed first-member insert)
+DROP POLICY IF EXISTS "creator deletes memberless org" ON public.organizations;
+CREATE POLICY "creator deletes memberless org" ON public.organizations
+  FOR DELETE TO authenticated
+  USING (
+    created_by = auth.uid()
+    AND NOT EXISTS (SELECT 1 FROM public.organization_members WHERE organization_id = id)
   );
 
 DROP TRIGGER IF EXISTS orgs_updated ON public.organizations;

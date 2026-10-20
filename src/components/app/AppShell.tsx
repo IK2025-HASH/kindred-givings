@@ -174,11 +174,21 @@ function CreateOrg() {
         })
         .select("id")
         .single();
-      if (error) throw error;
+      if (error) {
+        const msg = (error as { message?: string })?.message ?? "";
+        if (msg.includes("organizations_slug_key")) {
+          throw new Error(`The web address "/${finalSlug}" is already taken — try a different one.`);
+        }
+        throw error;
+      }
       const member = await supabase
         .from("organization_members")
         .insert({ organization_id: data.id, user_id: user.id, role: "owner" });
-      if (member.error) throw member.error;
+      if (member.error) {
+        // Roll back the org so the slug isn't orphaned
+        await supabase.from("organizations").delete().eq("id", data.id);
+        throw member.error;
+      }
       setCurrentOrgId(data.id);
       refreshMemberships();
       toast.success("Charity workspace created");
