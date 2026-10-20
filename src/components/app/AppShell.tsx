@@ -84,7 +84,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
         <span className="font-display text-lg font-extrabold tracking-tight">{settings.app_name}</span>
       </Link>
 
-      {currentOrg && (
+      {currentOrg ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="rounded-md border border-sidebar-border bg-sidebar-accent/40 px-3 py-2 text-left">
@@ -107,6 +107,14 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+      ) : (
+        <Link
+          to="/app"
+          onClick={onNavigate}
+          className="block rounded-md border border-dashed border-sidebar-border px-3 py-2 text-left text-sm text-sidebar-foreground/60 hover:border-sidebar-foreground/30 hover:text-sidebar-foreground transition-colors"
+        >
+          + Set up your charity
+        </Link>
       )}
 
       <NavLinks onNavigate={onNavigate} />
@@ -205,65 +213,62 @@ function CreateOrg() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4 py-12">
-      <div className="w-full max-w-lg space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Set up your charity</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Create your workspace to start recording donors and donations.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={submit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="org-name">Charity name</Label>
+    <div className="mx-auto w-full max-w-lg space-y-4 py-8">
+      <div>
+        <h1 className="font-display text-2xl font-bold tracking-tight">Set up your charity</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Create a workspace to start recording donors and donations.
+        </p>
+      </div>
+      <Card>
+        <CardContent className="pt-6">
+          <form onSubmit={submit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="org-name">Charity name</Label>
+              <Input
+                id="org-name"
+                value={name}
+                required
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (!slug) setSlug("");
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="org-slug">Web address</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">/give/</span>
                 <Input
-                  id="org-name"
-                  value={name}
-                  required
-                  onChange={(e) => {
-                    setName(e.target.value);
-                    if (!slug) setSlug("");
-                  }}
+                  id="org-slug"
+                  value={slug || slugify(name)}
+                  onChange={(e) => setSlug(e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="org-slug">Web address</Label>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">/give/</span>
-                  <Input
-                    id="org-slug"
-                    value={slug || slugify(name)}
-                    onChange={(e) => setSlug(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="org-email">Contact email</Label>
-                <Input
-                  id="org-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <Button type="submit" disabled={busy} className="w-full">
-                {busy ? "Creating…" : "Create workspace"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <div className="rounded-lg border bg-card p-4 text-center">
-          <p className="text-sm text-muted-foreground">Not setting up a charity?</p>
-          <Link
-            to="/my-giving"
-            className="mt-1 inline-block text-sm font-medium underline underline-offset-2"
-          >
-            View my donation history →
-          </Link>
-        </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="org-email">Contact email</Label>
+              <Input
+                id="org-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <Button type="submit" disabled={busy} className="w-full">
+              {busy ? "Creating…" : "Create workspace"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+      <div className="rounded-lg border bg-card p-4 text-center">
+        <p className="text-sm text-muted-foreground">Not setting up a charity?</p>
+        <Link
+          to="/my-giving"
+          className="mt-1 inline-block text-sm font-medium underline underline-offset-2"
+        >
+          View my donation history →
+        </Link>
       </div>
     </div>
   );
@@ -302,8 +307,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
-  if (memberships.length === 0 || !currentOrg) return <CreateOrg />;
-
   return (
     <div className="flex min-h-screen bg-muted/30">
       <aside className="hidden w-64 shrink-0 lg:block">
@@ -325,17 +328,21 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <SidebarBody onNavigate={() => setOpen(false)} />
               </SheetContent>
             </Sheet>
-            <span className="truncate text-sm font-semibold lg:hidden">{currentOrg.name}</span>
+            {currentOrg && (
+              <span className="truncate text-sm font-semibold lg:hidden">{currentOrg.name}</span>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            <a
-              href={`/give/${currentOrg.slug}`}
-              target="_blank"
-              rel="noreferrer"
-              className="hidden text-sm font-medium text-muted-foreground hover:text-foreground sm:inline"
-            >
-              View giving page
-            </a>
+            {currentOrg && (
+              <a
+                href={`/give/${currentOrg.slug}`}
+                target="_blank"
+                rel="noreferrer"
+                className="hidden text-sm font-medium text-muted-foreground hover:text-foreground sm:inline"
+              >
+                View giving page
+              </a>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
@@ -357,7 +364,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             </DropdownMenu>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 p-4 sm:p-6">{children}</main>
+        <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 p-4 sm:p-6">
+          {!currentOrg ? <CreateOrg /> : children}
+        </main>
       </div>
     </div>
   );
