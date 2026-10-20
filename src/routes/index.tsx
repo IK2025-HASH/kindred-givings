@@ -431,7 +431,7 @@ function PricingTeaserCards() {
         .eq("is_active", true)
         .eq("is_public", true)
         .order("sort_order")
-        .limit(3);
+        .limit(4);
       if (error) throw error;
       return data;
     },
@@ -443,7 +443,7 @@ function PricingTeaserCards() {
     <>
       <div className="mt-10 grid gap-4 sm:grid-cols-3">
         {plans.map((p, i) => {
-          const isEnterprise = p.slug === "enterprise";
+          const isEnterprise = p.slug === "on-premise";
           const price = isEnterprise
             ? "Contact us"
             : Number(p.price_monthly) === 0
