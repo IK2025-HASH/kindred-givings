@@ -1,7 +1,6 @@
 # Donorbook — Windows Dev Environment Setup
 # Run from the repo root: powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
 
-Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 Write-Host ""
@@ -12,29 +11,27 @@ Write-Host ""
 
 # ── 1. Check Node.js ──────────────────────────────────────────────────────────
 Write-Host "[1/5] Checking Node.js..." -ForegroundColor Yellow
-try {
-    $nodeVersion = node --version
-    $major = [int]($nodeVersion -replace 'v(\d+)\..*','$1')
-    if ($major -lt 18) {
-        Write-Host "ERROR: Node.js $nodeVersion found but v18+ is required." -ForegroundColor Red
-        Write-Host "Download from: https://nodejs.org" -ForegroundColor Red
-        exit 1
-    }
-    Write-Host "OK: Node.js $nodeVersion" -ForegroundColor Green
-} catch {
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     Write-Host "ERROR: Node.js not found. Download from: https://nodejs.org" -ForegroundColor Red
     exit 1
 }
+$nodeVersion = (node --version 2>&1).ToString().Trim()
+$major = [int]($nodeVersion -replace '^v(\d+)\..*', '$1')
+if ($major -lt 18) {
+    Write-Host "ERROR: Node.js $nodeVersion found but v18+ is required." -ForegroundColor Red
+    Write-Host "Download from: https://nodejs.org" -ForegroundColor Red
+    exit 1
+}
+Write-Host "OK: Node.js $nodeVersion" -ForegroundColor Green
 
 # ── 2. Check npm ──────────────────────────────────────────────────────────────
 Write-Host "[2/5] Checking npm..." -ForegroundColor Yellow
-try {
-    $npmVersion = npm --version
-    Write-Host "OK: npm $npmVersion" -ForegroundColor Green
-} catch {
+if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
     Write-Host "ERROR: npm not found. Reinstall Node.js from: https://nodejs.org" -ForegroundColor Red
     exit 1
 }
+$npmVersion = (npm --version 2>&1).ToString().Trim()
+Write-Host "OK: npm $npmVersion" -ForegroundColor Green
 
 # ── 3. Check .env files ───────────────────────────────────────────────────────
 Write-Host "[3/5] Checking environment files..." -ForegroundColor Yellow
@@ -63,8 +60,11 @@ Write-Host "OK: .env.local found and configured" -ForegroundColor Green
 
 # ── 4. Install dependencies (npm creates node_modules/.bin correctly on Windows)
 Write-Host "[4/5] Installing dependencies with npm..." -ForegroundColor Yellow
+$ErrorActionPreference = "Continue"
 npm install
-if ($LASTEXITCODE -ne 0) {
+$npmExitCode = $LASTEXITCODE
+$ErrorActionPreference = "Stop"
+if ($npmExitCode -ne 0) {
     Write-Host "ERROR: npm install failed." -ForegroundColor Red
     exit 1
 }
