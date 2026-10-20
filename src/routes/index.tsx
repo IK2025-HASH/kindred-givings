@@ -431,7 +431,7 @@ function PricingTeaserCards() {
         .eq("is_active", true)
         .eq("is_public", true)
         .order("sort_order")
-        .limit(4);
+        .limit(3);
       if (error) throw error;
       return data;
     },
@@ -439,23 +439,24 @@ function PricingTeaserCards() {
 
   if (isLoading || !plans?.length) return null;
 
-  const standardPlans = plans.filter((p) => p.slug !== "enterprise");
-  const enterprisePlan = plans.find((p) => p.slug === "enterprise");
-
   return (
     <>
       <div className="mt-10 grid gap-4 sm:grid-cols-3">
-        {standardPlans.map((p, i) => {
-          const price =
-            Number(p.price_monthly) === 0
-              ? "Free"
-              : `${formatMoney(Number(p.price_monthly))}/mo`;
-          const featureLines: string[] = [
-            `Up to ${p.max_members} team members`,
-            `${p.max_donors.toLocaleString()} donors`,
-            `${p.max_campaigns} campaigns`,
-            ...(Array.isArray(p.features) ? (p.features as string[]) : []),
-          ];
+        {plans.map((p, i) => {
+          const isEnterprise = p.slug === "enterprise";
+          const price = isEnterprise
+            ? "Contact us"
+            : Number(p.price_monthly) === 0
+            ? "Free"
+            : `${formatMoney(Number(p.price_monthly))}/mo`;
+          const featureLines: string[] = isEnterprise
+            ? (Array.isArray(p.features) ? (p.features as string[]) : [])
+            : [
+                `Up to ${p.max_members} team members`,
+                `${p.max_donors.toLocaleString()} donors`,
+                `${p.max_campaigns} campaigns`,
+                ...(Array.isArray(p.features) ? (p.features as string[]) : []),
+              ];
           return (
             <div
               key={p.id}
@@ -476,24 +477,19 @@ function PricingTeaserCards() {
                   </li>
                 ))}
               </ul>
-              <Button asChild className="mt-5 w-full" variant={i === 1 ? "default" : "outline"} size="sm">
-                <Link to="/auth" search={{ mode: "signup" }}>Get started</Link>
-              </Button>
+              {isEnterprise ? (
+                <Button asChild className="mt-5 w-full" variant="outline" size="sm">
+                  <a href="mailto:ilyas@networklogic.uk?subject=Enterprise%20Deployment%20Enquiry">Get in touch</a>
+                </Button>
+              ) : (
+                <Button asChild className="mt-5 w-full" variant={i === 1 ? "default" : "outline"} size="sm">
+                  <Link to="/auth" search={{ mode: "signup" }}>Get started</Link>
+                </Button>
+              )}
             </div>
           );
         })}
       </div>
-      {enterprisePlan && (
-        <div className="mt-4 flex flex-col items-start justify-between gap-4 rounded-xl border border-navy-foreground/20 bg-navy-foreground/5 p-5 sm:flex-row sm:items-center">
-          <div>
-            <p className="font-display text-lg font-bold">{enterprisePlan.name}</p>
-            <p className="mt-0.5 text-sm text-navy-foreground/70">{enterprisePlan.description ?? "On-premise or private cloud deployment — contact us for pricing."}</p>
-          </div>
-          <Button asChild size="sm" variant="outline" className="shrink-0 border-navy-foreground/30 bg-transparent text-navy-foreground hover:bg-navy-foreground/10 hover:text-navy-foreground">
-            <a href="mailto:ilyas@networklogic.uk?subject=Enterprise%20Deployment%20Enquiry">Get in touch</a>
-          </Button>
-        </div>
-      )}
       <p className="mt-6 text-center text-xs text-navy-foreground/45">
         See the{" "}
         <Link to="/pricing" className="underline underline-offset-2">
