@@ -155,7 +155,7 @@ function CreateOrg() {
   const { user, refreshMemberships, setCurrentOrgId } = useAuth();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(user?.email ?? "");
   const [busy, setBusy] = useState(false);
 
   async function submit(e: React.FormEvent) {
