@@ -132,7 +132,7 @@ export function useTeam(orgId: string | null) {
       const [members, invites] = await Promise.all([
         supabase
           .from("organization_members")
-          .select("id, role, user_id, created_at, profiles:user_id(full_name, email)")
+          .select("id, role, user_id, created_at")
           .eq("organization_id", orgId!),
         supabase
           .from("invitations")
@@ -142,8 +142,25 @@ export function useTeam(orgId: string | null) {
       ]);
       if (members.error) throw members.error;
       if (invites.error) throw invites.error;
+
+      // Fetch profiles separately — no direct FK from organization_members.user_id to profiles.id
+      const userIds = (members.data ?? []).map((m) => m.user_id);
+      const profileMap: Record<string, { full_name: string | null; email: string | null }> = {};
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .in("id", userIds);
+        for (const p of profiles ?? []) {
+          profileMap[p.id] = { full_name: p.full_name ?? null, email: p.email ?? null };
+        }
+      }
+
       return {
-        members: (members.data ?? []) as unknown as Array<{
+        members: (members.data ?? []).map((m) => ({
+          ...m,
+          profiles: profileMap[m.user_id] ?? null,
+        })) as Array<{
           id: string;
           role: string;
           user_id: string;
