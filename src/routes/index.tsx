@@ -16,11 +16,14 @@ import {
   Wallet,
   X,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { MarketingShell } from "@/components/site/MarketingShell";
 import { usePlatformSettings } from "@/hooks/usePlatformSettings";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { formatMoney } from "@/lib/format";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -417,6 +420,77 @@ function QrBoxMockup() {
   );
 }
 
+// ── Pricing teaser (live from DB) ────────────────────────────────
+function PricingTeaserCards() {
+  const { data: plans, isLoading } = useQuery({
+    queryKey: ["public-plans-teaser"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("plans")
+        .select("id,name,price_monthly,max_members,max_donors,max_campaigns,features,sort_order")
+        .eq("is_active", true)
+        .eq("is_public", true)
+        .order("sort_order")
+        .limit(3);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  if (isLoading || !plans?.length) return null;
+
+  return (
+    <>
+      <div className="mt-10 grid gap-4 sm:grid-cols-3">
+        {plans.map((p, i) => {
+          const price =
+            Number(p.price_monthly) === 0
+              ? "Free"
+              : `${formatMoney(Number(p.price_monthly))}/mo`;
+          const featureLines: string[] = [
+            `Up to ${p.max_members} team members`,
+            `${p.max_donors.toLocaleString()} donors`,
+            `${p.max_campaigns} campaigns`,
+            ...(Array.isArray(p.features) ? (p.features as string[]) : []),
+          ];
+          return (
+            <div
+              key={p.id}
+              className={`rounded-xl border p-5 ${i === 1 ? "border-primary bg-primary/10" : "border-navy-foreground/15 bg-navy-foreground/5"}`}
+            >
+              {i === 1 && (
+                <span className="mb-2 inline-block rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
+                  Most popular
+                </span>
+              )}
+              <p className="font-display text-xl font-bold">{p.name}</p>
+              <p className="mt-1 font-display text-2xl font-extrabold">{price}</p>
+              <ul className="mt-4 space-y-1.5">
+                {featureLines.map((f) => (
+                  <li key={f} className="flex items-center gap-2 text-sm text-navy-foreground/75">
+                    <Check className="size-3.5 shrink-0 text-primary" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <Button asChild className="mt-5 w-full" variant={i === 1 ? "default" : "outline"} size="sm">
+                <Link to="/auth" search={{ mode: "signup" }}>Get started</Link>
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-6 text-center text-xs text-navy-foreground/45">
+        See the{" "}
+        <Link to="/pricing" className="underline underline-offset-2">
+          Pricing page
+        </Link>{" "}
+        for full plan details and limits.
+      </p>
+    </>
+  );
+}
+
 // ── Home ─────────────────────────────────────────────────────────
 function Home() {
   const settings = usePlatformSettings();
@@ -725,40 +799,7 @@ function Home() {
               <Link to="/pricing">See all plans</Link>
             </Button>
           </div>
-          <div className="mt-10 grid gap-4 sm:grid-cols-3">
-            {[
-              { name: "Starter", price: "Free", note: "Get started", features: ["Up to 100 donors", "3 campaigns", "2 team members", "Public giving page"] },
-              { name: "Growth", price: "£19/mo", note: "Most popular", features: ["Up to 1,000 donors", "20 campaigns", "5 team members", "CSV import & export", "Priority support"] },
-              { name: "Pro", price: "£49/mo", note: "Unlimited", features: ["Unlimited donors", "Unlimited campaigns", "Unlimited team members", "Custom domain (coming soon)", "Dedicated account manager"] },
-            ].map((p, i) => (
-              <div
-                key={p.name}
-                className={`rounded-xl border p-5 ${i === 1 ? "border-primary bg-primary/10" : "border-navy-foreground/15 bg-navy-foreground/5"}`}
-              >
-                {i === 1 && (
-                  <span className="mb-2 inline-block rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
-                    Most popular
-                  </span>
-                )}
-                <p className="font-display text-xl font-bold">{p.name}</p>
-                <p className="mt-1 font-display text-2xl font-extrabold">{p.price}</p>
-                <ul className="mt-4 space-y-1.5">
-                  {p.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm text-navy-foreground/75">
-                      <Check className="size-3.5 shrink-0 text-primary" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <Button asChild className="mt-5 w-full" variant={i === 1 ? "default" : "outline"} size="sm">
-                  <Link to="/auth" search={{ mode: "signup" }}>Get started</Link>
-                </Button>
-              </div>
-            ))}
-          </div>
-          <p className="mt-6 text-center text-xs text-navy-foreground/45">
-            Prices are indicative. See the Pricing page for current plan details and limits.
-          </p>
+          <PricingTeaserCards />
         </div>
       </section>
 
