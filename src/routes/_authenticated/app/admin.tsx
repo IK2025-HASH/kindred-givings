@@ -2,12 +2,15 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ChevronDown, ChevronUp, Plus, X } from "lucide-react";
 import { PageHeader } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -65,6 +68,237 @@ const SETTING_LABELS: Record<keyof PlatformSettings, string> = {
   platform_currency: "Default currency",
   demo_slug: "Demo org slug",
 };
+
+type Plan = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  price_monthly: number;
+  price_yearly: number;
+  max_members: number;
+  max_donors: number;
+  max_campaigns: number;
+  features: string[];
+  is_public: boolean;
+  is_active: boolean;
+  sort_order: number;
+};
+
+const BLANK_PLAN: Omit<Plan, "id"> = {
+  name: "", slug: "", description: "",
+  price_monthly: 0, price_yearly: 0,
+  max_members: 5, max_donors: 500, max_campaigns: 5,
+  features: [], is_public: true, is_active: true, sort_order: 99,
+};
+
+function PlanForm({
+  value,
+  onChange,
+  onSave,
+  onCancel,
+  busy,
+  saveLabel,
+}: {
+  value: Omit<Plan, "id">;
+  onChange: (v: Omit<Plan, "id">) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  busy: boolean;
+  saveLabel: string;
+}) {
+  const set = (k: keyof Omit<Plan, "id">, v: unknown) => onChange({ ...value, [k]: v });
+  return (
+    <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label>Name</Label>
+          <Input value={value.name} onChange={(e) => set("name", e.target.value)} placeholder="Growth" />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Slug</Label>
+          <Input value={value.slug} onChange={(e) => set("slug", e.target.value)} placeholder="growth" />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Monthly price (£)</Label>
+          <Input type="number" min={0} value={value.price_monthly} onChange={(e) => set("price_monthly", Number(e.target.value))} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Yearly price (£)</Label>
+          <Input type="number" min={0} value={value.price_yearly} onChange={(e) => set("price_yearly", Number(e.target.value))} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Max members</Label>
+          <Input type="number" min={1} value={value.max_members} onChange={(e) => set("max_members", Number(e.target.value))} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Max donors</Label>
+          <Input type="number" min={1} value={value.max_donors} onChange={(e) => set("max_donors", Number(e.target.value))} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Max campaigns</Label>
+          <Input type="number" min={1} value={value.max_campaigns} onChange={(e) => set("max_campaigns", Number(e.target.value))} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Sort order</Label>
+          <Input type="number" min={0} value={value.sort_order} onChange={(e) => set("sort_order", Number(e.target.value))} />
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label>Description</Label>
+        <Input value={value.description ?? ""} onChange={(e) => set("description", e.target.value)} placeholder="For growing fundraising teams" />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Features (one per line)</Label>
+        <Textarea
+          rows={4}
+          value={value.features.join("\n")}
+          onChange={(e) => set("features", e.target.value.split("\n").map((s) => s.trim()).filter(Boolean))}
+          placeholder={"Donor records\nDonation tracking\nPublic giving page"}
+        />
+      </div>
+      <div className="flex items-center gap-6">
+        <label className="flex items-center gap-2 text-sm">
+          <Switch checked={value.is_public} onCheckedChange={(v) => set("is_public", v)} />
+          Public (visible on pricing page)
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <Switch checked={value.is_active} onCheckedChange={(v) => set("is_active", v)} />
+          Active
+        </label>
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" onClick={onCancel} disabled={busy}>Cancel</Button>
+        <Button onClick={onSave} disabled={busy}>{saveLabel}</Button>
+      </div>
+    </div>
+  );
+}
+
+function PlansSection() {
+  const qc = useQueryClient();
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Omit<Plan, "id">>(BLANK_PLAN);
+  const [adding, setAdding] = useState(false);
+  const [newPlan, setNewPlan] = useState<Omit<Plan, "id">>(BLANK_PLAN);
+  const [busy, setBusy] = useState(false);
+
+  const plansQuery = useQuery({
+    queryKey: ["admin-plans"],
+    queryFn: async (): Promise<Plan[]> => {
+      const { data, error } = await supabase
+        .from("plans")
+        .select("*")
+        .order("sort_order");
+      if (error) throw error;
+      return (data ?? []).map((p) => ({ ...p, features: Array.isArray(p.features) ? p.features as string[] : [] }));
+    },
+  });
+
+  function startEdit(plan: Plan) {
+    setExpanded(plan.id);
+    setEditing({ name: plan.name, slug: plan.slug, description: plan.description, price_monthly: plan.price_monthly, price_yearly: plan.price_yearly, max_members: plan.max_members, max_donors: plan.max_donors, max_campaigns: plan.max_campaigns, features: plan.features, is_public: plan.is_public, is_active: plan.is_active, sort_order: plan.sort_order });
+  }
+
+  async function savePlan(id: string) {
+    setBusy(true);
+    try {
+      const { error } = await supabase.from("plans").update({ ...editing, features: editing.features } as never).eq("id", id);
+      if (error) throw error;
+      toast.success("Plan saved");
+      setExpanded(null);
+      void qc.invalidateQueries({ queryKey: ["admin-plans"] });
+      void qc.invalidateQueries({ queryKey: ["public-plans"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save plan");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createPlan() {
+    if (!newPlan.name || !newPlan.slug) { toast.error("Name and slug are required"); return; }
+    setBusy(true);
+    try {
+      const { error } = await supabase.from("plans").insert({ ...newPlan, features: newPlan.features } as never);
+      if (error) throw error;
+      toast.success("Plan created");
+      setAdding(false);
+      setNewPlan(BLANK_PLAN);
+      void qc.invalidateQueries({ queryKey: ["admin-plans"] });
+      void qc.invalidateQueries({ queryKey: ["public-plans"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not create plan");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>Pricing plans</CardTitle>
+        <Button size="sm" onClick={() => { setAdding(true); setNewPlan(BLANK_PLAN); }}>
+          <Plus className="mr-1.5 size-4" /> New plan
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {adding && (
+          <PlanForm
+            value={newPlan}
+            onChange={setNewPlan}
+            onSave={() => void createPlan()}
+            onCancel={() => setAdding(false)}
+            busy={busy}
+            saveLabel="Create plan"
+          />
+        )}
+        {(plansQuery.data ?? []).map((plan) => (
+          <div key={plan.id} className="rounded-lg border">
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">{plan.name}</span>
+                  <Badge variant="outline" className="text-xs">£{plan.price_monthly}/mo</Badge>
+                  {!plan.is_active && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
+                  {!plan.is_public && <Badge variant="secondary" className="text-xs">Hidden</Badge>}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {plan.max_members} members · {plan.max_donors.toLocaleString()} donors · {plan.max_campaigns} campaigns
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => expanded === plan.id ? setExpanded(null) : startEdit(plan)}
+              >
+                {expanded === plan.id
+                  ? <><ChevronUp className="mr-1 size-4" />Close</>
+                  : <><ChevronDown className="mr-1 size-4" />Edit</>
+                }
+              </Button>
+            </div>
+            {expanded === plan.id && (
+              <div className="border-t px-4 pb-4 pt-3">
+                <PlanForm
+                  value={editing}
+                  onChange={setEditing}
+                  onSave={() => void savePlan(plan.id)}
+                  onCancel={() => setExpanded(null)}
+                  busy={busy}
+                  saveLabel="Save plan"
+                />
+              </div>
+            )}
+          </div>
+        ))}
+        {(plansQuery.data ?? []).length === 0 && !plansQuery.isLoading && (
+          <p className="py-6 text-center text-sm text-muted-foreground">No plans yet. Click "New plan" to add one.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function PlatformSettingsSection() {
   const { data: settings, refetch } = usePlatformSettingsQuery();
@@ -385,6 +619,7 @@ function AdminPage() {
         </CardContent>
       </Card>
 
+      <PlansSection />
       <PlatformSettingsSection />
     </div>
   );
