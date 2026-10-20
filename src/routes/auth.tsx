@@ -140,7 +140,7 @@ function AuthPage() {
               </div>
             )}
             {mode !== "confirm" && (
-            <form onSubmit={onSubmit} className="space-y-4">
+            <><form onSubmit={onSubmit} className="space-y-4">
               {mode === "signup" && (
                 <div className="space-y-2">
                   <Label htmlFor="name">Your name</Label>
@@ -223,7 +223,7 @@ function AuthPage() {
                 </button>
               )}
             </div>
-            )}
+            </>)}
           </CardContent>
         </Card>
       </div>
