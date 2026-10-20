@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 const TERMS_VERSION = "2025-09";
 
-type Mode = "signin" | "signup" | "reset";
+type Mode = "signin" | "signup" | "reset" | "confirm";
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -66,8 +66,13 @@ function AuthPage() {
             terms_version: TERMS_VERSION,
           }).eq("id", data.user.id);
         }
-        toast.success("Account created. Check your email if confirmation is required.");
-        navigate({ to: "/app" });
+        if (data.session) {
+          // Email confirmation disabled — go straight to app
+          navigate({ to: "/app" });
+        } else {
+          // Email confirmation required — show holding screen
+          setMode("confirm");
+        }
       } else if (mode === "signin") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -119,6 +124,22 @@ function AuthPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {mode === "confirm" && (
+              <div className="space-y-4 py-2 text-center">
+                <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary text-2xl">✉</div>
+                <div>
+                  <p className="font-semibold text-foreground">Check your email</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    We sent a confirmation link to <strong>{email}</strong>.
+                    Click it to activate your account, then come back to sign in.
+                  </p>
+                </div>
+                <Button variant="outline" className="w-full" onClick={() => setMode("signin")}>
+                  Back to sign in
+                </Button>
+              </div>
+            )}
+            {mode !== "confirm" && (
             <form onSubmit={onSubmit} className="space-y-4">
               {mode === "signup" && (
                 <div className="space-y-2">
@@ -202,6 +223,7 @@ function AuthPage() {
                 </button>
               )}
             </div>
+            )}
           </CardContent>
         </Card>
       </div>
