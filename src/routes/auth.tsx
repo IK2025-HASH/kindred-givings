@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Logo } from "@/components/site/MarketingShell";
 import { Button } from "@/components/ui/button";
@@ -140,90 +140,91 @@ function AuthPage() {
               </div>
             )}
             {mode !== "confirm" && (
-            <><form onSubmit={onSubmit} className="space-y-4">
-              {mode === "signup" && (
-                <div className="space-y-2">
-                  <Label htmlFor="name">Your name</Label>
-                  <Input
-                    id="name"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                  />
+              <React.Fragment>
+                <form onSubmit={onSubmit} className="space-y-4">
+                  {mode === "signup" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Your name</Label>
+                      <Input
+                        id="name"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        required
+                      />
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  {mode !== "reset" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Password</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        minLength={6}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                      />
+                    </div>
+                  )}
+                  {mode === "signup" && (
+                    <label className="flex items-start gap-2 text-sm text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 shrink-0"
+                        checked={termsAccepted}
+                        onChange={(e) => setTermsAccepted(e.target.checked)}
+                        required
+                      />
+                      <span>
+                        I have read and agree to the{" "}
+                        <Link to="/legal/$doc" params={{ doc: "terms" }} target="_blank" className="underline text-foreground">
+                          Terms of Service
+                        </Link>
+                        ,{" "}
+                        <Link to="/legal/$doc" params={{ doc: "privacy" }} target="_blank" className="underline text-foreground">
+                          Privacy Policy
+                        </Link>
+                        , and{" "}
+                        <Link to="/legal/$doc" params={{ doc: "data-retention" }} target="_blank" className="underline text-foreground">
+                          Data Retention Policy
+                        </Link>
+                      </span>
+                    </label>
+                  )}
+                  <Button type="submit" className="w-full" disabled={busy || (mode === "signup" && !termsAccepted)}>
+                    {mode === "signup" ? "Create account" : mode === "reset" ? "Send link" : "Sign in"}
+                  </Button>
+                </form>
+                <div className="mt-6 space-y-2 text-sm text-muted-foreground">
+                  {mode === "signin" && (
+                    <React.Fragment>
+                      <button className="underline" onClick={() => setMode("signup")}>
+                        Need an account? Sign up
+                      </button>
+                      <br />
+                      <button className="underline" onClick={() => setMode("reset")}>
+                        Forgot your password?
+                      </button>
+                    </React.Fragment>
+                  )}
+                  {mode !== "signin" && (
+                    <button className="underline" onClick={() => setMode("signin")}>
+                      Back to sign in
+                    </button>
+                  )}
                 </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-              {mode !== "reset" && (
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    minLength={6}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-              )}
-              {mode === "signup" && (
-                <label className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 shrink-0"
-                    checked={termsAccepted}
-                    onChange={(e) => setTermsAccepted(e.target.checked)}
-                    required
-                  />
-                  <span>
-                    I have read and agree to the{" "}
-                    <Link to="/legal/$doc" params={{ doc: "terms" }} target="_blank" className="underline text-foreground">
-                      Terms of Service
-                    </Link>
-                    ,{" "}
-                    <Link to="/legal/$doc" params={{ doc: "privacy" }} target="_blank" className="underline text-foreground">
-                      Privacy Policy
-                    </Link>
-                    , and{" "}
-                    <Link to="/legal/$doc" params={{ doc: "data-retention" }} target="_blank" className="underline text-foreground">
-                      Data Retention Policy
-                    </Link>
-                  </span>
-                </label>
-              )}
-              <Button type="submit" className="w-full" disabled={busy || (mode === "signup" && !termsAccepted)}>
-                {mode === "signup" ? "Create account" : mode === "reset" ? "Send link" : "Sign in"}
-              </Button>
-            </form>
-
-            <div className="mt-6 space-y-2 text-sm text-muted-foreground">
-              {mode === "signin" && (
-                <>
-                  <button className="underline" onClick={() => setMode("signup")}>
-                    Need an account? Sign up
-                  </button>
-                  <br />
-                  <button className="underline" onClick={() => setMode("reset")}>
-                    Forgot your password?
-                  </button>
-                </>
-              )}
-              {mode !== "signin" && (
-                <button className="underline" onClick={() => setMode("signin")}>
-                  Back to sign in
-                </button>
-              )}
-            </div>
-            </>)}
+              </React.Fragment>
+            )}
           </CardContent>
         </Card>
       </div>
