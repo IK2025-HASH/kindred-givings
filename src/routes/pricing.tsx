@@ -65,14 +65,16 @@ function Pricing() {
                 <CardTitle className="font-display text-xl">{plan.name}</CardTitle>
                 <p className="text-sm text-muted-foreground">{plan.description}</p>
                 <p className="mt-4 font-display text-4xl font-extrabold">
-                  {Number(plan.price_monthly) === 0
+                  {plan.slug === "enterprise"
+                    ? "Contact us"
+                    : Number(plan.price_monthly) === 0
                     ? "Free"
                     : formatMoney(Number(plan.price_monthly))}
-                  {Number(plan.price_monthly) > 0 && (
+                  {Number(plan.price_monthly) > 0 && plan.slug !== "enterprise" && (
                     <span className="text-base font-medium text-muted-foreground">/month</span>
                   )}
                 </p>
-                {Number(plan.price_yearly) > 0 && (
+                {Number(plan.price_yearly) > 0 && plan.slug !== "enterprise" && (
                   <p className="text-xs text-muted-foreground">
                     or {formatMoney(Number(plan.price_yearly))} billed yearly
                   </p>
@@ -80,20 +82,18 @@ function Pricing() {
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <ul className="space-y-2">
-                  <li className="flex gap-2">
-                    <Check className="size-4 text-success" /> Up to {plan.max_members} team members
-                  </li>
-                  <li className="flex gap-2">
-                    <Check className="size-4 text-success" /> {plan.max_donors.toLocaleString()}{" "}
-                    donor records
-                  </li>
-                  <li className="flex gap-2">
-                    <Check className="size-4 text-success" /> {plan.max_campaigns} active campaigns
-                  </li>
-                  {(plan as unknown as Record<string,unknown>).max_qr_boxes !== undefined && (
-                    <li className="flex gap-2">
-                      <Check className="size-4 text-success" /> {String((plan as unknown as Record<string,unknown>).max_qr_boxes)} QR donation boxes
-                    </li>
+                  {plan.slug !== "enterprise" && (
+                    <>
+                      <li className="flex gap-2">
+                        <Check className="size-4 text-success" /> Up to {plan.max_members} team members
+                      </li>
+                      <li className="flex gap-2">
+                        <Check className="size-4 text-success" /> {plan.max_donors.toLocaleString()} donor records
+                      </li>
+                      <li className="flex gap-2">
+                        <Check className="size-4 text-success" /> {plan.max_campaigns} active campaigns
+                      </li>
+                    </>
                   )}
                   {(Array.isArray(plan.features) ? (plan.features as unknown[]) : []).map((f, i) => (
                     <li key={i} className="flex gap-2">
@@ -101,11 +101,19 @@ function Pricing() {
                     </li>
                   ))}
                 </ul>
-                <Button asChild className="mt-4 w-full" variant={index === 1 ? "default" : "outline"}>
-                  <Link to="/auth" search={{ mode: "signup" }}>
-                    Choose {plan.name}
-                  </Link>
-                </Button>
+                {plan.slug === "enterprise" ? (
+                  <Button asChild className="mt-4 w-full">
+                    <a href="mailto:ilyas@networklogic.uk?subject=Enterprise%20Deployment%20Enquiry">
+                      Get in touch
+                    </a>
+                  </Button>
+                ) : (
+                  <Button asChild className="mt-4 w-full" variant={index === 1 ? "default" : "outline"}>
+                    <Link to="/auth" search={{ mode: "signup" }}>
+                      Choose {plan.name}
+                    </Link>
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ))}

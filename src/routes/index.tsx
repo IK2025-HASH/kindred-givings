@@ -427,11 +427,11 @@ function PricingTeaserCards() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("plans")
-        .select("id,name,price_monthly,max_members,max_donors,max_campaigns,features,sort_order")
+        .select("id,name,slug,price_monthly,max_members,max_donors,max_campaigns,features,sort_order")
         .eq("is_active", true)
         .eq("is_public", true)
         .order("sort_order")
-        .limit(3);
+        .limit(4);
       if (error) throw error;
       return data;
     },
@@ -439,10 +439,13 @@ function PricingTeaserCards() {
 
   if (isLoading || !plans?.length) return null;
 
+  const standardPlans = plans.filter((p) => p.slug !== "enterprise");
+  const enterprisePlan = plans.find((p) => p.slug === "enterprise");
+
   return (
     <>
       <div className="mt-10 grid gap-4 sm:grid-cols-3">
-        {plans.map((p, i) => {
+        {standardPlans.map((p, i) => {
           const price =
             Number(p.price_monthly) === 0
               ? "Free"
@@ -480,6 +483,17 @@ function PricingTeaserCards() {
           );
         })}
       </div>
+      {enterprisePlan && (
+        <div className="mt-4 flex flex-col items-start justify-between gap-4 rounded-xl border border-navy-foreground/20 bg-navy-foreground/5 p-5 sm:flex-row sm:items-center">
+          <div>
+            <p className="font-display text-lg font-bold">{enterprisePlan.name}</p>
+            <p className="mt-0.5 text-sm text-navy-foreground/70">{enterprisePlan.description ?? "On-premise or private cloud deployment — contact us for pricing."}</p>
+          </div>
+          <Button asChild size="sm" variant="outline" className="shrink-0 border-navy-foreground/30 bg-transparent text-navy-foreground hover:bg-navy-foreground/10 hover:text-navy-foreground">
+            <a href="mailto:ilyas@networklogic.uk?subject=Enterprise%20Deployment%20Enquiry">Get in touch</a>
+          </Button>
+        </div>
+      )}
       <p className="mt-6 text-center text-xs text-navy-foreground/45">
         See the{" "}
         <Link to="/pricing" className="underline underline-offset-2">
