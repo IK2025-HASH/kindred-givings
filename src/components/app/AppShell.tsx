@@ -5,21 +5,32 @@ import {
   Check,
   HeartHandshake,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
   Megaphone,
   Menu,
+  MessageCircle,
   QrCode,
   Settings,
   Users,
   Wallet,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -73,8 +84,100 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+function ContactSupportButton({ onNavigate }: { onNavigate?: () => void }) {
+  const { user, currentOrg } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!user || !subject.trim() || !message.trim()) return;
+    setBusy(true);
+    try {
+      const { data: conv, error: convErr } = await supabase
+        .from("support_conversations")
+        .insert({
+          org_id: currentOrg?.id ?? null,
+          started_by: user.id,
+          subject: subject.trim(),
+          status: "open",
+        })
+        .select("id")
+        .single();
+      if (convErr) throw convErr;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", user.id)
+        .maybeSingle();
+      const { error: msgErr } = await supabase.from("support_messages").insert({
+        conversation_id: conv.id,
+        sender_id: user.id,
+        sender_name: profile?.full_name ?? profile?.email ?? user.email,
+        body: message.trim(),
+      });
+      if (msgErr) throw msgErr;
+      toast.success("Support request sent");
+      setSubject("");
+      setMessage("");
+      setOpen(false);
+      onNavigate?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not send request");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button className="flex items-center gap-2 rounded-md px-3 py-2 text-xs text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors">
+          <LifeBuoy className="size-3.5" />
+          Contact support
+        </button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Contact support</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={(e) => void submit(e)} className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="cs-subject">Subject</Label>
+            <Input
+              id="cs-subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="What do you need help with?"
+              required
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="cs-message">Message</Label>
+            <Textarea
+              id="cs-message"
+              rows={4}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Describe your issue in detail…"
+              required
+            />
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={busy || !subject.trim() || !message.trim()}>
+              {busy ? "Sending…" : "Send request"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
-  const { memberships, currentOrg, setCurrentOrgId, isPlatformAdmin } = useAuth();
+  const { memberships, currentOrg, setCurrentOrgId, isPlatformAdmin, isChatSupportAgent } = useAuth();
   const settings = usePlatformSettings();
   return (
     <div className="flex h-full flex-col gap-6 bg-sidebar p-4 text-sidebar-foreground">
@@ -125,15 +228,38 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
 
       <NavLinks onNavigate={onNavigate} />
 
-      {isPlatformAdmin && (
+      {isChatSupportAgent && !isPlatformAdmin && (
         <Link
-          to="/app/admin"
+          to="/app/support"
           onClick={onNavigate}
-          className="rounded-md border border-sidebar-border px-3 py-2 text-xs text-sidebar-foreground/70"
+          className="flex items-center gap-2 rounded-md border border-sidebar-border px-3 py-2 text-xs text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors"
         >
-          Platform admin
+          <MessageCircle className="size-3.5" />
+          Support inbox
         </Link>
       )}
+
+      {isPlatformAdmin && (
+        <div className="flex flex-col gap-1.5">
+          <Link
+            to="/app/admin"
+            onClick={onNavigate}
+            className="rounded-md border border-sidebar-border px-3 py-2 text-xs text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors"
+          >
+            Platform admin
+          </Link>
+          <Link
+            to="/app/support"
+            onClick={onNavigate}
+            className="flex items-center gap-2 rounded-md border border-sidebar-border px-3 py-2 text-xs text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors"
+          >
+            <MessageCircle className="size-3.5" />
+            Support inbox
+          </Link>
+        </div>
+      )}
+
+      <ContactSupportButton onNavigate={onNavigate} />
 
       <div className="mt-auto flex flex-wrap gap-x-3 gap-y-1 pt-2">
         <Link

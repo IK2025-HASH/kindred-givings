@@ -35,6 +35,7 @@ type AuthContextValue = {
   currentOrg: Organization | null;
   currentRole: OrgRole | null;
   isPlatformAdmin: boolean;
+  isChatSupportAgent: boolean;
   setCurrentOrgId: (id: string) => void;
   refreshMemberships: () => void;
   signOut: () => Promise<void>;
@@ -103,6 +104,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
   });
 
+  const chatSupportQuery = useQuery({
+    queryKey: ["chat-support-agent", userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      try {
+        const { data } = await supabase
+          .from("chat_support_agents")
+          .select("user_id")
+          .eq("user_id", userId!)
+          .maybeSingle();
+        return !!data;
+      } catch {
+        return false;
+      }
+    },
+  });
+
   const memberships = membershipsQuery.data ?? [];
   const current =
     memberships.find((m) => m.organization.id === orgId) ?? memberships[0] ?? null;
@@ -129,6 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       currentOrg: current?.organization ?? null,
       currentRole: current?.role ?? null,
       isPlatformAdmin: adminQuery.data ?? false,
+      isChatSupportAgent: chatSupportQuery.data ?? false,
       setCurrentOrgId,
       refreshMemberships: () => {
         void queryClient.invalidateQueries({ queryKey: ["memberships"] });
@@ -142,6 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       membershipsQuery.isLoading,
       current,
       adminQuery.data,
+      chatSupportQuery.data,
       setCurrentOrgId,
       queryClient,
       signOut,

@@ -2,7 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ChevronDown, ChevronUp, CreditCard, Plus, X } from "lucide-react";
+import { ChevronDown, ChevronUp, CreditCard, MessageCircle, Plus, X } from "lucide-react";
 import { PageHeader } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -368,6 +368,258 @@ function PlatformSettingsSection() {
   );
 }
 
+type ConversationRow = {
+  id: string;
+  subject: string;
+  status: "open" | "assigned" | "closed";
+  created_at: string;
+  org: { name: string } | null;
+  started_by_profile: { full_name: string | null; email: string | null } | null;
+  assigned_to_profile: { full_name: string | null; email: string | null } | null;
+};
+
+function ChatSupportSection() {
+  const qc = useQueryClient();
+  const [newAgentEmail, setNewAgentEmail] = useState("");
+  const [agentBusy, setAgentBusy] = useState(false);
+
+  const agentsQuery = useQuery({
+    queryKey: ["chat-support-agents"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("chat_support_agents")
+        .select("user_id, created_at, profiles:user_id(email, full_name)")
+        .order("created_at");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const conversationsQuery = useQuery({
+    queryKey: ["admin-conversations"],
+    queryFn: async (): Promise<ConversationRow[]> => {
+      const { data, error } = await supabase
+        .from("support_conversations")
+        .select(
+          "id, subject, status, created_at, org:org_id(name), started_by_profile:started_by(full_name, email), assigned_to_profile:assigned_to(full_name, email)",
+        )
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as ConversationRow[];
+    },
+  });
+
+  async function addAgent() {
+    if (!newAgentEmail) return;
+    setAgentBusy(true);
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("email", newAgentEmail)
+        .maybeSingle();
+      if (profileError) throw profileError;
+      if (!profile) throw new Error("No user found with that email. They must sign up first.");
+      const { error } = await supabase.from("chat_support_agents").insert({ user_id: profile.id });
+      if (error) throw error;
+      toast.success("Chat support agent added");
+      setNewAgentEmail("");
+      void qc.invalidateQueries({ queryKey: ["chat-support-agents"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not add agent");
+    } finally {
+      setAgentBusy(false);
+    }
+  }
+
+  async function removeAgent(userId: string) {
+    const { error } = await supabase.from("chat_support_agents").delete().eq("user_id", userId);
+    if (error) return toast.error(error.message);
+    toast.success("Agent removed");
+    void qc.invalidateQueries({ queryKey: ["chat-support-agents"] });
+  }
+
+  async function assignConversation(convId: string, agentUserId: string) {
+    const { error } = await supabase
+      .from("support_conversations")
+      .update({ assigned_to: agentUserId, status: "assigned" })
+      .eq("id", convId);
+    if (error) return toast.error(error.message);
+    toast.success("Conversation assigned");
+    void qc.invalidateQueries({ queryKey: ["admin-conversations"] });
+  }
+
+  async function closeConversation(convId: string) {
+    const { error } = await supabase
+      .from("support_conversations")
+      .update({ status: "closed" })
+      .eq("id", convId);
+    if (error) return toast.error(error.message);
+    toast.success("Conversation closed");
+    void qc.invalidateQueries({ queryKey: ["admin-conversations"] });
+  }
+
+  const agents = agentsQuery.data ?? [];
+  const convos = conversationsQuery.data ?? [];
+
+  const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline"> = {
+    open: "default",
+    assigned: "outline",
+    closed: "secondary",
+  };
+
+  return (
+    <>
+      {/* Chat support agents */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Chat support agents</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead className="hidden md:table-cell">Added</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {agents.map((a) => {
+                const profile = a.profiles as unknown as { email: string | null; full_name: string | null } | null;
+                return (
+                  <TableRow key={a.user_id}>
+                    <TableCell className="font-medium">{profile?.full_name ?? "—"}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{profile?.email ?? "—"}</TableCell>
+                    <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                      {formatDate(a.created_at)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="ghost" onClick={() => void removeAgent(String(a.user_id))}>
+                        Remove
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {agents.length === 0 && !agentsQuery.isLoading && (
+                <TableRow>
+                  <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">
+                    No agents yet. Add one below.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+
+          <div className="flex gap-2 pt-2">
+            <div className="flex-1 space-y-1.5">
+              <Label htmlFor="new-agent">Add agent by email</Label>
+              <Input
+                id="new-agent"
+                type="email"
+                value={newAgentEmail}
+                onChange={(e) => setNewAgentEmail(e.target.value)}
+                placeholder="support@example.com"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button onClick={() => void addAgent()} disabled={agentBusy || !newAgentEmail}>
+                Add
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Conversations list */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Support conversations</CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-x-auto p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Subject</TableHead>
+                <TableHead className="hidden sm:table-cell">From</TableHead>
+                <TableHead className="hidden md:table-cell">Organisation</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="hidden lg:table-cell">Assigned to</TableHead>
+                <TableHead className="hidden lg:table-cell">Date</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {convos.map((c) => (
+                <TableRow key={c.id}>
+                  <TableCell className="font-medium">{c.subject}</TableCell>
+                  <TableCell className="hidden text-sm text-muted-foreground sm:table-cell">
+                    {c.started_by_profile?.full_name ?? c.started_by_profile?.email ?? "—"}
+                  </TableCell>
+                  <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                    {c.org?.name ?? "—"}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={STATUS_VARIANT[c.status] ?? "secondary"} className="capitalize">
+                      {c.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">
+                    {c.assigned_to_profile?.full_name ?? c.assigned_to_profile?.email ?? (
+                      <span className="text-muted-foreground/60">Unassigned</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">
+                    {formatDate(c.created_at)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      {c.status !== "closed" && agents.length > 0 && (
+                        <select
+                          className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                          defaultValue=""
+                          onChange={(e) => {
+                            if (e.target.value) void assignConversation(c.id, e.target.value);
+                            e.target.value = "";
+                          }}
+                        >
+                          <option value="" disabled>Assign…</option>
+                          {agents.map((a) => {
+                            const p = a.profiles as unknown as { email: string | null; full_name: string | null } | null;
+                            return (
+                              <option key={String(a.user_id)} value={String(a.user_id)}>
+                                {p?.full_name ?? p?.email ?? String(a.user_id).slice(0, 8)}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      )}
+                      {c.status !== "closed" && (
+                        <Button size="sm" variant="ghost" onClick={() => void closeConversation(c.id)}>
+                          Close
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {convos.length === 0 && !conversationsQuery.isLoading && (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                    No support conversations yet.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
 function AdminPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -712,6 +964,15 @@ function AdminPage() {
             <Badge variant="secondary">Coming soon</Badge>
           </CardContent>
         </Card>
+      </div>
+
+      {/* ── MODULE 5: CHAT & SUPPORT ───────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="border-b pb-2">
+          <h2 className="text-base font-semibold">Chat &amp; support</h2>
+          <p className="text-sm text-muted-foreground">Manage support agents and assign incoming conversations.</p>
+        </div>
+        <ChatSupportSection />
       </div>
     </div>
   );
