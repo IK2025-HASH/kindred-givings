@@ -22,6 +22,11 @@ export type Organization = {
   status: "active" | "suspended";
   public_page_enabled: boolean;
   suggested_amounts: number[];
+  bank_account_name: string | null;
+  bank_sort_code: string | null;
+  bank_account_number: string | null;
+  bank_reference: string | null;
+  bank_iban: string | null;
 };
 
 export type Membership = { role: OrgRole; organization: Organization };

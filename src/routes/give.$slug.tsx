@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, Heart, HeartHandshake, MapPin, Share2, Users } from "lucide-react";
+import { Building2, CheckCircle2, Heart, HeartHandshake, MapPin, Share2, Users } from "lucide-react";
 import QRCode from "react-qr-code";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -466,12 +466,51 @@ function GivePage() {
           {/* Donation form */}
           <Card className="shadow-lift">
             {done ? (
-              <CardContent className="space-y-4 py-12 text-center">
+              <CardContent className="space-y-4 py-8 text-center">
                 <CheckCircle2 className="mx-auto size-12 text-success" />
                 <h2 className="font-display text-2xl font-bold">Thank you!</h2>
                 <p className="text-sm text-muted-foreground">
-                  Your pledge has been sent to {org.name}. They will confirm it shortly.
+                  Your pledge has been sent to {org.name}.
                 </p>
+                {/* Bank transfer instructions */}
+                {(orgExt.bank_account_number as string | null) && (
+                  <div className="rounded-xl border bg-muted/50 p-4 text-left text-sm">
+                    <div className="flex items-center gap-2 font-semibold mb-3">
+                      <Building2 className="size-4 text-primary" />
+                      How to complete your bank transfer
+                    </div>
+                    <dl className="space-y-2">
+                      {(orgExt.bank_account_name as string | null) && (
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted-foreground shrink-0">Account name</dt>
+                          <dd className="font-medium text-right">{orgExt.bank_account_name as string}</dd>
+                        </div>
+                      )}
+                      {(orgExt.bank_sort_code as string | null) && (
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted-foreground shrink-0">Sort code</dt>
+                          <dd className="font-medium font-mono">{orgExt.bank_sort_code as string}</dd>
+                        </div>
+                      )}
+                      <div className="flex justify-between gap-4">
+                        <dt className="text-muted-foreground shrink-0">Account number</dt>
+                        <dd className="font-medium font-mono">{orgExt.bank_account_number as string}</dd>
+                      </div>
+                      {(orgExt.bank_reference as string | null) && (
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted-foreground shrink-0">Reference</dt>
+                          <dd className="font-medium">{orgExt.bank_reference as string}</dd>
+                        </div>
+                      )}
+                      {(orgExt.bank_iban as string | null) && (
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted-foreground shrink-0">IBAN</dt>
+                          <dd className="font-medium font-mono text-xs">{orgExt.bank_iban as string}</dd>
+                        </div>
+                      )}
+                    </dl>
+                  </div>
+                )}
                 <Button variant="outline" className="w-full" onClick={() => setDone(false)}>
                   Make another gift
                 </Button>
@@ -659,6 +698,51 @@ function GivePage() {
               </>
             )}
           </Card>
+
+          {/* Bank transfer details */}
+          {(orgExt.bank_account_number as string | null) && (
+            <Card className="shadow-card">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-2 text-sm font-semibold mb-3">
+                  <Building2 className="size-4 text-primary" />
+                  Pay by bank transfer
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Transfer directly to {org.name} — no platform fees, 100% goes to the charity.
+                </p>
+                <dl className="space-y-2 text-sm">
+                  {(orgExt.bank_account_name as string | null) && (
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted-foreground shrink-0">Account name</dt>
+                      <dd className="font-medium text-right">{orgExt.bank_account_name as string}</dd>
+                    </div>
+                  )}
+                  {(orgExt.bank_sort_code as string | null) && (
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted-foreground shrink-0">Sort code</dt>
+                      <dd className="font-mono font-medium">{orgExt.bank_sort_code as string}</dd>
+                    </div>
+                  )}
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground shrink-0">Account number</dt>
+                    <dd className="font-mono font-medium">{orgExt.bank_account_number as string}</dd>
+                  </div>
+                  {(orgExt.bank_reference as string | null) && (
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted-foreground shrink-0">Reference</dt>
+                      <dd className="font-medium">{orgExt.bank_reference as string}</dd>
+                    </div>
+                  )}
+                  {(orgExt.bank_iban as string | null) && (
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted-foreground shrink-0">IBAN</dt>
+                      <dd className="font-mono text-xs font-medium">{orgExt.bank_iban as string}</dd>
+                    </div>
+                  )}
+                </dl>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Share / QR */}
           <Card className="shadow-card">
