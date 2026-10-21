@@ -51,9 +51,9 @@ function Pricing() {
           payments for donations are coming soon.
         </p>
 
-        <div className="mt-10 grid gap-6 lg:grid-cols-3">
+        <div className="mt-10 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
           {isLoading &&
-            [0, 1, 2].map((i) => <Skeleton key={i} className="h-80 w-full rounded-xl" />)}
+            [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-80 w-full rounded-xl" />)}
           {data?.map((plan, index) => (
             <Card
               key={plan.id}

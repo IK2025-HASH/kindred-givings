@@ -428,7 +428,7 @@ function AdminPage() {
     const next = current === "active" ? "suspended" : "active";
     const { error } = await supabase
       .from("organizations")
-      .update({ status: next } as never)
+      .update({ status: next })
       .eq("id", orgId);
     if (error) return toast.error(error.message);
     toast.success(`Org ${next}`);

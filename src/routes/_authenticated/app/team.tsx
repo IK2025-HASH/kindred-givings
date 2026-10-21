@@ -76,6 +76,10 @@ function TeamPage() {
     (i) => !i.accepted_at && new Date(i.expires_at) > new Date(),
   );
 
+  // If the query succeeded but returned 0 members, the current user's membership
+  // row is missing from organization_members for this org (data integrity gap).
+  const membersMissing = !team.isLoading && !team.isError && members.length === 0;
+
   const planLimit = subscription.data?.plan?.max_members ?? 3;
   const atLimit = members.length >= planLimit;
 
@@ -144,7 +148,7 @@ function TeamPage() {
     <div className="space-y-6">
       <PageHeader
         title="Team"
-        description={`${members.length} of ${planLimit} seats used.`}
+        description={team.isLoading ? "Loading…" : `${members.length} of ${planLimit} seats used.`}
         action={
           canManage ? (
             <Button onClick={() => setInviteOpen(true)} disabled={atLimit}>
@@ -167,6 +171,21 @@ function TeamPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {team.isError && (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-6 text-center text-sm text-destructive">
+                    Could not load team members: {String((team.error as Error)?.message ?? "unknown error")}
+                  </TableCell>
+                </TableRow>
+              )}
+              {membersMissing && (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
+                    No member records found for this workspace. Your membership row may be missing —
+                    contact support or check the database directly.
+                  </TableCell>
+                </TableRow>
+              )}
               {members.map((m) => (
                 <TableRow key={m.id}>
                   <TableCell className="font-medium">

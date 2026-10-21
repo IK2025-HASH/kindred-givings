@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useNavigate } from "@tanstack/react-router";
 import { canManageOrg, useAuth } from "@/hooks/useAuth";
 import { slugify } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
@@ -84,6 +85,7 @@ const CURRENCIES: { code: string; name: string }[] = [
 function SettingsPage() {
   const { currentOrg, currentRole, refreshMemberships } = useAuth();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const canManage = canManageOrg(currentRole);
 
   const [name, setName] = useState("");
@@ -115,9 +117,8 @@ function SettingsPage() {
     setWebsite(currentOrg.website ?? "");
     setCharityNumber(currentOrg.charity_number ?? "");
     setLogoUrl(currentOrg.logo_url ?? "");
-    const ext = currentOrg as unknown as Record<string, string>;
-    setBannerUrl(ext.banner_url ?? "");
-    setPaymentLinkUrl(ext.payment_link_url ?? "");
+    setBannerUrl(currentOrg.banner_url ?? "");
+    setPaymentLinkUrl(currentOrg.payment_link_url ?? "");
     setSuggestedAmounts((currentOrg.suggested_amounts ?? [10, 25, 50, 100]).join(","));
     setPublicPageEnabled(currentOrg.public_page_enabled);
   }, [currentOrg]);
@@ -169,7 +170,7 @@ function SettingsPage() {
     if (error) return toast.error(error.message);
     toast.success("Charity workspace deleted");
     void qc.invalidateQueries({ queryKey: ["memberships"] });
-    window.location.href = "/app";
+    void navigate({ to: "/app", replace: true });
   }
 
   if (!currentOrg) return null;

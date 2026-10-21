@@ -10,6 +10,8 @@ export type Organization = {
   name: string;
   slug: string;
   logo_url: string | null;
+  banner_url: string | null;
+  payment_link_url: string | null;
   tagline: string | null;
   story: string | null;
   currency: string;
