@@ -35,12 +35,17 @@ function createSupabaseClient() {
   const SUPABASE_URL = "https://zaexufclxmrpiuxogsjo.supabase.co";
   const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_6HAkY8MLLzv6ToOii4R9_Q_zF8feNPS";
 
+  // Only use brokeredPreviewStorage inside Lovable's preview iframe.
+  // On the real deployed domain there is no parent frame, so message-based
+  // token reads never resolve and the UI hangs silently after sign-in.
+  const inPreviewIframe = typeof window !== 'undefined' && window.parent !== window;
+
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     global: {
       fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY),
     },
     auth: {
-      storage: brokeredPreviewStorage(),
+      storage: inPreviewIframe ? brokeredPreviewStorage() : undefined,
       persistSession: true,
       autoRefreshToken: true,
     },
