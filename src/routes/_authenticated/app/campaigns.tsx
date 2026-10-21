@@ -69,8 +69,8 @@ function CampaignsPage() {
   async function save() {
     if (!orgId || !draft?.title) return;
     if (!draft.id) {
-      const limit = subscription.data?.plan?.max_campaigns;
-      if (limit !== undefined && (campaigns.data?.length ?? 0) >= limit) {
+      const limit = subscription.data?.plan?.max_campaigns ?? 3;
+      if ((campaigns.data?.length ?? 0) >= limit) {
         toast.error(`Your plan allows ${limit} campaigns. Upgrade to add more.`);
         return;
       }
@@ -102,14 +102,23 @@ function CampaignsPage() {
     void qc.invalidateQueries({ queryKey: ["campaigns", orgId] });
   }
 
+  const campaignLimit = subscription.data?.plan?.max_campaigns ?? 3;
+  const campaignCount = campaigns.data?.length ?? 0;
+  const atCampaignLimit = campaignCount >= campaignLimit;
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Campaigns"
-        description="Appeals with a target, shown on your public giving page."
+        description={campaigns.isLoading ? "Loading…" : `${campaignCount} of ${campaignLimit} campaigns used.`}
         action={
           editable ? (
-            <Button onClick={() => setDraft({ title: "", status: "active" })}>New campaign</Button>
+            <Button
+              onClick={() => setDraft({ title: "", status: "active" })}
+              disabled={atCampaignLimit}
+            >
+              {atCampaignLimit ? `Limit reached (${campaignLimit})` : "New campaign"}
+            </Button>
           ) : null
         }
       />

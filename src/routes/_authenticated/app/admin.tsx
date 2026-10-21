@@ -2,7 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ChevronDown, ChevronUp, Plus, X } from "lucide-react";
+import { ChevronDown, ChevronUp, CreditCard, Plus, X } from "lucide-react";
 import { PageHeader } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -392,6 +392,19 @@ function AdminPage() {
     },
   });
 
+  const usersQuery = useQuery({
+    queryKey: ["admin-users"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, email, full_name, created_at")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const adminsQuery = useQuery({
     queryKey: ["admin-list"],
     queryFn: async () => {
@@ -410,10 +423,7 @@ function AdminPage() {
       const [orgsRes, usersRes, donationsRes] = await Promise.all([
         supabase.from("organizations").select("id", { count: "exact", head: true }),
         supabase.from("profiles").select("id", { count: "exact", head: true }),
-        supabase
-          .from("donations")
-          .select("amount")
-          .eq("status", "confirmed"),
+        supabase.from("donations").select("amount").eq("status", "confirmed"),
       ]);
       const total = (donationsRes.data ?? []).reduce((s, d) => s + Number(d.amount), 0);
       return {
@@ -474,12 +484,13 @@ function AdminPage() {
   const stats = statsQuery.data;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader title="Platform Admin" description="Donorbook platform management." />
 
+      {/* Platform-wide stats */}
       <div className="grid gap-4 sm:grid-cols-3">
         {[
-          { label: "Charities", value: stats?.orgs ?? "—" },
+          { label: "Organisations", value: stats?.orgs ?? "—" },
           { label: "Users", value: stats?.users ?? "—" },
           { label: "Total donated", value: stats ? formatMoney(stats.donations) : "—" },
         ].map((s) => (
@@ -494,133 +505,214 @@ function AdminPage() {
         ))}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>All charities</CardTitle>
-        </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead className="hidden md:table-cell">Plan</TableHead>
-                <TableHead className="hidden sm:table-cell">Members</TableHead>
-                <TableHead>Raised</TableHead>
-                <TableHead className="hidden lg:table-cell">Created</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(orgsQuery.data ?? []).map((org) => (
-                <TableRow key={org.org_id}>
-                  <TableCell>
-                    <div className="font-medium">{org.name}</div>
-                    <div className="text-xs text-muted-foreground">/give/{org.slug}</div>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {org.plan_name ?? <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">{org.member_count}</TableCell>
-                  <TableCell className="font-semibold">
-                    {formatMoney(org.donation_total)}
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                    {formatDate(org.created_at)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={org.status === "active" ? "default" : "secondary"}>
-                      {org.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => void toggleOrgStatus(org.org_id, org.status)}
-                    >
-                      {org.status === "active" ? "Suspend" : "Activate"}
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {(orgsQuery.data ?? []).length === 0 && !orgsQuery.isLoading && (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
-                    No charities yet.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {/* ── MODULE 1: USERS & ACCOUNTS ─────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="border-b pb-2">
+          <h2 className="text-base font-semibold">Users &amp; accounts</h2>
+          <p className="text-sm text-muted-foreground">See, suspend and support every organisation and user.</p>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Platform admins</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead className="hidden md:table-cell">Added</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(adminsQuery.data ?? []).map((a) => {
-                const profile = a.profiles as unknown as { email: string | null; full_name: string | null } | null;
-                return (
-                  <TableRow key={a.user_id}>
-                    <TableCell className="font-medium">{profile?.full_name ?? "—"}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {profile?.email ?? "—"}
+        <Card>
+          <CardHeader>
+            <CardTitle>All users</CardTitle>
+          </CardHeader>
+          <CardContent className="overflow-x-auto p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead className="hidden md:table-cell">Joined</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(usersQuery.data ?? []).map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell className="font-medium">
+                      {u.full_name ?? <span className="text-muted-foreground">—</span>}
                     </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{u.email ?? "—"}</TableCell>
                     <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
-                      {formatDate(a.created_at)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {a.user_id !== user?.id && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => void removeAdmin(String(a.user_id))}
-                        >
-                          Remove
-                        </Button>
-                      )}
+                      {formatDate(u.created_at)}
                     </TableCell>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                ))}
+                {(usersQuery.data ?? []).length === 0 && !usersQuery.isLoading && (
+                  <TableRow>
+                    <TableCell colSpan={3} className="py-10 text-center text-sm text-muted-foreground">
+                      No users yet.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
 
-          <div className="flex gap-2 pt-2">
-            <div className="flex-1 space-y-1.5">
-              <Label htmlFor="new-admin">Add admin by email</Label>
-              <Input
-                id="new-admin"
-                type="email"
-                value={newAdminEmail}
-                onChange={(e) => setNewAdminEmail(e.target.value)}
-                placeholder="admin@example.com"
-              />
-            </div>
-            <div className="flex items-end">
-              <Button onClick={() => void addAdmin()} disabled={busy || !newAdminEmail}>
-                Add
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>All organisations</CardTitle>
+          </CardHeader>
+          <CardContent className="overflow-x-auto p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="hidden md:table-cell">Plan</TableHead>
+                  <TableHead className="hidden sm:table-cell">Members</TableHead>
+                  <TableHead>Raised</TableHead>
+                  <TableHead className="hidden lg:table-cell">Created</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(orgsQuery.data ?? []).map((org) => (
+                  <TableRow key={org.org_id}>
+                    <TableCell>
+                      <div className="font-medium">{org.name}</div>
+                      <div className="text-xs text-muted-foreground">/give/{org.slug}</div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {org.plan_name ?? <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">{org.member_count}</TableCell>
+                    <TableCell className="font-semibold">
+                      {formatMoney(org.donation_total)}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                      {formatDate(org.created_at)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={org.status === "active" ? "default" : "secondary"}>
+                        {org.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => void toggleOrgStatus(org.org_id, org.status)}
+                      >
+                        {org.status === "active" ? "Suspend" : "Activate"}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {(orgsQuery.data ?? []).length === 0 && !orgsQuery.isLoading && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                      No organisations yet.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
 
-      <PlansSection />
-      <PlatformSettingsSection />
+        <Card>
+          <CardHeader>
+            <CardTitle>Platform admins</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead className="hidden md:table-cell">Added</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(adminsQuery.data ?? []).map((a) => {
+                  const profile = a.profiles as unknown as { email: string | null; full_name: string | null } | null;
+                  return (
+                    <TableRow key={a.user_id}>
+                      <TableCell className="font-medium">{profile?.full_name ?? "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {profile?.email ?? "—"}
+                      </TableCell>
+                      <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                        {formatDate(a.created_at)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {a.user_id !== user?.id && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => void removeAdmin(String(a.user_id))}
+                          >
+                            Remove
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+
+            <div className="flex gap-2 pt-2">
+              <div className="flex-1 space-y-1.5">
+                <Label htmlFor="new-admin">Add admin by email</Label>
+                <Input
+                  id="new-admin"
+                  type="email"
+                  value={newAdminEmail}
+                  onChange={(e) => setNewAdminEmail(e.target.value)}
+                  placeholder="admin@example.com"
+                />
+              </div>
+              <div className="flex items-end">
+                <Button onClick={() => void addAdmin()} disabled={busy || !newAdminEmail}>
+                  Add
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── MODULE 2: BRANDING ─────────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="border-b pb-2">
+          <h2 className="text-base font-semibold">Branding</h2>
+          <p className="text-sm text-muted-foreground">White-label name, logo, colours and email styling per customer.</p>
+        </div>
+        <PlatformSettingsSection />
+      </div>
+
+      {/* ── MODULE 3: PRICING & PLANS ──────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="border-b pb-2">
+          <h2 className="text-base font-semibold">Pricing &amp; plans</h2>
+          <p className="text-sm text-muted-foreground">Plans, limits and usage allowances you can change without a release.</p>
+        </div>
+        <PlansSection />
+      </div>
+
+      {/* ── MODULE 4: PAYMENTS ─────────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="border-b pb-2">
+          <h2 className="text-base font-semibold">Payments</h2>
+          <p className="text-sm text-muted-foreground">Take payment through Stripe and see subscriptions and invoices.</p>
+        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+            <CreditCard className="size-8 text-muted-foreground/50" />
+            <div>
+              <p className="font-medium">Stripe integration not yet connected</p>
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                Add your Stripe secret key and webhook secret to enable subscription management,
+                invoice history, and payment analytics.
+              </p>
+            </div>
+            <Badge variant="secondary">Coming soon</Badge>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

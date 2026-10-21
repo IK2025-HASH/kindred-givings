@@ -86,8 +86,8 @@ function DonorsPage() {
   async function save() {
     if (!orgId || !draft?.full_name) return;
     if (!draft.id) {
-      const limit = subscription.data?.plan?.max_donors;
-      if (limit !== undefined && (donors.data?.length ?? 0) >= limit) {
+      const limit = subscription.data?.plan?.max_donors ?? 100;
+      if ((donors.data?.length ?? 0) >= limit) {
         toast.error(`Your plan allows ${limit} donors. Upgrade to add more.`);
         return;
       }
@@ -159,11 +159,15 @@ function DonorsPage() {
     void qc.invalidateQueries({ queryKey: ["donors", orgId] });
   }
 
+  const donorLimit = subscription.data?.plan?.max_donors ?? 100;
+  const donorCount = donors.data?.length ?? 0;
+  const atDonorLimit = donorCount >= donorLimit;
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Donors"
-        description="Everyone who supports your charity."
+        description={donors.isLoading ? "Loading…" : `${donorCount} of ${donorLimit} donors used.`}
         action={
           editable ? (
             <div className="flex flex-wrap gap-2">
@@ -204,7 +208,9 @@ function DonorsPage() {
                 onOpenChange={(o) => setDraft(o ? (draft ?? { full_name: "" }) : null)}
               >
                 <DialogTrigger asChild>
-                  <Button onClick={() => setDraft({ full_name: "" })}>Add donor</Button>
+                  <Button onClick={() => setDraft({ full_name: "" })} disabled={atDonorLimit}>
+                    {atDonorLimit ? `Limit reached (${donorLimit})` : "Add donor"}
+                  </Button>
                 </DialogTrigger>
                 <DialogContent className="max-h-[90vh] overflow-y-auto">
                   <DialogHeader>

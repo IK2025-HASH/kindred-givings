@@ -106,11 +106,19 @@ export type SubscriptionPlan = {
   max_qr_boxes: number;
 };
 
+// Limits applied when an org has no active subscription (free / starter tier)
+const FREE_TIER: SubscriptionPlan = {
+  max_members: 3,
+  max_donors: 100,
+  max_campaigns: 3,
+  max_qr_boxes: 1,
+};
+
 export function useSubscription(orgId: string | null) {
   return useQuery({
     queryKey: ["subscription", orgId],
     enabled: !!orgId,
-    queryFn: async (): Promise<{ plan: SubscriptionPlan | null } | null> => {
+    queryFn: async (): Promise<{ plan: SubscriptionPlan }> => {
       const { data, error } = await supabase
         .from("subscriptions")
         .select("status, plans(max_donors, max_campaigns, max_members, max_qr_boxes)")
@@ -118,8 +126,8 @@ export function useSubscription(orgId: string | null) {
         .eq("status", "active")
         .maybeSingle();
       if (error) throw error;
-      if (!data) return null;
-      return { plan: (data.plans as unknown as SubscriptionPlan | null) ?? null };
+      if (!data) return { plan: FREE_TIER };
+      return { plan: (data.plans as unknown as SubscriptionPlan | null) ?? FREE_TIER };
     },
   });
 }
