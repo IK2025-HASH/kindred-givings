@@ -12,7 +12,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
-import { submitPublicDonation } from "@/lib/public-donations.functions";
 import { formatDate, formatMoney } from "@/lib/format";
 import { useAuth } from "@/hooks/useAuth";
 import { usePlatformSettings } from "@/hooks/usePlatformSettings";
@@ -167,25 +166,29 @@ function GivePage() {
       toast.error("Please choose an amount");
       return;
     }
+    if (!org) return;
     setBusy(true);
     try {
-      await submitPublicDonation({
-        data: {
-          slug,
-          amount: Number(amount),
-          campaignId,
-          name: name || undefined,
-          email: email || undefined,
-          message: message || undefined,
-          giftAid,
-          anonymous,
-          recurring,
-          sourceLocation: loc || undefined,
-        },
-      });
+      const { error } = await supabase.from("donations").insert({
+        organization_id: org.id,
+        campaign_id: campaignId,
+        amount: Number(amount),
+        currency: org.currency,
+        method: "online",
+        status: "pending",
+        source: "public_page",
+        is_recurring: recurring,
+        gift_aid: giftAid,
+        is_anonymous: anonymous,
+        donor_name: anonymous ? null : (name || null),
+        donor_email: email || null,
+        message: message || null,
+        source_location: loc || null,
+      } as never);
+      if (error) throw error;
       setDone(true);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "We couldn't record that donation");
+      toast.error(err instanceof Error ? err.message : "Could not record your donation. Please try again.");
     } finally {
       setBusy(false);
     }
