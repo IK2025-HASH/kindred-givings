@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Building2, CheckCircle2, Heart, HeartHandshake, MapPin, Share2, Users } from "lucide-react";
+import { Building2, CheckCircle2, CreditCard, Heart, HeartHandshake, MapPin, QrCode, Share2, Users } from "lucide-react";
 import QRCode from "react-qr-code";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -80,6 +80,7 @@ function GivePage() {
   const [anonymous, setAnonymous] = useState(false);
   const [recurring, setRecurring] = useState(false);
   const [done, setDone] = useState(false);
+  const [paymentStep, setPaymentStep] = useState<"bank" | "qr" | null>(null);
   const [busy, setBusy] = useState(false);
 
   const orgQuery = useQuery({
@@ -98,6 +99,13 @@ function GivePage() {
 
   const org = orgQuery.data;
   const orgExt = org as unknown as Record<string, unknown>;
+
+  const paymentLinkUrl = orgExt?.payment_link_url as string | null;
+  const bankAccountNumber = orgExt?.bank_account_number as string | null;
+  const bankAccountName = orgExt?.bank_account_name as string | null;
+  const bankSortCode = orgExt?.bank_sort_code as string | null;
+  const bankReference = orgExt?.bank_reference as string | null;
+  const bankIban = orgExt?.bank_iban as string | null;
 
   const campaignsQuery = useQuery({
     queryKey: ["public-campaigns", org?.id],
@@ -466,90 +474,106 @@ function GivePage() {
           {/* Donation form */}
           <Card className="shadow-lift">
             {done ? (
-              <CardContent className="space-y-4 py-8 text-center">
-                <CheckCircle2 className="mx-auto size-12 text-success" />
-                <h2 className="font-display text-2xl font-bold">Thank you!</h2>
-                <p className="text-sm text-muted-foreground">
-                  Your pledge has been sent to {org.name}.
-                </p>
-                {/* Bank transfer instructions */}
-                {(orgExt.bank_account_number as string | null) && (
-                  <div className="rounded-xl border bg-muted/50 p-4 text-left text-sm">
-                    <div className="flex items-center gap-2 font-semibold mb-3">
-                      <Building2 className="size-4 text-primary" />
-                      How to complete your bank transfer
-                    </div>
-                    <dl className="space-y-2">
-                      {(orgExt.bank_account_name as string | null) && (
-                        <div className="flex justify-between gap-4">
-                          <dt className="text-muted-foreground shrink-0">Account name</dt>
-                          <dd className="font-medium text-right">{orgExt.bank_account_name as string}</dd>
-                        </div>
-                      )}
-                      {(orgExt.bank_sort_code as string | null) && (
-                        <div className="flex justify-between gap-4">
-                          <dt className="text-muted-foreground shrink-0">Sort code</dt>
-                          <dd className="font-medium font-mono">{orgExt.bank_sort_code as string}</dd>
-                        </div>
-                      )}
-                      <div className="flex justify-between gap-4">
-                        <dt className="text-muted-foreground shrink-0">Account number</dt>
-                        <dd className="font-medium font-mono">{orgExt.bank_account_number as string}</dd>
-                      </div>
-                      {(orgExt.bank_reference as string | null) && (
-                        <div className="flex justify-between gap-4">
-                          <dt className="text-muted-foreground shrink-0">Reference</dt>
-                          <dd className="font-medium">{orgExt.bank_reference as string}</dd>
-                        </div>
-                      )}
-                      {(orgExt.bank_iban as string | null) && (
-                        <div className="flex justify-between gap-4">
-                          <dt className="text-muted-foreground shrink-0">IBAN</dt>
-                          <dd className="font-medium font-mono text-xs">{orgExt.bank_iban as string}</dd>
-                        </div>
-                      )}
-                    </dl>
-                  </div>
-                )}
-                <Button variant="outline" className="w-full" onClick={() => setDone(false)}>
-                  Make another gift
-                </Button>
-                {user ? (
-                  <Link
-                    to="/my-giving"
-                    className="block text-sm underline underline-offset-2 text-muted-foreground"
-                  >
-                    View your giving history
-                  </Link>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    <Link
-                      to="/auth"
-                      search={{ mode: "signup" }}
-                      className="underline underline-offset-2"
-                    >
-                      Create a free account
-                    </Link>{" "}
-                    to track your giving across all charities.
+              <CardContent className="space-y-4 py-8">
+                <div className="text-center">
+                  <CheckCircle2 className="mx-auto size-10 text-success mb-3" />
+                  <h2 className="font-display text-xl font-bold">Now complete your payment</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Choose how you'd like to pay {org.name} directly.
                   </p>
-                )}
+                </div>
+
+                <div className="space-y-3">
+                  {paymentLinkUrl && (
+                    <a
+                      href={paymentLinkUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+                    >
+                      <CreditCard className="size-4" />
+                      Pay by card
+                    </a>
+                  )}
+
+                  {bankAccountNumber && (
+                    <div>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => setPaymentStep(paymentStep === "bank" ? null : "bank")}
+                      >
+                        <Building2 className="size-4 mr-2" />
+                        Pay by bank transfer
+                      </Button>
+                      {paymentStep === "bank" && (
+                        <div className="mt-3 rounded-xl border bg-muted/50 p-4 text-sm">
+                          <dl className="space-y-2">
+                            {bankAccountName && (
+                              <div className="flex justify-between gap-4">
+                                <dt className="shrink-0 text-muted-foreground">Account name</dt>
+                                <dd className="font-medium text-right">{bankAccountName}</dd>
+                              </div>
+                            )}
+                            {bankSortCode && (
+                              <div className="flex justify-between gap-4">
+                                <dt className="shrink-0 text-muted-foreground">Sort code</dt>
+                                <dd className="font-mono font-medium">{bankSortCode}</dd>
+                              </div>
+                            )}
+                            <div className="flex justify-between gap-4">
+                              <dt className="shrink-0 text-muted-foreground">Account number</dt>
+                              <dd className="font-mono font-medium">{bankAccountNumber}</dd>
+                            </div>
+                            {bankReference && (
+                              <div className="flex justify-between gap-4">
+                                <dt className="shrink-0 text-muted-foreground">Reference</dt>
+                                <dd className="font-medium">{bankReference}</dd>
+                              </div>
+                            )}
+                            {bankIban && (
+                              <div className="flex justify-between gap-4">
+                                <dt className="shrink-0 text-muted-foreground">IBAN</dt>
+                                <dd className="font-mono text-xs font-medium">{bankIban}</dd>
+                              </div>
+                            )}
+                          </dl>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setPaymentStep(paymentStep === "qr" ? null : "qr")}
+                    >
+                      <QrCode className="size-4 mr-2" />
+                      Pay by QR code
+                    </Button>
+                    {paymentStep === "qr" && (
+                      <div className="mt-3 flex justify-center rounded-xl bg-white p-4">
+                        <QRCode value={paymentLinkUrl || pageUrl} size={160} level="M" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <Button
+                  variant="ghost"
+                  className="w-full text-sm text-muted-foreground"
+                  onClick={() => { setDone(false); setPaymentStep(null); }}
+                >
+                  Make another donation
+                </Button>
               </CardContent>
             ) : (
               <>
                 <CardHeader className="pb-3">
                   <CardTitle className="font-display text-xl">Make a donation</CardTitle>
-                  {(orgExt.payment_link_url as string) && (
-                    <a
-                      href={String(orgExt.payment_link_url)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-2 flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-                    >
-                      Pay by card instantly
-                    </a>
-                  )}
                   <p className="text-xs text-muted-foreground">
-                    Complete the form and {org.name} will be in touch to arrange payment.
+                    Fill in your details then choose how to pay — card, bank transfer, or QR code.
                   </p>
                 </CardHeader>
 
@@ -698,51 +722,6 @@ function GivePage() {
               </>
             )}
           </Card>
-
-          {/* Bank transfer details */}
-          {(orgExt.bank_account_number as string | null) && (
-            <Card className="shadow-card">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-2 text-sm font-semibold mb-3">
-                  <Building2 className="size-4 text-primary" />
-                  Pay by bank transfer
-                </div>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Transfer directly to {org.name} — no platform fees, 100% goes to the charity.
-                </p>
-                <dl className="space-y-2 text-sm">
-                  {(orgExt.bank_account_name as string | null) && (
-                    <div className="flex justify-between gap-3">
-                      <dt className="text-muted-foreground shrink-0">Account name</dt>
-                      <dd className="font-medium text-right">{orgExt.bank_account_name as string}</dd>
-                    </div>
-                  )}
-                  {(orgExt.bank_sort_code as string | null) && (
-                    <div className="flex justify-between gap-3">
-                      <dt className="text-muted-foreground shrink-0">Sort code</dt>
-                      <dd className="font-mono font-medium">{orgExt.bank_sort_code as string}</dd>
-                    </div>
-                  )}
-                  <div className="flex justify-between gap-3">
-                    <dt className="text-muted-foreground shrink-0">Account number</dt>
-                    <dd className="font-mono font-medium">{orgExt.bank_account_number as string}</dd>
-                  </div>
-                  {(orgExt.bank_reference as string | null) && (
-                    <div className="flex justify-between gap-3">
-                      <dt className="text-muted-foreground shrink-0">Reference</dt>
-                      <dd className="font-medium">{orgExt.bank_reference as string}</dd>
-                    </div>
-                  )}
-                  {(orgExt.bank_iban as string | null) && (
-                    <div className="flex justify-between gap-3">
-                      <dt className="text-muted-foreground shrink-0">IBAN</dt>
-                      <dd className="font-mono text-xs font-medium">{orgExt.bank_iban as string}</dd>
-                    </div>
-                  )}
-                </dl>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Share / QR */}
           <Card className="shadow-card">

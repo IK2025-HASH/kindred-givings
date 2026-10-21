@@ -366,6 +366,18 @@ function SettingsPage() {
               <p className="text-xs text-muted-foreground">Comma-separated numbers, up to 6.</p>
             </div>
 
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Recipient account</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <p className="text-sm text-muted-foreground">
+              Donors pay <strong>directly to you</strong> — Donorbook never handles money. Set whichever payment methods you accept and they will appear on your giving page.
+            </p>
+
             <div className="space-y-1.5">
               <Label htmlFor="s-payment">Card payment link</Label>
               <Input
@@ -377,76 +389,66 @@ function SettingsPage() {
                 disabled={!canManage}
               />
               <p className="text-xs text-muted-foreground">
-                If set, a "Pay by card" button appears on your giving page. Use a Stripe Payment
-                Link or equivalent.
+                A "Pay by card" button appears on your giving page. Use a Stripe Payment Link or equivalent.
               </p>
             </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Payment receiving</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Enter your charity's bank details so donors know where to send money directly to you.
-              These appear on your giving page.{" "}
-              <strong>Donorbook never touches your funds — all payments go straight to you.</strong>
-            </p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="s-bank-name">Account name</Label>
-                <Input
-                  id="s-bank-name"
-                  value={bankAccountName}
-                  onChange={(e) => setBankAccountName(e.target.value)}
-                  placeholder="e.g. Hope Charity Trust"
-                  disabled={!canManage}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="s-sort">Sort code</Label>
-                <Input
-                  id="s-sort"
-                  value={bankSortCode}
-                  onChange={(e) => setBankSortCode(e.target.value)}
-                  placeholder="00-00-00"
-                  disabled={!canManage}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="s-acc">Account number</Label>
-                <Input
-                  id="s-acc"
-                  value={bankAccountNumber}
-                  onChange={(e) => setBankAccountNumber(e.target.value)}
-                  placeholder="12345678"
-                  disabled={!canManage}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="s-ref">Payment reference</Label>
-                <Input
-                  id="s-ref"
-                  value={bankReference}
-                  onChange={(e) => setBankReference(e.target.value)}
-                  placeholder="e.g. DONATION or donor's name"
-                  disabled={!canManage}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Tell donors what to write in the payment reference field.
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="s-iban">IBAN (international donors)</Label>
-                <Input
-                  id="s-iban"
-                  value={bankIban}
-                  onChange={(e) => setBankIban(e.target.value)}
-                  placeholder="GB29 XXXX XXXX XXXX XXXX XX"
-                  disabled={!canManage}
-                />
+            <div className="border-t pt-4">
+              <p className="text-sm font-medium mb-3">Bank transfer details</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="s-bank-name">Account name</Label>
+                  <Input
+                    id="s-bank-name"
+                    value={bankAccountName}
+                    onChange={(e) => setBankAccountName(e.target.value)}
+                    placeholder="e.g. Hope Charity Trust"
+                    disabled={!canManage}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="s-sort">Sort code</Label>
+                  <Input
+                    id="s-sort"
+                    value={bankSortCode}
+                    onChange={(e) => setBankSortCode(e.target.value)}
+                    placeholder="00-00-00"
+                    disabled={!canManage}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="s-acc">Account number</Label>
+                  <Input
+                    id="s-acc"
+                    value={bankAccountNumber}
+                    onChange={(e) => setBankAccountNumber(e.target.value)}
+                    placeholder="12345678"
+                    disabled={!canManage}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="s-ref">Payment reference</Label>
+                  <Input
+                    id="s-ref"
+                    value={bankReference}
+                    onChange={(e) => setBankReference(e.target.value)}
+                    placeholder="e.g. DONATION or your name"
+                    disabled={!canManage}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    What donors should put in their transfer reference.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="s-iban">IBAN (international donors)</Label>
+                  <Input
+                    id="s-iban"
+                    value={bankIban}
+                    onChange={(e) => setBankIban(e.target.value)}
+                    placeholder="GB29 XXXX XXXX XXXX XXXX XX"
+                    disabled={!canManage}
+                  />
+                </div>
               </div>
             </div>
           </CardContent>
