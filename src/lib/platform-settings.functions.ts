@@ -12,6 +12,7 @@ export type PlatformSettings = {
   company_address: string;
   platform_currency: string;
   demo_slug: string;
+  stripe_publishable_key: string;
 };
 
 export const DEFAULTS: PlatformSettings = {
@@ -25,6 +26,7 @@ export const DEFAULTS: PlatformSettings = {
   company_address: "Donorbook, England, United Kingdom",
   platform_currency: "GBP",
   demo_slug: "sunrise-childrens-foundation",
+  stripe_publishable_key: "",
 };
 
 function rowsToSettings(rows: { key: string; value: string }[]): PlatformSettings {
@@ -41,6 +43,7 @@ function rowsToSettings(rows: { key: string; value: string }[]): PlatformSetting
     company_address: map.company_address ?? DEFAULTS.company_address,
     platform_currency: map.platform_currency ?? DEFAULTS.platform_currency,
     demo_slug: map.demo_slug ?? DEFAULTS.demo_slug,
+    stripe_publishable_key: map.stripe_publishable_key ?? DEFAULTS.stripe_publishable_key,
   };
 }
 

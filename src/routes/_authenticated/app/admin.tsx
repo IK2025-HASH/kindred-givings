@@ -67,7 +67,10 @@ const SETTING_LABELS: Record<keyof PlatformSettings, string> = {
   company_address: "Company address",
   platform_currency: "Default currency",
   demo_slug: "Demo org slug",
+  stripe_publishable_key: "Stripe publishable key (pk_live_…)",
 };
+
+const STRIPE_KEYS: (keyof PlatformSettings)[] = ["stripe_publishable_key"];
 
 type Plan = {
   id: string;
@@ -337,45 +340,71 @@ function PlatformSettingsSection() {
     }
   }
 
-  const keys = Object.keys(DEFAULTS) as (keyof PlatformSettings)[];
+  const generalKeys = (Object.keys(DEFAULTS) as (keyof PlatformSettings)[]).filter((k) => !STRIPE_KEYS.includes(k));
   const hasChanges = Object.keys(editing).length > 0;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Platform settings</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          {keys.map((key) => (
-            <div key={key} className="space-y-1.5">
-              <Label htmlFor={`ps-${key}`}>{SETTING_LABELS[key]}</Label>
-              <Input
-                id={`ps-${key}`}
-                value={editing[key] ?? current[key]}
-                onChange={(e) =>
-                  setEditing((prev) => ({ ...prev, [key]: e.target.value }))
-                }
-              />
-            </div>
-          ))}
-        </div>
-        {hasChanges && (
-          <div className="flex justify-end gap-2 pt-2">
-            <Button
-              variant="ghost"
-              onClick={() => setEditing({})}
-              disabled={busy}
-            >
-              Discard
-            </Button>
-            <Button onClick={() => void save()} disabled={busy}>
-              Save changes
-            </Button>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Platform settings</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            {generalKeys.map((key) => (
+              <div key={key} className="space-y-1.5">
+                <Label htmlFor={`ps-${key}`}>{SETTING_LABELS[key]}</Label>
+                <Input
+                  id={`ps-${key}`}
+                  value={editing[key] ?? current[key]}
+                  onChange={(e) =>
+                    setEditing((prev) => ({ ...prev, [key]: e.target.value }))
+                  }
+                />
+              </div>
+            ))}
           </div>
-        )}
-      </CardContent>
-    </Card>
+          {hasChanges && (
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" onClick={() => setEditing({})} disabled={busy}>Discard</Button>
+              <Button onClick={() => void save()} disabled={busy}>Save changes</Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="size-4" /> Stripe configuration
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Charity subscription payments go to your Stripe account. Enter your keys below.
+            The <strong>secret key</strong> must also be added to Lovable environment variables as{" "}
+            <code className="rounded bg-muted px-1 text-xs">STRIPE_SECRET_KEY</code> — never stored here.
+          </p>
+          <div className="space-y-1.5">
+            <Label htmlFor="ps-stripe_publishable_key">Stripe publishable key (pk_live_… or pk_test_…)</Label>
+            <Input
+              id="ps-stripe_publishable_key"
+              value={editing.stripe_publishable_key ?? current.stripe_publishable_key}
+              onChange={(e) => setEditing((prev) => ({ ...prev, stripe_publishable_key: e.target.value }))}
+              placeholder="pk_live_…"
+              className="font-mono text-xs"
+            />
+            <p className="text-xs text-muted-foreground">Safe to store — this key is public-facing.</p>
+          </div>
+          {hasChanges && (
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" onClick={() => setEditing({})} disabled={busy}>Discard</Button>
+              <Button onClick={() => void save()} disabled={busy}>Save changes</Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </>
   );
 }
 
