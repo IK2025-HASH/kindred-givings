@@ -83,6 +83,8 @@ type Plan = {
   is_public: boolean;
   is_active: boolean;
   sort_order: number;
+  stripe_price_id_monthly: string | null;
+  stripe_price_id_yearly: string | null;
 };
 
 const BLANK_PLAN: Omit<Plan, "id"> = {
@@ -90,6 +92,7 @@ const BLANK_PLAN: Omit<Plan, "id"> = {
   price_monthly: 0, price_yearly: 0,
   max_members: 5, max_donors: 500, max_campaigns: 5,
   features: [], is_public: true, is_active: true, sort_order: 99,
+  stripe_price_id_monthly: null, stripe_price_id_yearly: null,
 };
 
 function PlanForm({
@@ -126,6 +129,14 @@ function PlanForm({
         <div className="space-y-1.5">
           <Label>Yearly price (£)</Label>
           <Input type="number" min={0} value={value.price_yearly} onChange={(e) => set("price_yearly", Number(e.target.value))} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Stripe Price ID — monthly</Label>
+          <Input value={value.stripe_price_id_monthly ?? ""} onChange={(e) => set("stripe_price_id_monthly", e.target.value || null)} placeholder="price_1ABC…" className="font-mono text-xs" />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Stripe Price ID — yearly</Label>
+          <Input value={value.stripe_price_id_yearly ?? ""} onChange={(e) => set("stripe_price_id_yearly", e.target.value || null)} placeholder="price_1XYZ…" className="font-mono text-xs" />
         </div>
         <div className="space-y-1.5">
           <Label>Max members</Label>
@@ -191,13 +202,13 @@ function PlansSection() {
         .select("*")
         .order("sort_order");
       if (error) throw error;
-      return (data ?? []).map((p) => ({ ...p, features: Array.isArray(p.features) ? p.features as string[] : [] }));
+      return (data ?? []).map((p) => ({ ...p, features: Array.isArray(p.features) ? p.features as string[] : [], stripe_price_id_monthly: (p as never as Plan).stripe_price_id_monthly ?? null, stripe_price_id_yearly: (p as never as Plan).stripe_price_id_yearly ?? null }));
     },
   });
 
   function startEdit(plan: Plan) {
     setExpanded(plan.id);
-    setEditing({ name: plan.name, slug: plan.slug, description: plan.description, price_monthly: plan.price_monthly, price_yearly: plan.price_yearly, max_members: plan.max_members, max_donors: plan.max_donors, max_campaigns: plan.max_campaigns, features: plan.features, is_public: plan.is_public, is_active: plan.is_active, sort_order: plan.sort_order });
+    setEditing({ name: plan.name, slug: plan.slug, description: plan.description, price_monthly: plan.price_monthly, price_yearly: plan.price_yearly, max_members: plan.max_members, max_donors: plan.max_donors, max_campaigns: plan.max_campaigns, features: plan.features, is_public: plan.is_public, is_active: plan.is_active, sort_order: plan.sort_order, stripe_price_id_monthly: plan.stripe_price_id_monthly, stripe_price_id_yearly: plan.stripe_price_id_yearly });
   }
 
   async function savePlan(id: string) {
