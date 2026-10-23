@@ -87,7 +87,65 @@ export const checkStripeOnboarding = createServerFn({ method: "POST" })
     return { complete };
   });
 
-// ── 3. Create Stripe Checkout session for a donor ────────────────────────────
+// ── 3. Create Stripe Checkout session for a platform subscription ────────────
+export const createSubscriptionCheckout = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    z.object({
+      orgId: z.string().uuid(),
+      planId: z.string().uuid(),
+      interval: z.enum(["monthly", "yearly"]),
+    }).parse(d)
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const stripe = await getStripe();
+    const origin = appOrigin();
+
+    const { data: org } = await supabaseAdmin
+      .from("organizations")
+      .select("id, name, contact_email, stripe_customer_id")
+      .eq("id", data.orgId)
+      .single();
+    if (!org) throw new Error("Organisation not found.");
+
+    const { data: plan } = await supabaseAdmin
+      .from("plans")
+      .select("id, name, stripe_price_id_monthly, stripe_price_id_yearly")
+      .eq("id", data.planId)
+      .single();
+    if (!plan) throw new Error("Plan not found.");
+
+    const priceId = data.interval === "yearly" ? (plan as never as { stripe_price_id_yearly: string | null }).stripe_price_id_yearly : (plan as never as { stripe_price_id_monthly: string | null }).stripe_price_id_monthly;
+    if (!priceId) throw new Error(`Stripe Price ID for this plan (${data.interval}) is not configured yet. Contact support.`);
+
+    // Create or reuse Stripe customer for this org
+    let customerId = (org as never as { stripe_customer_id: string | null }).stripe_customer_id;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        name: org.name,
+        email: org.contact_email ?? undefined,
+        metadata: { org_id: org.id },
+      });
+      customerId = customer.id;
+      await supabaseAdmin
+        .from("organizations")
+        .update({ stripe_customer_id: customerId } as never)
+        .eq("id", org.id);
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      customer: customerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${origin}/app/billing?subscription=success`,
+      cancel_url: `${origin}/app/billing`,
+      metadata: { org_id: org.id, plan_id: plan.id, interval: data.interval },
+    });
+
+    return { url: session.url! };
+  });
+
+// ── 4. Create Stripe Checkout session for a donor ────────────────────────────
 export const createDonationCheckout = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z.object({
