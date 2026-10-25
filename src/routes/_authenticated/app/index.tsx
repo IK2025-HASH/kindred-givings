@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
+import { CheckCircle2, Circle } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -14,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, type Organization } from "@/hooks/useAuth";
 import { useCampaigns, useDonations, useDonors } from "@/hooks/useOrgData";
 import { formatDate, formatMoney } from "@/lib/format";
 
@@ -32,6 +33,70 @@ export const Route = createFileRoute("/_authenticated/app/")({
   }),
   component: Dashboard,
 });
+
+function SetupChecklist({
+  org,
+  hasDonors,
+  hasCampaigns,
+}: {
+  org: Organization | null;
+  hasDonors: boolean;
+  hasCampaigns: boolean;
+}) {
+  const steps = [
+    { label: "Workspace created", done: true, to: null },
+    {
+      label: "Add your recipient account (card link or bank details)",
+      done: !!(org?.payment_link_url || org?.bank_account_number),
+      to: "/app/settings" as const,
+    },
+    {
+      label: "Add your first donor",
+      done: hasDonors,
+      to: "/app/donors" as const,
+    },
+    {
+      label: "Create your first campaign",
+      done: hasCampaigns,
+      to: "/app/campaigns" as const,
+    },
+    {
+      label: "Share your public giving page",
+      done: !!org?.public_page_enabled,
+      to: "/app/settings" as const,
+    },
+  ];
+  const allDone = steps.every((s) => s.done);
+  if (allDone) return null;
+  const completed = steps.filter((s) => s.done).length;
+  return (
+    <Card className="border-primary/30 bg-primary/5">
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <p className="font-semibold text-sm">Get started — {completed}/{steps.length} done</p>
+          <span className="text-xs text-muted-foreground">{Math.round((completed / steps.length) * 100)}%</span>
+        </div>
+        <Progress value={(completed / steps.length) * 100} className="mb-4 h-1.5" />
+        <ul className="space-y-2">
+          {steps.map((step) => (
+            <li key={step.label} className="flex items-center gap-2.5 text-sm">
+              {step.done
+                ? <CheckCircle2 className="size-4 shrink-0 text-primary" />
+                : <Circle className="size-4 shrink-0 text-muted-foreground" />}
+              {step.to && !step.done ? (
+                <Link to={step.to} className="underline-offset-2 hover:underline text-foreground">
+                  {step.label}
+                </Link>
+              ) : (
+                <span className={step.done ? "text-muted-foreground line-through" : ""}>{step.label}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -119,6 +184,8 @@ function Dashboard() {
           </CardContent>
         </Card>
       )}
+
+      <SetupChecklist org={currentOrg} hasDonors={(donors.data?.length ?? 0) > 0} hasCampaigns={(campaigns.data?.length ?? 0) > 0} />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Raised this month" value={formatMoney(monthTotal, currency)} />

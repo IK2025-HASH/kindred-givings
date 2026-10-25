@@ -123,6 +123,18 @@ function BillingPage() {
         subtitle="Manage your Donorbook subscription"
       />
 
+      {!currentSub && !subQuery.isLoading && (
+        <Card className="border-muted bg-muted/30">
+          <CardContent className="flex items-center gap-3 py-4">
+            <CreditCard className="size-5 shrink-0 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium">Current plan: <span className="font-semibold">Free</span></p>
+              <p className="text-xs text-muted-foreground mt-0.5">Up to 100 donors · 3 campaigns · 3 team members · no card payments</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {currentSub && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="flex items-center gap-4 py-4">

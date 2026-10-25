@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { sendInviteEmail } from "@/lib/email.functions";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -102,8 +103,17 @@ function TeamPage() {
         .single();
       if (error) throw error;
       const link = `${window.location.origin}/invite/${data.token}`;
-      await navigator.clipboard.writeText(link);
-      toast.success("Invite link copied to clipboard");
+      // Send invite email (fire-and-forget; don't block on failure)
+      void sendInviteEmail({
+        data: {
+          toEmail: email,
+          orgName: currentOrg?.name ?? "your organisation",
+          inviteLink: link,
+          role,
+        },
+      }).catch(() => null);
+      try { await navigator.clipboard.writeText(link); } catch { /* silent */ }
+      toast.success("Invite sent by email — link also copied to clipboard");
       setEmail("");
       setInviteOpen(false);
       refresh();
