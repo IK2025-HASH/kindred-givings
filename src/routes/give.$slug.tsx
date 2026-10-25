@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
+import { sendDonationNotification } from "@/lib/email.functions";
 import { formatDate, formatMoney } from "@/lib/format";
 import { useAuth } from "@/hooks/useAuth";
 import { usePlatformSettings } from "@/hooks/usePlatformSettings";
@@ -187,6 +188,19 @@ function GivePage() {
       } as never);
       if (error) throw error;
       setDone(true);
+      // Notify the charity (fire-and-forget — don't block the donor UX on email failure)
+      if (org.contact_email) {
+        void sendDonationNotification({
+          data: {
+            orgEmail: org.contact_email,
+            orgName: org.name,
+            donorName: anonymous ? null : (name || null),
+            amount: Number(amount),
+            currency: org.currency,
+            giftAid,
+          },
+        }).catch(() => null);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not record your donation. Please try again.");
     } finally {
