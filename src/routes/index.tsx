@@ -304,7 +304,7 @@ function ReportMockup() {
             <div key={m} className="flex flex-1 flex-col items-center gap-1">
               <div
                 className="w-full rounded-t bg-primary/80"
-                style={{ height: `${(vals[i] / max) * 88}px` }}
+                style={{ height: `${((vals[i] ?? 0) / max) * 88}px` }}
               />
               <span className="text-[10px] text-muted-foreground">{m}</span>
             </div>
@@ -532,7 +532,7 @@ function Home() {
                 variant="outline"
                 className="border-navy-foreground/30 bg-transparent text-navy-foreground hover:bg-navy-foreground/10 hover:text-navy-foreground"
               >
-                <Link to="/give/$slug" params={{ slug: "sunrise-childrens-foundation" }}>
+                <Link to="/give/$slug" params={{ slug: "sunrise-childrens-foundation" }} search={{ loc: undefined }}>
                   See a live giving page
                 </Link>
               </Button>
@@ -891,7 +891,7 @@ function Home() {
                   ] as { label: string; value: CellValue; highlight?: boolean }[]
                 ).map((col) => (
                   <div key={col.label} className="flex items-center gap-2">
-                    <Cell value={col.value} highlight={col.highlight} />
+                    <Cell value={col.value} {...(col.highlight ? { highlight: true } : {})} />
                     <span className="text-xs text-muted-foreground">{col.label}</span>
                   </div>
                 ))}
@@ -931,7 +931,7 @@ function Home() {
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline">
-              <Link to="/give/$slug" params={{ slug: "sunrise-childrens-foundation" }}>
+              <Link to="/give/$slug" params={{ slug: "sunrise-childrens-foundation" }} search={{ loc: undefined }}>
                 View demo giving page
               </Link>
             </Button>

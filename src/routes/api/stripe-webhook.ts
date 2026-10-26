@@ -29,7 +29,7 @@ export const APIRoute = createAPIFileRoute("/api/stripe-webhook")({
       const session = event.data.object as import("stripe").Stripe.Checkout.Session;
 
       // Donation checkout
-      const donationId = session.metadata?.donation_id;
+      const donationId = session.metadata?.['donation_id'];
       if (donationId) {
         await supabaseAdmin
           .from("donations")
@@ -38,9 +38,9 @@ export const APIRoute = createAPIFileRoute("/api/stripe-webhook")({
       }
 
       // Subscription checkout
-      const orgId = session.metadata?.org_id;
-      const planId = session.metadata?.plan_id;
-      const interval = session.metadata?.interval;
+      const orgId = session.metadata?.['org_id'];
+      const planId = session.metadata?.['plan_id'];
+      const interval = session.metadata?.['interval'];
       if (orgId && planId && session.mode === "subscription" && session.subscription) {
         const { default: Stripe } = await import("stripe");
         const stripeClient = new Stripe(process.env["STRIPE_SECRET_KEY"]!, { apiVersion: STRIPE_API_VERSION });

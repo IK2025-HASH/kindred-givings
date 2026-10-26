@@ -66,7 +66,7 @@ export const submitPublicDonation = createServerFn({ method: "POST" })
         to: data.email,
         donorName: data.name ?? "Supporter",
         orgName: org.name,
-        orgEmail: org.contact_email ?? undefined,
+        ...(org.contact_email ? { orgEmail: org.contact_email } : {}),
         amount: data.amount,
         currency: org.currency,
       });

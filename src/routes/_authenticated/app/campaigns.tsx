@@ -89,7 +89,7 @@ function CampaignsPage() {
     const res = draft.id
       ? await supabase.from("campaigns").update(payload).eq("id", draft.id)
       : await supabase.from("campaigns").insert(payload);
-    if (res.error) return toast.error(res.error.message);
+    if (res.error) { toast.error(res.error.message); return; }
     toast.success(draft.id ? "Campaign updated" : "Campaign created");
     setDraft(null);
     void qc.invalidateQueries({ queryKey: ["campaigns", orgId] });
@@ -97,7 +97,7 @@ function CampaignsPage() {
 
   async function remove(id: string) {
     const { error } = await supabase.from("campaigns").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Campaign deleted");
     void qc.invalidateQueries({ queryKey: ["campaigns", orgId] });
   }

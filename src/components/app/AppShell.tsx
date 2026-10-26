@@ -3,6 +3,7 @@ import {
   BarChart3,
   Building2,
   Check,
+  CreditCard,
   HeartHandshake,
   LayoutDashboard,
   LifeBuoy,
@@ -116,7 +117,7 @@ function ContactSupportButton({ onNavigate }: { onNavigate?: () => void }) {
       const { error: msgErr } = await supabase.from("support_messages").insert({
         conversation_id: conv.id,
         sender_id: user.id,
-        sender_name: profile?.full_name ?? profile?.email ?? user.email,
+        sender_name: profile?.full_name ?? profile?.email ?? user.email ?? null,
         body: message.trim(),
       });
       if (msgErr) throw msgErr;
@@ -227,7 +228,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
         </Link>
       )}
 
-      <NavLinks onNavigate={onNavigate} />
+      <NavLinks {...(onNavigate !== undefined ? { onNavigate } : {})} />
 
       {isChatSupportAgent && !isPlatformAdmin && (
         <Link
@@ -260,7 +261,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       )}
 
-      <ContactSupportButton onNavigate={onNavigate} />
+      <ContactSupportButton {...(onNavigate !== undefined ? { onNavigate } : {})} />
 
       <div className="mt-auto flex flex-wrap gap-x-3 gap-y-1 pt-2">
         <Link
@@ -310,7 +311,7 @@ function CreateOrg() {
         .insert({
           name,
           slug: finalSlug,
-          contact_email: email || user.email,
+          contact_email: email || user.email || null,
           created_by: user.id,
         })
         .select("id")
@@ -488,7 +489,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <DropdownMenuItem
                   onClick={async () => {
                     await signOut();
-                    navigate({ to: "/auth", replace: true });
+                    navigate({ to: "/auth", search: { mode: "signin" as const }, replace: true });
                   }}
                 >
                   <LogOut className="mr-2 size-4" /> Sign out

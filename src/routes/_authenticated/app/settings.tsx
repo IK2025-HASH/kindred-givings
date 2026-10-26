@@ -182,7 +182,7 @@ function SettingsPage() {
   async function deleteOrg() {
     if (!currentOrg || deleteConfirm !== currentOrg.name) return;
     const { error } = await supabase.from("organizations").delete().eq("id", currentOrg.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Charity workspace deleted");
     void qc.invalidateQueries({ queryKey: ["memberships"] });
     void navigate({ to: "/app", replace: true });

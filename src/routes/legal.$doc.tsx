@@ -1,3 +1,4 @@
+import React from "react";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { MarketingShell } from "@/components/site/MarketingShell";
 import { usePlatformSettings } from "@/hooks/usePlatformSettings";
@@ -8,7 +9,7 @@ const GOVERNING_LAW = "England and Wales";
 type DocId = "terms" | "privacy" | "data-retention";
 type LegalProps = { company: string; email: string; address: string };
 
-const DOCS: Record<DocId, { title: string; subtitle: string; content: (p: LegalProps) => JSX.Element }> = {
+const DOCS: Record<DocId, { title: string; subtitle: string; content: (p: LegalProps) => React.JSX.Element }> = {
   terms: {
     title: "Terms of Service",
     subtitle: `Effective ${CURRENT_VERSION} · Version ${CURRENT_VERSION}`,

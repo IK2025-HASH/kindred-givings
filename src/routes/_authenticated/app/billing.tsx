@@ -13,7 +13,7 @@ import { createSubscriptionCheckout } from "@/lib/stripe.functions";
 
 export const Route = createFileRoute("/_authenticated/app/billing")({
   validateSearch: (s: Record<string, unknown>) => ({
-    subscription: s.subscription as string | undefined,
+    subscription: s['subscription'] as string | undefined,
   }),
   head: () => ({
     meta: [
@@ -120,7 +120,7 @@ function BillingPage() {
     <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
       <PageHeader
         title="Billing & plan"
-        subtitle="Manage your Donorbook subscription"
+        description="Manage your Donorbook subscription"
       />
 
       {!currentSub && !subQuery.isLoading && (

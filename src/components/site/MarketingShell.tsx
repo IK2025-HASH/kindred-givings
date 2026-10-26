@@ -48,7 +48,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
             ) : (
               <>
                 <Button asChild variant="ghost" size="sm">
-                  <Link to="/auth">Sign in</Link>
+                  <Link to="/auth" search={{ mode: "signin" as const }}>Sign in</Link>
                 </Button>
                 <Button asChild size="sm">
                   <Link to="/auth" search={{ mode: "signup" }}>

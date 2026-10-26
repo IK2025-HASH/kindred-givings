@@ -115,21 +115,21 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
       .single();
     if (!plan) throw new Error("Plan not found.");
 
-    const priceId = data.interval === "yearly" ? (plan as never as { stripe_price_id_yearly: string | null }).stripe_price_id_yearly : (plan as never as { stripe_price_id_monthly: string | null }).stripe_price_id_monthly;
+    const priceId = data.interval === "yearly" ? plan.stripe_price_id_yearly : plan.stripe_price_id_monthly;
     if (!priceId) throw new Error(`Stripe Price ID for this plan (${data.interval}) is not configured yet. Contact support.`);
 
     // Create or reuse Stripe customer for this org
-    let customerId = (org as never as { stripe_customer_id: string | null }).stripe_customer_id;
+    let customerId = org.stripe_customer_id;
     if (!customerId) {
       const customer = await stripe.customers.create({
         name: org.name,
-        email: org.contact_email ?? undefined,
+        ...(org.contact_email ? { email: org.contact_email } : {}),
         metadata: { org_id: org.id },
       });
       customerId = customer.id;
       await supabaseAdmin
         .from("organizations")
-        .update({ stripe_customer_id: customerId } as never)
+        .update({ stripe_customer_id: customerId })
         .eq("id", org.id);
     }
 
@@ -187,7 +187,7 @@ export const createDonationCheckout = createServerFn({ method: "POST" })
         campaign_id: data.campaignId ?? null,
         amount: data.amount,
         currency: org.currency,
-        method: "stripe",
+        method: "card",
         status: "pending",
         source: "public_page",
         is_recurring: !!data.recurring,
@@ -220,7 +220,7 @@ export const createDonationCheckout = createServerFn({ method: "POST" })
         },
       ],
       mode: "payment",
-      customer_email: data.donorEmail ?? undefined,
+      ...(data.donorEmail ? { customer_email: data.donorEmail } : {}),
       success_url: `${origin}/give/${data.slug}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/give/${data.slug}`,
       metadata: {

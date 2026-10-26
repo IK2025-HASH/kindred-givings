@@ -20,6 +20,7 @@ export type Database = {
           description: string | null
           ends_on: string | null
           id: string
+          media_url: string | null
           organization_id: string
           slug: string | null
           starts_on: string | null
@@ -33,6 +34,7 @@ export type Database = {
           description?: string | null
           ends_on?: string | null
           id?: string
+          media_url?: string | null
           organization_id: string
           slug?: string | null
           starts_on?: string | null
@@ -46,6 +48,7 @@ export type Database = {
           description?: string | null
           ends_on?: string | null
           id?: string
+          media_url?: string | null
           organization_id?: string
           slug?: string | null
           starts_on?: string | null
@@ -83,6 +86,7 @@ export type Database = {
           organization_id: string
           reference: string | null
           source: string
+          source_location: string | null
           status: Database["public"]["Enums"]["donation_status"]
           updated_at: string
         }
@@ -104,6 +108,7 @@ export type Database = {
           organization_id: string
           reference?: string | null
           source?: string
+          source_location?: string | null
           status?: Database["public"]["Enums"]["donation_status"]
           updated_at?: string
         }
@@ -125,6 +130,7 @@ export type Database = {
           organization_id?: string
           reference?: string | null
           source?: string
+          source_location?: string | null
           status?: Database["public"]["Enums"]["donation_status"]
           updated_at?: string
         }
@@ -312,6 +318,7 @@ export type Database = {
           status: Database["public"]["Enums"]["org_status"]
           story: string | null
           stripe_account_id: string | null
+          stripe_customer_id: string | null
           stripe_onboarding_complete: boolean | null
           suggested_amounts: number[]
           tagline: string | null
@@ -339,6 +346,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["org_status"]
           story?: string | null
           stripe_account_id?: string | null
+          stripe_customer_id?: string | null
           stripe_onboarding_complete?: boolean | null
           suggested_amounts?: number[]
           tagline?: string | null
@@ -366,6 +374,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["org_status"]
           story?: string | null
           stripe_account_id?: string | null
+          stripe_customer_id?: string | null
           stripe_onboarding_complete?: boolean | null
           suggested_amounts?: number[]
           tagline?: string | null
@@ -390,6 +399,8 @@ export type Database = {
           price_yearly: number
           slug: string
           sort_order: number
+          stripe_price_id_monthly: string | null
+          stripe_price_id_yearly: string | null
           updated_at: string
         }
         Insert: {
@@ -407,6 +418,8 @@ export type Database = {
           price_yearly?: number
           slug: string
           sort_order?: number
+          stripe_price_id_monthly?: string | null
+          stripe_price_id_yearly?: string | null
           updated_at?: string
         }
         Update: {
@@ -424,6 +437,8 @@ export type Database = {
           price_yearly?: number
           slug?: string
           sort_order?: number
+          stripe_price_id_monthly?: string | null
+          stripe_price_id_yearly?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -450,6 +465,8 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          terms_accepted_at: string | null
+          terms_version: string | null
           updated_at: string
         }
         Insert: {
@@ -458,6 +475,8 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
+          terms_accepted_at?: string | null
+          terms_version?: string | null
           updated_at?: string
         }
         Update: {
@@ -466,6 +485,8 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          terms_accepted_at?: string | null
+          terms_version?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -480,6 +501,7 @@ export type Database = {
           plan_id: string
           started_at: string
           status: string
+          stripe_subscription_id: string | null
           updated_at: string
         }
         Insert: {
@@ -491,6 +513,7 @@ export type Database = {
           plan_id: string
           started_at?: string
           status?: string
+          stripe_subscription_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -502,6 +525,7 @@ export type Database = {
           plan_id?: string
           started_at?: string
           status?: string
+          stripe_subscription_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -521,11 +545,121 @@ export type Database = {
           },
         ]
       }
+      platform_settings: {
+        Row: {
+          key: string
+          value: string
+          updated_at: string
+        }
+        Insert: {
+          key: string
+          value: string
+          updated_at?: string
+        }
+        Update: {
+          key?: string
+          value?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      chat_support_agents: {
+        Row: {
+          user_id: string
+          created_at: string
+        }
+        Insert: {
+          user_id: string
+          created_at?: string
+        }
+        Update: {
+          user_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      support_conversations: {
+        Row: {
+          id: string
+          org_id: string | null
+          started_by: string | null
+          assigned_to: string | null
+          subject: string
+          status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          org_id?: string | null
+          started_by?: string | null
+          assigned_to?: string | null
+          subject: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          org_id?: string | null
+          started_by?: string | null
+          assigned_to?: string | null
+          subject?: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      support_messages: {
+        Row: {
+          id: string
+          conversation_id: string
+          sender_id: string | null
+          sender_name: string | null
+          body: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          conversation_id: string
+          sender_id?: string | null
+          sender_name?: string | null
+          body: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          conversation_id?: string
+          sender_id?: string | null
+          sender_name?: string | null
+          body?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      accept_invitation: {
+        Args: { _token: string }
+        Returns: { ok?: boolean; error?: string; organization_id?: string }
+      }
+      admin_org_summary: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          org_id: string
+          name: string
+          slug: string
+          status: string
+          plan_name: string | null
+          member_count: number
+          donation_total: number
+          created_at: string
+        }[]
+      }
       campaign_raised: {
         Args: { _org: string }
         Returns: {
@@ -551,6 +685,18 @@ export type Database = {
         Returns: {
           supporters: number
           total_raised: number
+        }[]
+      }
+      my_donation_history: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          amount: number
+          org_name: string
+          org_slug: string
+          donated_on: string
+          status: string
+          currency: string
+          gift_aid: boolean
         }[]
       }
       public_recent_supporters: {

@@ -69,7 +69,7 @@ function GivePage() {
   const { loc } = Route.useSearch();
   const { user } = useAuth();
   const settings = usePlatformSettings();
-  const pageUrl = typeof window !== "undefined" ? window.location.href.split("?")[0] : "";
+  const pageUrl = typeof window !== "undefined" ? (window.location.href.split("?")[0] ?? "") : "";
 
   const [amount, setAmount] = useState<number | "">("");
   const [campaignId, setCampaignId] = useState<string | null>(null);
@@ -100,12 +100,12 @@ function GivePage() {
   const org = orgQuery.data;
   const orgExt = org as unknown as Record<string, unknown>;
 
-  const paymentLinkUrl = orgExt?.payment_link_url as string | null;
-  const bankAccountNumber = orgExt?.bank_account_number as string | null;
-  const bankAccountName = orgExt?.bank_account_name as string | null;
-  const bankSortCode = orgExt?.bank_sort_code as string | null;
-  const bankReference = orgExt?.bank_reference as string | null;
-  const bankIban = orgExt?.bank_iban as string | null;
+  const paymentLinkUrl = orgExt?.['payment_link_url'] as string | null;
+  const bankAccountNumber = orgExt?.['bank_account_number'] as string | null;
+  const bankAccountName = orgExt?.['bank_account_name'] as string | null;
+  const bankSortCode = orgExt?.['bank_sort_code'] as string | null;
+  const bankReference = orgExt?.['bank_reference'] as string | null;
+  const bankIban = orgExt?.['bank_iban'] as string | null;
 
   const campaignsQuery = useQuery({
     queryKey: ["public-campaigns", org?.id],
@@ -243,7 +243,7 @@ function GivePage() {
   const supportersList = supportersQuery.data ?? [];
 
   // Media: banner_url or media_url field if set via Settings
-  const mediaUrl = String(orgExt.banner_url ?? orgExt.media_url ?? "");
+  const mediaUrl = String(orgExt['banner_url'] ?? orgExt['media_url'] ?? "");
   const hasMedia = mediaUrl.length > 0;
   const embedUrl = hasMedia && isYouTube(mediaUrl) ? youtubeEmbed(mediaUrl) : null;
 
@@ -571,7 +571,7 @@ function GivePage() {
                     </Button>
                     {paymentStep === "qr" && (
                       <div className="mt-3 flex justify-center rounded-xl bg-white p-4">
-                        <QRCode value={paymentLinkUrl || pageUrl} size={160} level="M" />
+                        <QRCode value={(paymentLinkUrl || pageUrl) || ""} size={160} level="M" />
                       </div>
                     )}
                   </div>
@@ -751,7 +751,7 @@ function GivePage() {
                 Scan or share the link to help {org.name} reach more supporters.
               </p>
               <div className="mt-4 flex justify-center rounded-xl bg-white p-4">
-                <QRCode value={pageUrl} size={140} level="M" />
+                <QRCode value={pageUrl || ""} size={140} level="M" />
               </div>
               <p className="mt-3 break-all text-center text-[10px] text-muted-foreground">
                 {pageUrl}
@@ -759,7 +759,7 @@ function GivePage() {
               <button
                 type="button"
                 onClick={() => {
-                  navigator.clipboard.writeText(pageUrl);
+                  navigator.clipboard.writeText(pageUrl || "");
                   toast.success("Link copied!");
                 }}
                 className="mt-3 w-full rounded-lg border border-border py-2 text-xs font-medium hover:bg-muted transition-colors"

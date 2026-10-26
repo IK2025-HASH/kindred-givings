@@ -107,7 +107,7 @@ function DonationsPage() {
     const res = draft.id
       ? await supabase.from("donations").update(payload).eq("id", draft.id)
       : await supabase.from("donations").insert({ ...payload, source: "manual" });
-    if (res.error) return toast.error(res.error.message);
+    if (res.error) { toast.error(res.error.message); return; }
     toast.success(draft.id ? "Donation updated" : "Donation recorded");
     setDraft(null);
     refresh();
@@ -115,14 +115,14 @@ function DonationsPage() {
 
   async function setStatus(id: string, status: Donation["status"]) {
     const { error } = await supabase.from("donations").update({ status }).eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success(`Donation ${status}`);
     refresh();
   }
 
   async function remove(id: string) {
     const { error } = await supabase.from("donations").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Donation deleted");
     refresh();
   }

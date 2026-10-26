@@ -122,7 +122,7 @@ function DonorsPage() {
 
   async function remove(id: string) {
     const { error } = await supabase.from("donors").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Donor removed");
     void qc.invalidateQueries({ queryKey: ["donors", orgId] });
   }
@@ -152,9 +152,9 @@ function DonorsPage() {
         };
       })
       .filter(Boolean) as Record<string, unknown>[];
-    if (rows.length === 0) return toast.error("No donors found in that file");
+    if (rows.length === 0) { toast.error("No donors found in that file"); return; }
     const { error } = await supabase.from("donors").insert(rows as never);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success(`Imported ${rows.length} donors`);
     void qc.invalidateQueries({ queryKey: ["donors", orgId] });
   }

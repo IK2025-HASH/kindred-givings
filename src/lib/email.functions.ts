@@ -13,8 +13,8 @@ async function sendEmail(to: string, subject: string, html: string) {
     .in("key", ["app_name", "from_email"]);
   const map: Record<string, string> = {};
   for (const r of settings ?? []) map[r.key] = r.value;
-  const fromName = map.app_name ?? "Donorbook";
-  const fromEmail = map.from_email ?? "noreply@donorbook.co.uk";
+  const fromName = map['app_name'] ?? "Donorbook";
+  const fromEmail = map['from_email'] ?? "noreply@donorbook.co.uk";
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",

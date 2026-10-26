@@ -98,7 +98,7 @@ function TeamPage() {
     try {
       const { data, error } = await supabase
         .from("invitations")
-        .insert({ organization_id: orgId, email, role, invited_by: user?.id })
+        .insert({ organization_id: orgId, email, role, invited_by: user?.id ?? null })
         .select("token")
         .single();
       if (error) throw error;
@@ -126,7 +126,7 @@ function TeamPage() {
 
   async function removeMember(memberId: string) {
     const { error } = await supabase.from("organization_members").delete().eq("id", memberId);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Member removed");
     refresh();
   }
@@ -136,14 +136,14 @@ function TeamPage() {
       .from("organization_members")
       .update({ role: newRole })
       .eq("id", memberId);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Role updated");
     refresh();
   }
 
   async function revokeInvite(inviteId: string) {
     const { error } = await supabase.from("invitations").delete().eq("id", inviteId);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Invitation revoked");
     refresh();
   }

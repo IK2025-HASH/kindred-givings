@@ -29,7 +29,7 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/_authenticated/app/support")({
   beforeLoad: async () => {
     const { data } = await supabase.auth.getUser();
-    if (!data.user) throw redirect({ to: "/auth" });
+    if (!data.user) throw redirect({ to: "/auth", search: { mode: "signin" as const } });
     // Allow platform admins and chat support agents
     const [adminRow, agentRow] = await Promise.all([
       supabase.from("platform_admins").select("user_id").eq("user_id", data.user.id).maybeSingle(),
@@ -136,7 +136,7 @@ function SupportPage() {
       .from("support_conversations")
       .update({ status: "closed" })
       .eq("id", convId);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Conversation closed");
     setSelected(null);
     void qc.invalidateQueries({ queryKey: ["support-inbox", user?.id] });

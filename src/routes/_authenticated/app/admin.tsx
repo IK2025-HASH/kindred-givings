@@ -28,7 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/_authenticated/app/admin")({
   beforeLoad: async () => {
     const { data } = await supabase.auth.getUser();
-    if (!data.user) throw redirect({ to: "/auth" });
+    if (!data.user) throw redirect({ to: "/auth", search: { mode: "signin" as const } });
     const { data: adminRow } = await supabase
       .from("platform_admins")
       .select("user_id")
@@ -474,7 +474,7 @@ function ChatSupportSection() {
 
   async function removeAgent(userId: string) {
     const { error } = await supabase.from("chat_support_agents").delete().eq("user_id", userId);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Agent removed");
     void qc.invalidateQueries({ queryKey: ["chat-support-agents"] });
   }
@@ -484,7 +484,7 @@ function ChatSupportSection() {
       .from("support_conversations")
       .update({ assigned_to: agentUserId, status: "assigned" })
       .eq("id", convId);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Conversation assigned");
     void qc.invalidateQueries({ queryKey: ["admin-conversations"] });
   }
@@ -494,7 +494,7 @@ function ChatSupportSection() {
       .from("support_conversations")
       .update({ status: "closed" })
       .eq("id", convId);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Conversation closed");
     void qc.invalidateQueries({ queryKey: ["admin-conversations"] });
   }
@@ -671,15 +671,15 @@ function AdminPage() {
     queryFn: async (): Promise<OrgRow[]> => {
       const { data, error } = await supabase.rpc("admin_org_summary");
       if (error) throw error;
-      return (data ?? []).map((r: Record<string, unknown>) => ({
-        org_id: String(r.org_id),
-        name: String(r.name),
-        slug: String(r.slug),
-        status: r.status as "active" | "suspended",
-        plan_name: r.plan_name ? String(r.plan_name) : null,
-        member_count: Number(r.member_count),
-        donation_total: Number(r.donation_total),
-        created_at: String(r.created_at),
+      return (data ?? []).map((r) => ({
+        org_id: String(r['org_id']),
+        name: String(r['name']),
+        slug: String(r['slug']),
+        status: r['status'] as "active" | "suspended",
+        plan_name: r['plan_name'] ? String(r['plan_name']) : null,
+        member_count: Number(r['member_count']),
+        donation_total: Number(r['donation_total']),
+        created_at: String(r['created_at']),
       }));
     },
   });
@@ -732,7 +732,7 @@ function AdminPage() {
       .from("organizations")
       .update({ status: next })
       .eq("id", orgId);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success(`Org ${next}`);
     void qc.invalidateQueries({ queryKey: ["admin-orgs"] });
   }
@@ -768,7 +768,7 @@ function AdminPage() {
       return;
     }
     const { error } = await supabase.from("platform_admins").delete().eq("user_id", userId);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Admin removed");
     void qc.invalidateQueries({ queryKey: ["admin-list"] });
   }
