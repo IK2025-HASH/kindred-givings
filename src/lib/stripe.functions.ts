@@ -3,8 +3,8 @@ import { z } from "zod";
 import { STRIPE_API_VERSION } from "@/lib/stripe-config";
 
 function appOrigin() {
-  const url = process.env["VITE_APP_URL"];
-  if (!url) throw new Error("VITE_APP_URL is not set — Stripe redirects cannot be built.");
+  const url = process.env["APP_URL"];
+  if (!url) throw new Error("APP_URL is not set — Stripe redirects cannot be built.");
   return url;
 }
 
