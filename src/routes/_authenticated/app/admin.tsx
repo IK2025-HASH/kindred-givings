@@ -2,7 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ChevronDown, ChevronUp, CreditCard, MessageCircle, Plus, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, CreditCard, MessageCircle, Plus, Trash2, X } from "lucide-react";
 import { PageHeader } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -689,13 +689,51 @@ function AdminPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, email, full_name, created_at")
+        .select("id, email, full_name, created_at, is_suspended")
         .order("created_at", { ascending: false })
         .limit(200);
       if (error) throw error;
       return data ?? [];
     },
   });
+
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [userActionBusy, setUserActionBusy] = useState<string | null>(null);
+
+  async function toggleUserSuspended(userId: string, suspended: boolean) {
+    setUserActionBusy(userId);
+    try {
+      const { error } = await supabase.rpc("admin_set_user_suspended", {
+        target_user_id: userId,
+        suspended,
+      });
+      if (error) throw error;
+      toast.success(suspended ? "User suspended" : "User activated");
+      void qc.invalidateQueries({ queryKey: ["admin-users"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not update user");
+    } finally {
+      setUserActionBusy(null);
+    }
+  }
+
+  async function deleteUser(userId: string) {
+    setUserActionBusy(userId);
+    try {
+      const { error } = await supabase.rpc("admin_delete_user", {
+        target_user_id: userId,
+      });
+      if (error) throw error;
+      toast.success("User deleted");
+      setConfirmDeleteId(null);
+      void qc.invalidateQueries({ queryKey: ["admin-users"] });
+      void qc.invalidateQueries({ queryKey: ["admin-stats"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not delete user");
+    } finally {
+      setUserActionBusy(null);
+    }
+  }
 
   const adminsQuery = useQuery({
     queryKey: ["admin-list"],
@@ -815,23 +853,81 @@ function AdminPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead className="hidden md:table-cell">Joined</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(usersQuery.data ?? []).map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-medium">
-                      {u.full_name ?? <span className="text-muted-foreground">—</span>}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{u.email ?? "—"}</TableCell>
-                    <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
-                      {formatDate(u.created_at)}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {(usersQuery.data ?? []).map((u) => {
+                  const isSelf = u.id === user?.id;
+                  const busy = userActionBusy === u.id;
+                  const confirming = confirmDeleteId === u.id;
+                  return (
+                    <TableRow key={u.id} className={u.is_suspended ? "opacity-60" : ""}>
+                      <TableCell className="font-medium">
+                        {u.full_name ?? <span className="text-muted-foreground">—</span>}
+                        {isSelf && <span className="ml-1.5 text-xs text-muted-foreground">(you)</span>}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{u.email ?? "—"}</TableCell>
+                      <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                        {formatDate(u.created_at)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={u.is_suspended ? "secondary" : "default"}>
+                          {u.is_suspended ? "Suspended" : "Active"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {!isSelf && (
+                          confirming ? (
+                            <div className="flex items-center justify-end gap-1">
+                              <AlertTriangle className="size-4 text-destructive" />
+                              <span className="text-xs text-destructive">Delete?</span>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                disabled={busy}
+                                onClick={() => void deleteUser(u.id)}
+                              >
+                                Confirm
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={busy}
+                                onClick={() => setConfirmDeleteId(null)}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={busy}
+                                onClick={() => void toggleUserSuspended(u.id, !u.is_suspended)}
+                              >
+                                {u.is_suspended ? "Activate" : "Suspend"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={busy}
+                                onClick={() => setConfirmDeleteId(u.id)}
+                              >
+                                <Trash2 className="size-4 text-destructive" />
+                              </Button>
+                            </div>
+                          )
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 {(usersQuery.data ?? []).length === 0 && !usersQuery.isLoading && (
                   <TableRow>
-                    <TableCell colSpan={3} className="py-10 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
                       No users yet.
                     </TableCell>
                   </TableRow>

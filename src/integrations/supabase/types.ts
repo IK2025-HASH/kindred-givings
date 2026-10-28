@@ -465,6 +465,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          is_suspended: boolean
           terms_accepted_at: string | null
           terms_version: string | null
           updated_at: string
@@ -475,6 +476,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
+          is_suspended?: boolean
           terms_accepted_at?: string | null
           terms_version?: string | null
           updated_at?: string
@@ -485,6 +487,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          is_suspended?: boolean
           terms_accepted_at?: string | null
           terms_version?: string | null
           updated_at?: string
@@ -668,6 +671,10 @@ export type Database = {
         Args: { _token: string }
         Returns: { ok?: boolean; error?: string; organization_id?: string }
       }
+      admin_delete_user: {
+        Args: { target_user_id: string }
+        Returns: undefined
+      }
       admin_org_summary: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -680,6 +687,10 @@ export type Database = {
           donation_total: number
           created_at: string
         }[]
+      }
+      admin_set_user_suspended: {
+        Args: { target_user_id: string; suspended: boolean }
+        Returns: undefined
       }
       campaign_raised: {
         Args: { _org: string }
