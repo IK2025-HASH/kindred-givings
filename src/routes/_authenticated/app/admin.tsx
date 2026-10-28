@@ -428,10 +428,20 @@ function ChatSupportSection() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("chat_support_agents")
-        .select("user_id, created_at, profiles:user_id(email, full_name)")
+        .select("user_id, created_at")
         .order("created_at");
       if (error) throw error;
-      return data ?? [];
+      const rows = data ?? [];
+      const ids = rows.map((r) => r.user_id as string);
+      const profileMap: Record<string, { email: string | null; full_name: string | null }> = {};
+      if (ids.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, email, full_name")
+          .in("id", ids);
+        for (const p of profiles ?? []) profileMap[p.id] = { email: p.email ?? null, full_name: p.full_name ?? null };
+      }
+      return rows.map((r) => ({ ...r, profiles: profileMap[r.user_id as string] ?? null }));
     },
   });
 
@@ -740,10 +750,20 @@ function AdminPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("platform_admins")
-        .select("user_id, created_at, profiles:user_id(email, full_name)")
+        .select("user_id, created_at")
         .order("created_at");
       if (error) throw error;
-      return data ?? [];
+      const rows = data ?? [];
+      const ids = rows.map((r) => r.user_id as string);
+      const profileMap: Record<string, { email: string | null; full_name: string | null }> = {};
+      if (ids.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, email, full_name")
+          .in("id", ids);
+        for (const p of profiles ?? []) profileMap[p.id] = { email: p.email ?? null, full_name: p.full_name ?? null };
+      }
+      return rows.map((r) => ({ ...r, profiles: profileMap[r.user_id as string] ?? null }));
     },
   });
 
@@ -987,7 +1007,14 @@ function AdminPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {(orgsQuery.data ?? []).length === 0 && !orgsQuery.isLoading && (
+                {orgsQuery.isError && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-10 text-center text-sm text-destructive">
+                      Error: {orgsQuery.error instanceof Error ? orgsQuery.error.message : "Could not load organisations"}
+                    </TableCell>
+                  </TableRow>
+                )}
+                {(orgsQuery.data ?? []).length === 0 && !orgsQuery.isLoading && !orgsQuery.isError && (
                   <TableRow>
                     <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
                       No organisations yet.
