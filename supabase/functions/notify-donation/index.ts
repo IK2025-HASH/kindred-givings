@@ -21,8 +21,17 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") ?? "noreply@donorbook.co.uk";
 const APP_NAME = Deno.env.get("APP_NAME") ?? "Donorbook";
+const WEBHOOK_SECRET = Deno.env.get("NOTIFY_WEBHOOK_SECRET");
 
 Deno.serve(async (req) => {
+  // Verify the request comes from our Supabase DB webhook, not an external caller.
+  if (WEBHOOK_SECRET) {
+    const auth = req.headers.get("Authorization");
+    if (auth !== `Bearer ${WEBHOOK_SECRET}`) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+  }
+
   try {
     const payload = await req.json();
     const donation = payload.record as {

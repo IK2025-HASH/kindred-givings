@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { STRIPE_API_VERSION } from "@/lib/stripe-config";
+import { requireOrgRole } from "@/lib/server-auth";
 
 function appOrigin() {
   const url = process.env["APP_URL"];
@@ -19,6 +20,7 @@ async function getStripe() {
 export const createConnectOnboardingLink = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ orgId: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
+    await requireOrgRole(data.orgId, ["owner", "admin"]);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const stripe = await getStripe();
 
@@ -63,6 +65,7 @@ export const createConnectOnboardingLink = createServerFn({ method: "POST" })
 export const checkStripeOnboarding = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ orgId: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
+    await requireOrgRole(data.orgId, ["owner", "admin"]);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: org } = await supabaseAdmin
@@ -97,6 +100,7 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data }) => {
+    await requireOrgRole(data.orgId, ["owner", "admin"]);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const stripe = await getStripe();
     const origin = appOrigin();
