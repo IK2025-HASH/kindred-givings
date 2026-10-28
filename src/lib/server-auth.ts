@@ -4,7 +4,7 @@
  * that uses supabaseAdmin — those handlers run as any caller, so
  * they must enforce identity themselves.
  */
-import { getWebRequest } from "@tanstack/react-start/server";
+import { getRequest as getWebRequest } from "@tanstack/react-start/server";
 
 async function getAdminClient() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

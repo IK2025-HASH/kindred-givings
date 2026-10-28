@@ -87,10 +87,9 @@ function GivePage() {
     queryKey: ["public-org", slug],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("organizations")
+        .from("public_organizations")
         .select("*")
         .eq("slug", slug)
-        .eq("public_page_enabled", true)
         .maybeSingle();
       if (error) throw error;
       return data ?? null;

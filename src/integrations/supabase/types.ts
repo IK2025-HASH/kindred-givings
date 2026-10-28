@@ -640,7 +640,28 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      public_organizations: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          logo_url: string | null
+          banner_url: string | null
+          story: string | null
+          tagline: string | null
+          currency: string
+          contact_email: string | null
+          website: string | null
+          charity_number: string | null
+          status: Database["public"]["Enums"]["org_status"]
+          public_page_enabled: boolean
+          suggested_amounts: number[]
+          payment_link_url: string | null
+          stripe_account_id: string | null
+          stripe_onboarding_complete: boolean | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_invitation: {
