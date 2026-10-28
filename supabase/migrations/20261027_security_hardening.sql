@@ -29,6 +29,9 @@ CREATE POLICY "admin_email_whitelist: deny all"
 
 REVOKE EXECUTE ON FUNCTION public.admin_org_summary() FROM authenticated;
 
+-- Drop first so we can change the return signature
+DROP FUNCTION IF EXISTS public.admin_org_summary();
+
 -- Re-create with an internal admin guard
 CREATE OR REPLACE FUNCTION public.admin_org_summary()
 RETURNS TABLE (
