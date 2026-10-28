@@ -6,6 +6,19 @@ export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) throw redirect({ to: "/auth", search: { mode: "signin" as const } });
+
+    // Check profile exists and is not suspended — covers deleted and banned users
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id, is_suspended")
+      .eq("id", data.user.id)
+      .maybeSingle();
+
+    if (!profile || profile.is_suspended) {
+      await supabase.auth.signOut();
+      throw redirect({ to: "/auth", search: { mode: "signin" as const } });
+    }
+
     return { user: data.user };
   },
   component: () => <Outlet />,
