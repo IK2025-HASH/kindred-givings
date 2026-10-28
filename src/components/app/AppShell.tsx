@@ -5,6 +5,7 @@ import {
   Check,
   CreditCard,
   HeartHandshake,
+  Inbox,
   LayoutDashboard,
   LifeBuoy,
   LogOut,
@@ -16,7 +17,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import { useState, useRef, type ReactNode } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,6 +56,7 @@ const NAV = [
   { to: "/app/reports", label: "Reports", icon: BarChart3 },
   { to: "/app/qr", label: "QR Boxes", icon: QrCode },
   { to: "/app/team", label: "Team", icon: Building2 },
+  { to: "/app/inbox", label: "Inbox", icon: Inbox },
   { to: "/app/billing", label: "Billing", icon: CreditCard },
   { to: "/app/settings", label: "Settings", icon: Settings },
 ] as const;
@@ -428,6 +430,63 @@ export function PageHeader({
   );
 }
 
+function AutoCreateOrg() {
+  const { user, refreshMemberships, setCurrentOrgId } = useAuth();
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    if (!user || done) return;
+    const fullName = (user as { user_metadata?: { full_name?: string } })?.user_metadata?.full_name ?? "";
+    const baseName = fullName ? `${fullName}'s Charity` : "My Charity";
+    const baseSlug = slugify(baseName);
+
+    async function create() {
+      if (!user) return;
+      try {
+        const { data, error } = await supabase
+          .from("organizations")
+          .insert({
+            name: baseName,
+            slug: baseSlug,
+            contact_email: user.email ?? null,
+            created_by: user.id,
+          })
+          .select("id")
+          .single();
+        if (error) throw error;
+        const member = await supabase
+          .from("organization_members")
+          .insert({ organization_id: data.id, user_id: user.id, role: "owner" });
+        if (member.error) {
+          await supabase.from("organizations").delete().eq("id", data.id);
+          throw member.error;
+        }
+        setCurrentOrgId(data.id);
+        refreshMemberships();
+        toast.success("Workspace ready — rename it any time in Settings");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Could not create workspace";
+        if (msg.includes("organizations_slug_key")) {
+          // Slug collision — workspace may have been created already; refresh
+          refreshMemberships();
+        } else {
+          toast.error(msg);
+        }
+      } finally {
+        setDone(true);
+      }
+    }
+
+    void create();
+  }, [user, done, refreshMemberships, setCurrentOrgId]);
+
+  return (
+    <div className="flex min-h-[50vh] items-center justify-center text-sm text-muted-foreground">
+      Setting up your workspace…
+    </div>
+  );
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, memberships, membershipsLoading, currentOrg, signOut } = useAuth();
   const [open, setOpen] = useState(false);
@@ -499,7 +558,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 p-4 sm:p-6">
-          {!currentOrg ? <CreateOrg /> : children}
+          {!currentOrg ? <AutoCreateOrg /> : children}
         </main>
       </div>
     </div>

@@ -3,7 +3,7 @@ import { sendInviteEmail } from "@/lib/email.functions";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Copy, UserMinus } from "lucide-react";
+import { Copy, UserMinus, Mail, MessageSquareShare } from "lucide-react";
 import { PageHeader } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,7 @@ function TeamPage() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<OrgRole>("fundraiser");
   const [busy, setBusy] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
 
   const members = team.data?.members ?? [];
   const invitations = team.data?.invitations ?? [];
@@ -103,7 +104,6 @@ function TeamPage() {
         .single();
       if (error) throw error;
       const link = `${window.location.origin}/invite/${data.token}`;
-      // Send invite email (fire-and-forget; don't block on failure)
       void sendInviteEmail({
         data: {
           toEmail: email,
@@ -112,16 +112,21 @@ function TeamPage() {
           role,
         },
       }).catch(() => null);
+      setGeneratedLink(link);
       try { await navigator.clipboard.writeText(link); } catch { /* silent */ }
-      toast.success("Invite sent by email — link also copied to clipboard");
-      setEmail("");
-      setInviteOpen(false);
       refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not create invite");
     } finally {
       setBusy(false);
     }
+  }
+
+  function closeInviteDialog() {
+    setInviteOpen(false);
+    setGeneratedLink(null);
+    setEmail("");
+    setRole("fundraiser");
   }
 
   async function removeMember(memberId: string) {
@@ -315,43 +320,89 @@ function TeamPage() {
         </div>
       )}
 
-      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+      <Dialog open={inviteOpen} onOpenChange={(v) => { if (!v) closeInviteDialog(); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Invite a team member</DialogTitle>
+            <DialogTitle>
+              {generatedLink ? "Invite link ready" : "Invite a team member"}
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="invite-email">Email address</Label>
-              <Input
-                id="invite-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="colleague@example.com"
-              />
+
+          {generatedLink ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Share this link with <span className="font-medium text-foreground">{email}</span> so they can join your workspace.
+              </p>
+              <div className="flex items-center gap-2">
+                <Input readOnly value={generatedLink} className="font-mono text-xs" />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(generatedLink).catch(() => null);
+                    toast.success("Copied!");
+                  }}
+                >
+                  <Copy className="size-4" />
+                </Button>
+              </div>
+              <div className="flex gap-2">
+                <a
+                  href={`mailto:${email}?subject=You've been invited to ${currentOrg?.name ?? "a workspace"}&body=Hi%2C%0A%0AYou've been invited to join ${encodeURIComponent(currentOrg?.name ?? "our workspace")} on Donorbook.%0A%0AClick this link to accept:%0A${encodeURIComponent(generatedLink)}`}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
+                >
+                  <Mail className="size-4" /> Email
+                </a>
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(`You've been invited to join ${currentOrg?.name ?? "our workspace"} on Donorbook. Click to accept: ${generatedLink}`)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
+                >
+                  <MessageSquareShare className="size-4" /> WhatsApp
+                </a>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={closeInviteDialog}>Done</Button>
+                <Button onClick={() => { setGeneratedLink(null); setEmail(""); }}>Invite another</Button>
+              </DialogFooter>
             </div>
-            <div className="space-y-1.5">
-              <Label>Role</Label>
-              <Select value={role} onValueChange={(v) => setRole(v as OrgRole)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROLES.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {ROLE_LABEL[r]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={sendInvite} disabled={busy || !email}>
-              {busy ? "Creating…" : "Create invite link"}
-            </Button>
-          </DialogFooter>
+          ) : (
+            <>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="invite-email">Email address</Label>
+                  <Input
+                    id="invite-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="colleague@example.com"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Role</Label>
+                  <Select value={role} onValueChange={(v) => setRole(v as OrgRole)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ROLES.map((r) => (
+                        <SelectItem key={r} value={r}>
+                          {ROLE_LABEL[r]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={sendInvite} disabled={busy || !email}>
+                  {busy ? "Creating…" : "Create invite link"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
