@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { sendDonationNotification } from "@/lib/email.functions";
+import { createDonationCheckout } from "@/lib/stripe.functions";
 import { formatDate, formatMoney } from "@/lib/format";
 import { useAuth } from "@/hooks/useAuth";
 import { usePlatformSettings } from "@/hooks/usePlatformSettings";
@@ -169,6 +170,30 @@ function GivePage() {
     if (!org) return;
     setBusy(true);
     try {
+      const orgExt2 = org as unknown as Record<string, unknown>;
+      const stripeReady = !!(orgExt2["stripe_account_id"] && orgExt2["stripe_onboarding_complete"]);
+
+      if (stripeReady) {
+        // Route through Stripe Checkout — donation record created server-side
+        const { url } = await createDonationCheckout({
+          data: {
+            slug: org.slug,
+            amount: Number(amount),
+            campaignId: campaignId ?? null,
+            donorName: anonymous ? undefined : (name || undefined),
+            donorEmail: email || undefined,
+            message: message || undefined,
+            giftAid,
+            anonymous,
+            recurring,
+            sourceLocation: loc || undefined,
+          },
+        });
+        window.location.href = url;
+        return;
+      }
+
+      // Fallback: record donation manually and show manual payment options
       const { error } = await supabase.from("donations").insert({
         organization_id: org.id,
         campaign_id: campaignId,
@@ -187,7 +212,6 @@ function GivePage() {
       } as never);
       if (error) throw error;
       setDone(true);
-      // Notify the charity (fire-and-forget — don't block the donor UX on email failure)
       if (org.contact_email) {
         void sendDonationNotification({
           data: {
