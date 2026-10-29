@@ -119,8 +119,10 @@ function BillingPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
       <PageHeader
-        title="Billing & plan"
-        description="Manage your Donorbook subscription"
+        title={!currentSub && !subQuery.isLoading ? "Choose your plan" : "Billing & plan"}
+        description={!currentSub && !subQuery.isLoading
+          ? "Pick the plan that fits your charity. You can upgrade or cancel any time."
+          : "Manage your Donorbook subscription"}
       />
 
       {!currentSub && !subQuery.isLoading && (

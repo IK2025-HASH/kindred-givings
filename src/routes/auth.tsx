@@ -130,8 +130,30 @@ function AuthPage() {
           setMode("confirm");
         }
       } else if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        // If this user has no active subscription, send them to billing to pick a plan
+        const userId = signInData.user?.id;
+        if (userId) {
+          const { data: orgs } = await supabase
+            .from("organization_members")
+            .select("organization_id")
+            .eq("user_id", userId)
+            .limit(1);
+          const orgId = orgs?.[0]?.organization_id;
+          if (orgId) {
+            const { data: sub } = await supabase
+              .from("subscriptions")
+              .select("id")
+              .eq("organization_id", orgId)
+              .eq("status", "active")
+              .maybeSingle();
+            if (!sub) {
+              navigate({ to: "/app/billing", search: { subscription: undefined } });
+              return;
+            }
+          }
+        }
         navigate({ to: "/app" });
       } else {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
