@@ -303,7 +303,12 @@ function PlansSection() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="font-semibold">{plan.name}</span>
-                  <Badge variant="outline" className="text-xs">£{plan.price_monthly}/mo</Badge>
+                  {plan.slug === "on-premise"
+                    ? <Badge variant="outline" className="text-xs">Contact us</Badge>
+                    : plan.price_monthly === 0
+                      ? <Badge variant="outline" className="text-xs">Free</Badge>
+                      : <Badge variant="outline" className="text-xs">£{plan.price_monthly}/mo</Badge>
+                  }
                   {!plan.is_active && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
                   {!plan.is_public && <Badge variant="secondary" className="text-xs">Hidden</Badge>}
                 </div>
