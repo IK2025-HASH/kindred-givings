@@ -744,6 +744,9 @@ function AdminPage() {
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [userActionBusy, setUserActionBusy] = useState<string | null>(null);
+  const [orphanWarning, setOrphanWarning] = useState<{ userId: string; userName: string; orgs: Array<{ id: string; name: string }> } | null>(null);
+  const [confirmCleanupOrgId, setConfirmCleanupOrgId] = useState<string | null>(null);
+  const [orgCleanupBusy, setOrgCleanupBusy] = useState(false);
 
   async function toggleUserSuspended(userId: string, suspended: boolean) {
     setUserActionBusy(userId);
@@ -762,21 +765,81 @@ function AdminPage() {
     }
   }
 
-  async function deleteUser(userId: string) {
+  async function deleteUser(userId: string, alsoSuspendOrgIds?: string[]) {
     setUserActionBusy(userId);
     try {
-      const { error } = await supabase.rpc("admin_delete_user", {
-        target_user_id: userId,
-      });
+      if (alsoSuspendOrgIds?.length) {
+        for (const orgId of alsoSuspendOrgIds) {
+          await supabase.from("organizations").update({ status: "suspended" }).eq("id", orgId);
+        }
+      }
+      const { error } = await supabase.rpc("admin_delete_user", { target_user_id: userId });
       if (error) throw error;
-      toast.success("User deleted");
+      toast.success(alsoSuspendOrgIds?.length ? "User deleted and orphan organisation(s) suspended" : "User deleted");
       setConfirmDeleteId(null);
+      setOrphanWarning(null);
       void qc.invalidateQueries({ queryKey: ["admin-users"] });
+      void qc.invalidateQueries({ queryKey: ["admin-orgs"] });
       void qc.invalidateQueries({ queryKey: ["admin-stats"] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not delete user");
     } finally {
       setUserActionBusy(null);
+    }
+  }
+
+  async function handleConfirmDelete(userId: string, userName: string) {
+    setUserActionBusy(userId);
+    try {
+      const { data: memberships } = await supabase
+        .from("org_members" as never)
+        .select("org_id")
+        .eq("user_id", userId);
+      const lastMemberOrgs: Array<{ id: string; name: string }> = [];
+      for (const m of (memberships ?? []) as Array<{ org_id: string }>) {
+        const { count } = await supabase
+          .from("org_members" as never)
+          .select("*", { count: "exact", head: true })
+          .eq("org_id", m.org_id);
+        if ((count ?? 0) <= 1) {
+          const { data: org } = await supabase.from("organizations").select("id, name").eq("id", m.org_id).maybeSingle();
+          if (org) lastMemberOrgs.push({ id: org.id, name: org.name });
+        }
+      }
+      setUserActionBusy(null);
+      if (lastMemberOrgs.length > 0) {
+        setOrphanWarning({ userId, userName, orgs: lastMemberOrgs });
+        setConfirmDeleteId(null);
+      } else {
+        await deleteUser(userId);
+      }
+    } catch {
+      setUserActionBusy(null);
+      toast.error("Could not check organisation membership — please try again");
+    }
+  }
+
+  async function cleanupOrg(orgId: string, suspendMembers: boolean) {
+    setOrgCleanupBusy(true);
+    try {
+      if (suspendMembers) {
+        const { data: members } = await supabase
+          .from("org_members" as never)
+          .select("user_id")
+          .eq("org_id", orgId);
+        for (const m of (members ?? []) as Array<{ user_id: string }>) {
+          await supabase.rpc("admin_set_user_suspended", { target_user_id: m.user_id, suspended: true });
+        }
+      }
+      await supabase.from("organizations").update({ status: "suspended" }).eq("id", orgId);
+      toast.success(suspendMembers ? "Organisation and all members suspended" : "Organisation suspended");
+      setConfirmCleanupOrgId(null);
+      void qc.invalidateQueries({ queryKey: ["admin-orgs"] });
+      void qc.invalidateQueries({ queryKey: ["admin-users"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not cleanup organisation");
+    } finally {
+      setOrgCleanupBusy(false);
     }
   }
 
@@ -942,7 +1005,7 @@ function AdminPage() {
                                 size="sm"
                                 variant="destructive"
                                 disabled={busy}
-                                onClick={() => void deleteUser(u.id)}
+                                onClick={() => void handleConfirmDelete(u.id, u.full_name ?? u.email ?? "this user")}
                               >
                                 Confirm
                               </Button>
@@ -992,6 +1055,46 @@ function AdminPage() {
           </CardContent>
         </Card>
 
+        {orphanWarning && (
+          <Card className="border-destructive">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 size-5 shrink-0 text-destructive" />
+                <div className="flex-1 space-y-2">
+                  <p className="text-sm font-medium text-destructive">Orphan organisation warning</p>
+                  <p className="text-sm text-muted-foreground">
+                    <strong>{orphanWarning.userName}</strong> is the only member of{" "}
+                    <strong>{orphanWarning.orgs.map((o) => o.name).join(", ")}</strong>.
+                    Deleting this user will leave {orphanWarning.orgs.length === 1 ? "that organisation" : "those organisations"} with no members.
+                  </p>
+                  <p className="text-xs text-muted-foreground">Note: In production, use Suspend instead of Delete to preserve data.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={userActionBusy === orphanWarning.userId}
+                      onClick={() => void deleteUser(orphanWarning.userId, orphanWarning.orgs.map((o) => o.id))}
+                    >
+                      Delete user + suspend {orphanWarning.orgs.length === 1 ? "org" : "orgs"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={userActionBusy === orphanWarning.userId}
+                      onClick={() => void deleteUser(orphanWarning.userId)}
+                    >
+                      Delete user only
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setOrphanWarning(null)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle>All organisations</CardTitle>
@@ -1032,13 +1135,42 @@ function AdminPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => void toggleOrgStatus(org.org_id, org.status)}
-                      >
-                        {org.status === "active" ? "Suspend" : "Activate"}
-                      </Button>
+                      {confirmCleanupOrgId === org.org_id ? (
+                        <div className="flex items-center justify-end gap-1">
+                          <AlertTriangle className="size-4 text-destructive" />
+                          <span className="text-xs text-destructive">Suspend:</span>
+                          <Button size="sm" variant="destructive" disabled={orgCleanupBusy}
+                            onClick={() => void cleanupOrg(org.org_id, true)}>
+                            Org + members
+                          </Button>
+                          <Button size="sm" variant="outline" disabled={orgCleanupBusy}
+                            onClick={() => void cleanupOrg(org.org_id, false)}>
+                            Org only
+                          </Button>
+                          <Button size="sm" variant="ghost" disabled={orgCleanupBusy}
+                            onClick={() => setConfirmCleanupOrgId(null)}>
+                            <X className="size-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => void toggleOrgStatus(org.org_id, org.status)}
+                          >
+                            {org.status === "active" ? "Suspend" : "Activate"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Cleanup organisation"
+                            onClick={() => setConfirmCleanupOrgId(org.org_id)}
+                          >
+                            <Trash2 className="size-4 text-destructive" />
+                          </Button>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
