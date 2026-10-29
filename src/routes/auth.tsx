@@ -82,7 +82,15 @@ function AuthPage() {
         .eq("is_public", true)
         .order("sort_order");
       if (error) throw error;
-      return (data ?? []) as Plan[];
+      const all = (data ?? []) as Plan[];
+      // Keep paid plans + only the first (lowest sort_order) free plan.
+      // Filters out "contact us" plans (On Premise etc.) that also have price=0.
+      let seenFree = false;
+      return all.filter((p) => {
+        if (Number(p.price_monthly) > 0) return true;
+        if (!seenFree) { seenFree = true; return true; }
+        return false;
+      });
     },
     enabled: mode === "register" && registerStep === "plan",
   });
