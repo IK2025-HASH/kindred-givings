@@ -179,9 +179,6 @@ export const createDonationCheckout = createServerFn({ method: "POST" })
     if (!org || !org.public_page_enabled || org.status !== "active") {
       throw new Error("This giving page is not accepting donations.");
     }
-    if (!org.stripe_account_id || !org.stripe_onboarding_complete) {
-      throw new Error("Card payments are not set up for this charity yet.");
-    }
 
     // Record the donation as pending before creating the checkout
     const { data: donation, error: donErr } = await supabaseAdmin
@@ -211,6 +208,13 @@ export const createDonationCheckout = createServerFn({ method: "POST" })
     const origin = appOrigin();
     const currency = org.currency.toLowerCase();
 
+    // Route to charity's own Stripe account if they've completed Connect onboarding,
+    // otherwise collect to the platform account and distribute manually.
+    const connectedAccount =
+      org.stripe_account_id && org.stripe_onboarding_complete
+        ? org.stripe_account_id
+        : null;
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: [
@@ -231,10 +235,14 @@ export const createDonationCheckout = createServerFn({ method: "POST" })
         donation_id: donation.id,
         org_id: org.id,
       },
-      payment_intent_data: {
-        transfer_data: { destination: org.stripe_account_id },
-        application_fee_amount: 0,
-      },
+      ...(connectedAccount
+        ? {
+            payment_intent_data: {
+              transfer_data: { destination: connectedAccount },
+              application_fee_amount: 0,
+            },
+          }
+        : {}),
     });
 
     return { url: session.url! };
