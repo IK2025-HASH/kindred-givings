@@ -732,13 +732,42 @@ function AdminPage() {
   const usersQuery = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: profiles, error } = await supabase
         .from("profiles")
         .select("id, email, full_name, created_at, is_suspended")
         .order("created_at", { ascending: false })
         .limit(200);
       if (error) throw error;
-      return (data ?? []) as unknown as Array<{ id: string; email: string | null; full_name: string | null; created_at: string; is_suspended: boolean | null }>;
+
+      // Fetch active subscriptions with plan names
+      const { data: subsData } = await supabase
+        .from("subscriptions")
+        .select("organization_id, status, current_period_start, billing_period, plans(name)")
+        .in("status", ["active", "trialing"]);
+
+      const orgSubMap: Record<string, { plan_name: string; start: string | null }> = {};
+      for (const sub of subsData ?? []) {
+        const planName = (sub.plans as { name: string } | null)?.name ?? null;
+        if (planName) orgSubMap[sub.organization_id] = { plan_name: planName, start: sub.current_period_start ?? null };
+      }
+
+      // Map user_id → org subscription via org memberships
+      const ids = (profiles ?? []).map((p) => p.id);
+      const { data: memberships } = ids.length > 0
+        ? await supabase.from("organization_members").select("user_id, organization_id").in("user_id", ids)
+        : { data: [] };
+
+      const userSubMap: Record<string, { plan_name: string; start: string | null }> = {};
+      for (const m of memberships ?? []) {
+        const sub = orgSubMap[(m as { user_id: string; organization_id: string }).organization_id];
+        if (sub) userSubMap[(m as { user_id: string; organization_id: string }).user_id] = sub;
+      }
+
+      return (profiles ?? []).map((p) => ({
+        ...p,
+        plan_name: userSubMap[p.id]?.plan_name ?? null,
+        sub_start: userSubMap[p.id]?.start ?? null,
+      })) as Array<{ id: string; email: string | null; full_name: string | null; created_at: string; is_suspended: boolean | null; plan_name: string | null; sub_start: string | null }>;
     },
   });
 
@@ -971,6 +1000,8 @@ function AdminPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead className="hidden md:table-cell">Joined</TableHead>
+                  <TableHead className="hidden lg:table-cell">Plan</TableHead>
+                  <TableHead className="hidden xl:table-cell">Since</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead />
                 </TableRow>
@@ -989,6 +1020,14 @@ function AdminPage() {
                       <TableCell className="text-sm text-muted-foreground">{u.email ?? "—"}</TableCell>
                       <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
                         {formatDate(u.created_at)}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        {u.plan_name
+                          ? <Badge variant="outline" className="text-xs">{u.plan_name}</Badge>
+                          : <span className="text-xs text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="hidden text-xs text-muted-foreground xl:table-cell">
+                        {u.sub_start ? formatDate(u.sub_start) : "—"}
                       </TableCell>
                       <TableCell>
                         <Badge variant={u.is_suspended ? "secondary" : "default"}>
@@ -1045,7 +1084,7 @@ function AdminPage() {
                 })}
                 {(usersQuery.data ?? []).length === 0 && !usersQuery.isLoading && (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
                       No users yet.
                     </TableCell>
                   </TableRow>
