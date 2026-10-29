@@ -103,12 +103,28 @@ type SyncResult = {
 export const syncPlansToStripe = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ token: z.string() }).parse(d))
   .handler(async ({ data }): Promise<{ results: SyncResult[] }> => {
+    // Verify platform admin using RLS — identical mechanism to the route's beforeLoad
+    // guard. We avoid supabaseAdmin.auth.getUser() here because it requires the service
+    // role key to be provisioned correctly in Lovable's server environment, which has
+    // proven unreliable. RLS on platform_admins only returns a row for the token owner,
+    // so a row being present is proof of both authentication and admin membership.
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabaseUrl = process.env["SUPABASE_URL"];
+    const supabasePublishableKey = process.env["SUPABASE_PUBLISHABLE_KEY"];
+    if (!supabaseUrl || !supabasePublishableKey) {
+      throw new Error("Server is missing SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY env var.");
+    }
+    const userClient = createClient(supabaseUrl, supabasePublishableKey, {
+      global: { headers: { Authorization: `Bearer ${data.token}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: adminRow } = await userClient
+      .from("platform_admins")
+      .select("user_id")
+      .maybeSingle();
+    if (!adminRow) throw new Error("Unauthorized");
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: { user } } = await supabaseAdmin.auth.getUser(data.token);
-    if (!user) throw new Error("Unauthorized");
-    const { data: adminRow } = await supabaseAdmin
-      .from("platform_admins").select("user_id").eq("user_id", user.id).maybeSingle();
-    if (!adminRow) throw new Error("Platform admin access required.");
 
     const stripe = await getStripe();
 
