@@ -87,7 +87,10 @@ const STRIPE_PLAN_DEFS = [
       "Custom integrations & API access",
       "White-label branding",
     ],
-    prices: [], // Contact us — no automated price
+    prices: [
+      { interval: "month" as const, amount_pence: 100000, nickname: "On Premise Monthly", lookup_key: "on_premise_monthly" },
+      { interval: "year"  as const, amount_pence: 100000, nickname: "On Premise Yearly",  lookup_key: "on_premise_yearly"  },
+    ],
   },
 ] as const;
 
@@ -101,11 +104,15 @@ type SyncResult = {
 };
 
 export const syncPlansToStripe = createServerFn({ method: "POST" })
-  .handler(async (): Promise<{ results: SyncResult[] }> => {
-    const { requirePlatformAdmin } = await import("@/lib/server-auth");
-    await requirePlatformAdmin();
-
+  .inputValidator((d: unknown) => z.object({ token: z.string() }).parse(d))
+  .handler(async ({ data }): Promise<{ results: SyncResult[] }> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: { user } } = await supabaseAdmin.auth.getUser(data.token);
+    if (!user) throw new Error("Unauthorized");
+    const { data: adminRow } = await supabaseAdmin
+      .from("platform_admins").select("user_id").eq("user_id", user.id).maybeSingle();
+    if (!adminRow) throw new Error("Platform admin access required.");
+
     const stripe = await getStripe();
 
     const results: SyncResult[] = [];

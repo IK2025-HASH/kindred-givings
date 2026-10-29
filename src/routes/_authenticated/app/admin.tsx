@@ -202,7 +202,9 @@ function PlansSection() {
   async function handleSyncToStripe() {
     setSyncing(true);
     try {
-      const { results } = await syncPlansToStripe();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) { toast.error("Not signed in"); setSyncing(false); return; }
+      const { results } = await syncPlansToStripe({ data: { token: session.access_token } });
       const created = results.filter((r) => !r.skipped).length;
       const skipped = results.filter((r) => r.skipped).length;
       toast.success(
