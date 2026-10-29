@@ -578,7 +578,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <button
         onClick={() => setChatOpen(true)}
         aria-label="Contact support"
-        className="fixed bottom-6 right-6 z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
+        className="fixed bottom-20 right-6 z-50 flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
       >
         <MessageCircle className="size-6" />
       </button>
