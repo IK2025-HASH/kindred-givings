@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Building2, CheckCircle2, CreditCard, Heart, HeartHandshake, MapPin, QrCode, Share2, Users } from "lucide-react";
 import QRCode from "react-qr-code";
@@ -21,6 +21,8 @@ import { usePlatformSettings } from "@/hooks/usePlatformSettings";
 export const Route = createFileRoute("/give/$slug")({
   validateSearch: (s: Record<string, unknown>) => ({
     loc: typeof s["loc"] === "string" ? s["loc"] : undefined,
+    payment: typeof s["payment"] === "string" ? s["payment"] : undefined,
+    session_id: typeof s["session_id"] === "string" ? s["session_id"] : undefined,
   }),
   head: ({ params }) => ({
     meta: [
@@ -67,7 +69,7 @@ function youtubeEmbed(url: string) {
 
 function GivePage() {
   const { slug } = Route.useParams();
-  const { loc } = Route.useSearch();
+  const { loc, payment } = Route.useSearch();
   const { user } = useAuth();
   const settings = usePlatformSettings();
   const pageUrl = typeof window !== "undefined" ? (window.location.href.split("?")[0] ?? "") : "";
@@ -80,8 +82,20 @@ function GivePage() {
   const [giftAid, setGiftAid] = useState(false);
   const [anonymous, setAnonymous] = useState(false);
   const [recurring, setRecurring] = useState(false);
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState(payment === "success");
   const [paymentStep, setPaymentStep] = useState<"bank" | "qr" | null>(null);
+  const [stripeSuccess, setStripeSuccess] = useState(payment === "success");
+  const [stripeCancelled, setStripeCancelled] = useState(payment === "cancelled");
+
+  // Clear the ?payment query param from the URL without remounting
+  useEffect(() => {
+    if (payment) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("payment");
+      url.searchParams.delete("session_id");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
   const [busy, setBusy] = useState(false);
 
   const orgQuery = useQuery({
@@ -513,7 +527,30 @@ function GivePage() {
         <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
           {/* Donation form */}
           <Card className="shadow-lift">
-            {done ? (
+            {stripeCancelled ? (
+              <CardContent className="space-y-4 py-8 text-center">
+                <p className="text-lg font-semibold">Payment cancelled</p>
+                <p className="text-sm text-muted-foreground">
+                  No charge was made. You can try again whenever you're ready.
+                </p>
+                <Button onClick={() => setStripeCancelled(false)}>Try again</Button>
+              </CardContent>
+            ) : stripeSuccess ? (
+              <CardContent className="space-y-4 py-8 text-center">
+                <CheckCircle2 className="mx-auto size-12 text-success" />
+                <h2 className="font-display text-xl font-bold">Thank you!</h2>
+                <p className="text-sm text-muted-foreground">
+                  Your payment to <strong>{org.name}</strong> was successful.
+                  {email && " A receipt will be sent to your email."}
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => { setStripeSuccess(false); setDone(false); }}
+                >
+                  Make another donation
+                </Button>
+              </CardContent>
+            ) : done ? (
               <CardContent className="space-y-4 py-8">
                 <div className="text-center">
                   <CheckCircle2 className="mx-auto size-10 text-success mb-3" />

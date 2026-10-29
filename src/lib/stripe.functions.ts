@@ -226,7 +226,7 @@ export const createDonationCheckout = createServerFn({ method: "POST" })
       mode: "payment",
       ...(data.donorEmail ? { customer_email: data.donorEmail } : {}),
       success_url: `${origin}/give/${data.slug}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/give/${data.slug}`,
+      cancel_url: `${origin}/give/${data.slug}?payment=cancelled`,
       metadata: {
         donation_id: donation.id,
         org_id: org.id,

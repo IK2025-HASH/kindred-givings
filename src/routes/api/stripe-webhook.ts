@@ -31,10 +31,64 @@ export const APIRoute = createAPIFileRoute("/api/stripe-webhook")({
       // Donation checkout
       const donationId = session.metadata?.['donation_id'];
       if (donationId) {
-        await supabaseAdmin
+        // Mark donation confirmed
+        const { data: donation } = await supabaseAdmin
           .from("donations")
           .update({ status: "confirmed" })
-          .eq("id", donationId);
+          .eq("id", donationId)
+          .select("amount, currency, donor_name, donor_email, gift_aid, is_anonymous, organization_id")
+          .single();
+
+        // Send charity notification + donor receipt after confirmed payment
+        if (donation) {
+          const { data: org } = await supabaseAdmin
+            .from("organizations")
+            .select("name, contact_email")
+            .eq("id", donation.organization_id)
+            .single();
+
+          const resendKey = process.env["RESEND_API_KEY"];
+          const fromEmail = process.env["FROM_EMAIL"] ?? "noreply@donorbook.co.uk";
+          const appName = process.env["APP_NAME"] ?? "Donorbook";
+
+          if (resendKey && org) {
+            const amount = new Intl.NumberFormat("en-GB", {
+              style: "currency",
+              currency: donation.currency ?? "GBP",
+              maximumFractionDigits: 0,
+            }).format(Number(donation.amount));
+            const donorName = donation.is_anonymous ? "An anonymous supporter" : (donation.donor_name ?? "A supporter");
+            const giftAidNote = donation.gift_aid ? " (Gift Aid eligible)" : "";
+
+            // Notify charity
+            if (org.contact_email) {
+              await fetch("https://api.resend.com/emails", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${resendKey}` },
+                body: JSON.stringify({
+                  from: fromEmail,
+                  to: [org.contact_email],
+                  subject: `New donation confirmed: ${amount} from ${donorName}`,
+                  text: `A card payment has been confirmed on your ${appName} giving page.\n\nDonor: ${donorName}\nAmount: ${amount}${giftAidNote}\n\nView in your dashboard: ${process.env["APP_URL"] ?? "https://donorbook.co.uk"}/app/donations\n\n— ${appName}`,
+                }),
+              }).catch(() => null);
+            }
+
+            // Send donor receipt
+            if (!donation.is_anonymous && donation.donor_email) {
+              await fetch("https://api.resend.com/emails", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${resendKey}` },
+                body: JSON.stringify({
+                  from: fromEmail,
+                  to: [donation.donor_email],
+                  subject: `Thank you for your donation to ${org.name}`,
+                  text: `Dear ${donation.donor_name ?? "Supporter"},\n\nThank you for your generous donation of ${amount} to ${org.name}.${giftAidNote}\n\nYour payment has been received and confirmed.\n\nWith gratitude,\n${org.name} via ${appName}`,
+                }),
+              }).catch(() => null);
+            }
+          }
+        }
       }
 
       // Subscription checkout
