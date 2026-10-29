@@ -462,7 +462,7 @@ function ChatSupportSection() {
     queryKey: ["chat-support-agents"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("chat_support_agents")
+        .from("chat_support_agents" as never)
         .select("user_id, created_at")
         .order("created_at");
       if (error) throw error;
@@ -505,7 +505,7 @@ function ChatSupportSection() {
         .maybeSingle();
       if (profileError) throw profileError;
       if (!profile) throw new Error("No user found with that email. They must register first.");
-      const { error } = await supabase.from("chat_support_agents").insert({ user_id: profile.id });
+      const { error } = await supabase.from("chat_support_agents" as never).insert({ user_id: profile.id } as never);
       if (error) throw error;
       toast.success("Chat support agent added");
       setNewAgentEmail("");
@@ -518,7 +518,7 @@ function ChatSupportSection() {
   }
 
   async function removeAgent(userId: string) {
-    const { error } = await supabase.from("chat_support_agents").delete().eq("user_id", userId);
+    const { error } = await supabase.from("chat_support_agents" as never).delete().eq("user_id", userId);
     if (error) { toast.error(error.message); return; }
     toast.success("Agent removed");
     void qc.invalidateQueries({ queryKey: ["chat-support-agents"] });
@@ -738,7 +738,7 @@ function AdminPage() {
         .order("created_at", { ascending: false })
         .limit(200);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as unknown as Array<{ id: string; email: string | null; full_name: string | null; created_at: string; is_suspended: boolean | null }>;
     },
   });
 
