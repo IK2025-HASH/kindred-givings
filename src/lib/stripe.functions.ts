@@ -103,26 +103,76 @@ type SyncResult = {
 export const syncPlansToStripe = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ token: z.string() }).parse(d))
   .handler(async ({ data }): Promise<{ results: SyncResult[] }> => {
-    // Verify platform admin using RLS — identical mechanism to the route's beforeLoad
-    // guard. We avoid supabaseAdmin.auth.getUser() here because it requires the service
-    // role key to be provisioned correctly in Lovable's server environment, which has
-    // proven unreliable. RLS on platform_admins only returns a row for the token owner,
-    // so a row being present is proof of both authentication and admin membership.
-    const { createClient } = await import("@supabase/supabase-js");
+    // DEBUG_MODE=true in Lovable secrets enables verbose error messages in toasts.
+    // Set it to diagnose auth/env issues; remove once resolved for clean production UX.
+    const DEBUG = process.env["DEBUG_MODE"] === "true";
+
+    // ── Auth: verify caller is a platform admin via RLS ──────────────────────
+    // We build a user-scoped Supabase client using the caller's JWT so that
+    // Supabase's RLS on platform_admins enforces admin membership. The custom
+    // fetch handles the new sb_publishable_* key format (apikey header, not
+    // Bearer) — same pattern as client.ts and client.server.ts.
     const supabaseUrl = process.env["SUPABASE_URL"];
-    const supabasePublishableKey = process.env["SUPABASE_PUBLISHABLE_KEY"];
-    if (!supabaseUrl || !supabasePublishableKey) {
-      throw new Error("Server is missing SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY env var.");
+    const supabasePubKey = process.env["SUPABASE_PUBLISHABLE_KEY"];
+
+    if (DEBUG) {
+      console.log("[syncPlansToStripe] env check", {
+        SUPABASE_URL: supabaseUrl ? supabaseUrl.substring(0, 35) + "…" : "MISSING",
+        SUPABASE_PUBLISHABLE_KEY: supabasePubKey ? supabasePubKey.substring(0, 22) + "…" : "MISSING",
+        SUPABASE_SERVICE_ROLE_KEY: process.env["SUPABASE_SERVICE_ROLE_KEY"] ? "present" : "MISSING",
+        STRIPE_SECRET_KEY: process.env["STRIPE_SECRET_KEY"] ? "present" : "MISSING",
+        token_prefix: data.token.substring(0, 30) + "…",
+        token_length: data.token.length,
+      });
     }
-    const userClient = createClient(supabaseUrl, supabasePublishableKey, {
-      global: { headers: { Authorization: `Bearer ${data.token}` } },
+
+    if (!supabaseUrl || !supabasePubKey) {
+      const missing = [!supabaseUrl && "SUPABASE_URL", !supabasePubKey && "SUPABASE_PUBLISHABLE_KEY"].filter(Boolean).join(", ");
+      throw new Error(`Server env missing: ${missing}`);
+    }
+
+    const { createClient: makeClient } = await import("@supabase/supabase-js");
+    const isNewFmtKey = supabasePubKey.startsWith("sb_publishable_") || supabasePubKey.startsWith("sb_secret_");
+
+    // Custom fetch mirrors the pattern in client.ts / client.server.ts:
+    // new-format keys go in `apikey` header, NOT as `Authorization: Bearer`.
+    const authFetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const hdrs = new Headers(init?.headers);
+      if (isNewFmtKey && hdrs.get("Authorization") === `Bearer ${supabasePubKey}`) {
+        hdrs.delete("Authorization");
+      }
+      hdrs.set("apikey", supabasePubKey);
+      // Ensure the user's JWT is in Authorization (global headers may have set it;
+      // the custom fetch should not overwrite it if already present).
+      if (!hdrs.has("Authorization")) hdrs.set("Authorization", `Bearer ${data.token}`);
+      return fetch(input, { ...init, headers: hdrs });
+    };
+
+    const userClient = makeClient(supabaseUrl, supabasePubKey, {
+      global: { headers: { Authorization: `Bearer ${data.token}` }, fetch: authFetch },
       auth: { persistSession: false, autoRefreshToken: false },
     });
-    const { data: adminRow } = await userClient
+
+    const { data: adminRow, error: adminErr } = await userClient
       .from("platform_admins")
       .select("user_id")
       .maybeSingle();
-    if (!adminRow) throw new Error("Unauthorized");
+
+    if (DEBUG) {
+      console.log("[syncPlansToStripe] RLS check result", {
+        adminRow,
+        adminErr: adminErr?.message ?? null,
+        isNewFmtKey,
+      });
+    }
+
+    if (!adminRow) {
+      throw new Error(
+        DEBUG
+          ? `Unauthorized — RLS: ${adminErr?.message ?? "no row returned"}. URL=${supabaseUrl.substring(0, 35)}. Key=${supabasePubKey.substring(0, 22)}. Token[0:30]=${data.token.substring(0, 30)}`
+          : "Unauthorized"
+      );
+    }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
