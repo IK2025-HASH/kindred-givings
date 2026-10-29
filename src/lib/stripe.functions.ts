@@ -16,6 +16,180 @@ async function getStripe() {
   return new Stripe(key, { apiVersion: STRIPE_API_VERSION });
 }
 
+// ── 0. Sync platform plans → Stripe products + prices ───────────────────────
+const STRIPE_PLAN_DEFS = [
+  {
+    slug: "starter",
+    name: "Starter",
+    description: "Get started free — ideal for small charities",
+    statement_descriptor: "DONORBOOK STARTER",
+    unit_label: "charity",
+    marketing_features: [
+      "Up to 100 donor records",
+      "Up to 3 active campaigns",
+      "Up to 3 team members",
+      "Gift Aid tracking",
+      "Public giving page",
+    ],
+    prices: [
+      { interval: "month" as const, amount_pence: 0,     nickname: "Starter Monthly",    lookup_key: "starter_monthly"    },
+      { interval: "year"  as const, amount_pence: 0,     nickname: "Starter Yearly",     lookup_key: "starter_yearly"     },
+    ],
+  },
+  {
+    slug: "growth",
+    name: "Growth",
+    description: "For growing charities — more donors, campaigns and team members",
+    statement_descriptor: "DONORBOOK GROWTH",
+    unit_label: "charity",
+    marketing_features: [
+      "Up to 500 donor records",
+      "Up to 10 active campaigns",
+      "Up to 5 team members",
+      "Gift Aid tracking",
+      "Public giving page",
+    ],
+    prices: [
+      { interval: "month" as const, amount_pence: 900,   nickname: "Growth Monthly",     lookup_key: "growth_monthly"     },
+      { interval: "year"  as const, amount_pence: 9000,  nickname: "Growth Yearly",      lookup_key: "growth_yearly"      },
+    ],
+  },
+  {
+    slug: "enterprise",
+    name: "Enterprise",
+    description: "For large charities — unlimited donors, campaigns and team",
+    statement_descriptor: "DONORBOOK ENTERPRISE",
+    unit_label: "charity",
+    marketing_features: [
+      "Unlimited donor records",
+      "Unlimited active campaigns",
+      "Unlimited team members",
+      "Gift Aid tracking",
+      "Public giving page",
+      "Priority support",
+      "Dedicated account manager",
+    ],
+    prices: [
+      { interval: "month" as const, amount_pence: 5900,  nickname: "Enterprise Monthly", lookup_key: "enterprise_monthly" },
+      { interval: "year"  as const, amount_pence: 59000, nickname: "Enterprise Yearly",  lookup_key: "enterprise_yearly"  },
+    ],
+  },
+  {
+    slug: "on-premise",
+    name: "On Premise",
+    description: "Self-hosted deployment for organisations with specific compliance requirements",
+    statement_descriptor: "DONORBOOK ONPREM",
+    unit_label: "licence",
+    marketing_features: [
+      "Self-hosted on your infrastructure",
+      "Custom compliance & data residency",
+      "Dedicated SLA & support",
+      "Custom integrations & API access",
+      "White-label branding",
+    ],
+    prices: [], // Contact us — no automated price
+  },
+] as const;
+
+type SyncResult = {
+  slug: string;
+  name: string;
+  product_id: string;
+  price_id_monthly: string | null;
+  price_id_yearly: string | null;
+  skipped: boolean;
+};
+
+export const syncPlansToStripe = createServerFn({ method: "POST" })
+  .handler(async (): Promise<{ results: SyncResult[] }> => {
+    const { requirePlatformAdmin } = await import("@/lib/server-auth");
+    await requirePlatformAdmin();
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const stripe = await getStripe();
+
+    const results: SyncResult[] = [];
+
+    for (const plan of STRIPE_PLAN_DEFS) {
+      // Check if any price with this plan's lookup keys already exists
+      const existingMonthly = plan.prices.find((p) => p.interval === "month")
+        ? (await stripe.prices.list({ lookup_keys: [plan.prices.find((p) => p.interval === "month")!.lookup_key], limit: 1 })).data[0] ?? null
+        : null;
+      const existingYearly = plan.prices.find((p) => p.interval === "year")
+        ? (await stripe.prices.list({ lookup_keys: [plan.prices.find((p) => p.interval === "year")!.lookup_key], limit: 1 })).data[0] ?? null
+        : null;
+
+      // If both prices already exist, skip creation
+      const allPricesExist =
+        plan.prices.length === 0 ||
+        (plan.prices.every((p) => p.interval === "month") && !!existingMonthly) ||
+        (plan.prices.every((p) => p.interval === "year") && !!existingYearly) ||
+        (plan.prices.length === 2 && !!existingMonthly && !!existingYearly);
+
+      let productId: string;
+      let priceIdMonthly: string | null = existingMonthly?.id ?? null;
+      let priceIdYearly: string | null = existingYearly?.id ?? null;
+
+      if (allPricesExist && plan.prices.length > 0) {
+        productId = (existingMonthly ?? existingYearly)!.product as string;
+        results.push({ slug: plan.slug, name: plan.name, product_id: productId, price_id_monthly: priceIdMonthly, price_id_yearly: priceIdYearly, skipped: true });
+      } else {
+        // Create the product
+        const product = await stripe.products.create({
+          name: plan.name,
+          description: plan.description,
+          statement_descriptor: plan.statement_descriptor,
+          unit_label: plan.unit_label,
+          tax_code: "txcd_10000000",
+          metadata: { plan_slug: plan.slug, app: "donorbook" },
+          marketing_features: plan.marketing_features.map((f) => ({ name: f })),
+        });
+        productId = product.id;
+
+        // Create any missing prices
+        for (const p of plan.prices) {
+          const existing = p.interval === "month" ? existingMonthly : existingYearly;
+          if (existing) {
+            if (p.interval === "month") priceIdMonthly = existing.id;
+            else priceIdYearly = existing.id;
+            continue;
+          }
+          const price = await stripe.prices.create({
+            product: productId,
+            currency: "gbp",
+            unit_amount: p.amount_pence,
+            recurring: { interval: p.interval, usage_type: "licensed" },
+            nickname: p.nickname,
+            tax_behavior: "exclusive",
+            lookup_key: p.lookup_key,
+            transfer_lookup_key: true,
+            metadata: {
+              billing_period: p.interval === "month" ? "monthly" : "yearly",
+              plan_slug: plan.slug,
+            },
+          });
+          if (p.interval === "month") priceIdMonthly = price.id;
+          else priceIdYearly = price.id;
+        }
+
+        results.push({ slug: plan.slug, name: plan.name, product_id: productId, price_id_monthly: priceIdMonthly, price_id_yearly: priceIdYearly, skipped: false });
+      }
+
+      // Write price IDs back to the plans table
+      if (priceIdMonthly || priceIdYearly) {
+        await supabaseAdmin
+          .from("plans")
+          .update({
+            ...(priceIdMonthly ? { stripe_price_id_monthly: priceIdMonthly } : {}),
+            ...(priceIdYearly  ? { stripe_price_id_yearly:  priceIdYearly  } : {}),
+          })
+          .eq("slug", plan.slug);
+      }
+    }
+
+    return { results };
+  });
+
 // ── 1. Create/resume Stripe Connect Express onboarding link ──────────────────
 export const createConnectOnboardingLink = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ orgId: z.string().uuid() }).parse(d))

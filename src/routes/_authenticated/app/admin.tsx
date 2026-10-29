@@ -2,7 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, ChevronDown, ChevronUp, CreditCard, MessageCircle, Plus, Trash2, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, CreditCard, MessageCircle, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { PageHeader } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import { usePlatformSettingsQuery } from "@/hooks/usePlatformSettings";
 import { DEFAULTS, type PlatformSettings } from "@/lib/platform-settings.functions";
 import { formatDate, formatMoney } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
+import { syncPlansToStripe } from "@/lib/stripe.functions";
 
 export const Route = createFileRoute("/_authenticated/app/admin")({
   beforeLoad: async () => {
@@ -196,6 +197,27 @@ function PlansSection() {
   const [adding, setAdding] = useState(false);
   const [newPlan, setNewPlan] = useState<Omit<Plan, "id">>(BLANK_PLAN);
   const [busy, setBusy] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  async function handleSyncToStripe() {
+    setSyncing(true);
+    try {
+      const { results } = await syncPlansToStripe();
+      const created = results.filter((r) => !r.skipped).length;
+      const skipped = results.filter((r) => r.skipped).length;
+      toast.success(
+        created > 0
+          ? `Stripe sync complete — ${created} plan${created !== 1 ? "s" : ""} created, ${skipped} already existed`
+          : `All plans already exist in Stripe (${skipped} skipped)`
+      );
+      void qc.invalidateQueries({ queryKey: ["admin-plans"] });
+      void qc.invalidateQueries({ queryKey: ["public-plans"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Stripe sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   const plansQuery = useQuery({
     queryKey: ["admin-plans"],
@@ -252,9 +274,15 @@ function PlansSection() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Pricing plans</CardTitle>
-        <Button size="sm" onClick={() => { setAdding(true); setNewPlan(BLANK_PLAN); }}>
-          <Plus className="mr-1.5 size-4" /> New plan
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={handleSyncToStripe} disabled={syncing}>
+            <RefreshCw className={`mr-1.5 size-4 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Syncing…" : "Sync to Stripe"}
+          </Button>
+          <Button size="sm" onClick={() => { setAdding(true); setNewPlan(BLANK_PLAN); }}>
+            <Plus className="mr-1.5 size-4" /> New plan
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         {adding && (
