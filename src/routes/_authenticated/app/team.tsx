@@ -40,10 +40,10 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/_authenticated/app/team")({
   head: () => ({
     meta: [
-      { title: "Team — Donorbook workspace" },
+      { title: "Team — Donorbook" },
       {
         name: "description",
-        content: "Invite team members and manage roles for your charity workspace.",
+        content: "Invite team members and manage roles for your charity.",
       },
     ],
   }),
@@ -196,7 +196,7 @@ function TeamPage() {
               {membersMissing && (
                 <TableRow>
                   <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
-                    No member records found for this workspace. Your membership row may be missing —
+                    No member records found for this charity. Your membership row may be missing —
                     contact support or check the database directly.
                   </TableCell>
                 </TableRow>
@@ -331,7 +331,7 @@ function TeamPage() {
           {generatedLink ? (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Share this link with <span className="font-medium text-foreground">{email}</span> so they can join your workspace.
+                Share this link with <span className="font-medium text-foreground">{email}</span> so they can join your charity.
               </p>
               <div className="flex items-center gap-2">
                 <Input readOnly value={generatedLink} className="font-mono text-xs" />
@@ -348,13 +348,13 @@ function TeamPage() {
               </div>
               <div className="flex gap-2">
                 <a
-                  href={`mailto:${email}?subject=You've been invited to ${currentOrg?.name ?? "a workspace"}&body=Hi%2C%0A%0AYou've been invited to join ${encodeURIComponent(currentOrg?.name ?? "our workspace")} on Donorbook.%0A%0AClick this link to accept:%0A${encodeURIComponent(generatedLink)}`}
+                  href={`mailto:${email}?subject=You've been invited to ${currentOrg?.name ?? "a charity"}&body=Hi%2C%0A%0AYou've been invited to join ${encodeURIComponent(currentOrg?.name ?? "our charity")} on Donorbook.%0A%0AClick this link to accept:%0A${encodeURIComponent(generatedLink)}`}
                   className="flex flex-1 items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
                 >
                   <Mail className="size-4" /> Email
                 </a>
                 <a
-                  href={`https://wa.me/?text=${encodeURIComponent(`You've been invited to join ${currentOrg?.name ?? "our workspace"} on Donorbook. Click to accept: ${generatedLink}`)}`}
+                  href={`https://wa.me/?text=${encodeURIComponent(`You've been invited to join ${currentOrg?.name ?? "our charity"} on Donorbook. Click to accept: ${generatedLink}`)}`}
                   target="_blank"
                   rel="noreferrer"
                   className="flex flex-1 items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"

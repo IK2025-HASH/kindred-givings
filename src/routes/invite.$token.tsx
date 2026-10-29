@@ -12,7 +12,7 @@ export const Route = createFileRoute("/invite/$token")({
   head: () => ({
     meta: [
       { title: "Accept invitation — Donorbook" },
-      { name: "description", content: "Accept your invitation to join a charity workspace on Donorbook." },
+      { name: "description", content: "Accept your invitation to join a charity on Donorbook." },
     ],
   }),
   component: InvitePage,

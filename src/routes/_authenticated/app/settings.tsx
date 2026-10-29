@@ -24,7 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/_authenticated/app/settings")({
   head: () => ({
     meta: [
-      { title: "Settings — Donorbook workspace" },
+      { title: "Settings — Donorbook" },
       {
         name: "description",
         content: "Update your charity details, giving page and notification settings.",
@@ -183,7 +183,7 @@ function SettingsPage() {
     if (!currentOrg || deleteConfirm !== currentOrg.name) return;
     const { error } = await supabase.from("organizations").delete().eq("id", currentOrg.id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Charity workspace deleted");
+    toast.success("Charity deleted");
     void qc.invalidateQueries({ queryKey: ["memberships"] });
     void navigate({ to: "/app", replace: true });
   }
@@ -468,7 +468,7 @@ function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Permanently delete this charity workspace and all its data. This cannot be undone.
+              Permanently delete this charity and all its data. This cannot be undone.
             </p>
             <div className="space-y-1.5">
               <Label htmlFor="del-confirm">
@@ -485,7 +485,7 @@ function SettingsPage() {
               disabled={deleteConfirm !== currentOrg.name}
               onClick={() => void deleteOrg()}
             >
-              Delete workspace
+              Delete charity
             </Button>
           </CardContent>
         </Card>

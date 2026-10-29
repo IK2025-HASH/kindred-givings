@@ -335,13 +335,13 @@ function CreateOrg() {
       }
       setCurrentOrgId(data.id);
       refreshMemberships();
-      toast.success("Charity workspace created");
+      toast.success("Charity created");
     } catch (err) {
       console.error("CreateOrg error:", err);
       const msg =
         err instanceof Error
           ? err.message
-          : (err as { message?: string })?.message ?? "Could not create the workspace";
+          : (err as { message?: string })?.message ?? "Could not create charity";
       toast.error(msg);
     } finally {
       setBusy(false);
@@ -353,7 +353,7 @@ function CreateOrg() {
       <div>
         <h1 className="font-display text-2xl font-bold tracking-tight">Set up your charity</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Create a workspace to start recording donors and donations.
+          Register your charity to start recording donors and donations.
         </p>
       </div>
       <Card>
@@ -392,7 +392,7 @@ function CreateOrg() {
               />
             </div>
             <Button type="submit" disabled={busy} className="w-full">
-              {busy ? "Creating…" : "Create workspace"}
+              {busy ? "Creating…" : "Create charity"}
             </Button>
           </form>
         </CardContent>
@@ -436,8 +436,8 @@ function AutoCreateOrg() {
 
   useEffect(() => {
     if (!user || done) return;
-    const fullName = (user as { user_metadata?: { full_name?: string } })?.user_metadata?.full_name ?? "";
-    const baseName = fullName ? `${fullName}'s Charity` : "My Charity";
+    const meta = (user as { user_metadata?: { full_name?: string; charity_name?: string } })?.user_metadata ?? {};
+    const baseName = meta.charity_name || (meta.full_name ? `${meta.full_name}'s Charity` : "My Charity");
     const baseSlug = slugify(baseName);
 
     async function create() {
@@ -463,11 +463,11 @@ function AutoCreateOrg() {
         }
         setCurrentOrgId(data.id);
         refreshMemberships();
-        toast.success("Workspace ready — rename it any time in Settings");
+        toast.success("Charity ready — rename it any time in Settings");
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Could not create workspace";
+        const msg = err instanceof Error ? err.message : "Could not create charity";
         if (msg.includes("organizations_slug_key")) {
-          // Slug collision — workspace may have been created already; refresh
+          // Slug collision — charity may have been created already; refresh
           refreshMemberships();
         } else {
           toast.error(msg);
@@ -482,7 +482,7 @@ function AutoCreateOrg() {
 
   return (
     <div className="flex min-h-[50vh] items-center justify-center text-sm text-muted-foreground">
-      Setting up your workspace…
+      Setting up your charity…
     </div>
   );
 }
@@ -495,7 +495,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (membershipsLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-        Loading your workspace…
+        Loading your charity…
       </div>
     );
   }

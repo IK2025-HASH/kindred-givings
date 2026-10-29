@@ -99,11 +99,11 @@ const FAQS = [
   },
   {
     q: "How is our data kept secure?",
-    a: "Each charity is an isolated workspace. Team members only see the data that belongs to their own charity. Authentication and data are handled by Supabase (hosted on AWS), with row-level security enforced at the database layer.",
+    a: "Each charity's data is completely isolated. Team members only see the data that belongs to their own charity. Authentication and data are handled by Supabase (hosted on AWS), with row-level security enforced at the database layer.",
   },
   {
     q: "Can I manage more than one charity?",
-    a: "Yes. You can create or be invited to multiple charity workspaces under a single login. Switch between them using the dropdown in the sidebar.",
+    a: "Yes. You can create or be invited to multiple charities under a single login. Switch between them using the dropdown in the sidebar.",
   },
   {
     q: "Is there a free plan?",
@@ -518,7 +518,7 @@ function Home() {
               One place for every donor, gift and appeal
             </h1>
             <p className="mt-5 max-w-xl text-lg text-navy-foreground/80">
-              {settings.app_name} replaces spreadsheets and scattered email threads with a clean workspace: donor records, Gift Aid tracking, fundraising campaigns and a public giving page — all connected.
+              {settings.app_name} replaces spreadsheets and scattered email threads with a single platform: donor records, Gift Aid tracking, fundraising campaigns and a public giving page — all connected.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild size="lg">
@@ -560,7 +560,7 @@ function Home() {
               ))}
             </div>
             <p className="mt-4 text-xs text-navy-foreground/55">
-              Figures from the Sunrise Children's Foundation demo workspace.
+              Figures from the Sunrise Children's Foundation demo charity.
             </p>
           </div>
         </div>
@@ -586,7 +586,7 @@ function Home() {
           {[
             {
               step: "1",
-              title: "Set up your workspace",
+              title: "Set up your charity",
               body: "Enter your charity's name, logo, story and contact details. Your public giving page is created automatically with a shareable link like /give/your-charity-name.",
               icon: Building2,
             },
@@ -749,8 +749,8 @@ function Home() {
             </p>
             <div className="mt-6 space-y-3">
               {[
-                { role: "Owner", desc: "Full access including billing, settings and deleting the workspace" },
-                { role: "Admin", desc: "Everything except billing and workspace deletion" },
+                { role: "Owner", desc: "Full access including billing, settings and deleting the charity" },
+                { role: "Admin", desc: "Everything except billing and charity deletion" },
                 { role: "Fundraiser", desc: "Can add and edit donors, donations and campaigns" },
                 { role: "Viewer", desc: "Read-only access to all data" },
               ].map((r) => (
@@ -789,7 +789,7 @@ function Home() {
             </span>
             <h3 className="mt-4 font-display text-2xl font-bold">Manage multiple charities</h3>
             <p className="mt-3 text-muted-foreground">
-              Running more than one charity? Each has its own private workspace, its own team, its own giving page and its own data — all accessible under a single {settings.app_name} login. Switch between them from the sidebar.
+              Running more than one charity? Each has its own private account, its own team, its own giving page and its own data — all accessible under a single {settings.app_name} login. Switch between them from the sidebar.
             </p>
           </div>
         </div>
@@ -921,13 +921,13 @@ function Home() {
           <div>
             <h2 className="font-display text-2xl font-bold">Ready to get started?</h2>
             <p className="mt-2 max-w-md text-muted-foreground">
-              Create your free workspace in under 5 minutes. Add donors, record your first donation and share your giving page — all today.
+              Register your charity in under 5 minutes. Add donors, record your first donation and share your giving page — all today.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Button asChild size="lg">
               <Link to="/auth" search={{ mode: "register" }}>
-                Create free workspace <ArrowRight className="size-4" />
+                Register your charity <ArrowRight className="size-4" />
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline">

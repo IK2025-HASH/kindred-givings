@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, slugify } from "@/lib/format";
 
 const TERMS_VERSION = "2025-09";
 
@@ -37,10 +37,10 @@ export const Route = createFileRoute("/auth")({
       { title: "Log in — Donorbook" },
       {
         name: "description",
-        content: "Log in to your Donorbook charity workspace or create a new one.",
+        content: "Log in to your Donorbook charity account or register a new charity.",
       },
       { property: "og:title", content: "Log in to Donorbook" },
-      { property: "og:description", content: "Access your charity's donation workspace." },
+      { property: "og:description", content: "Access your charity's Donorbook account." },
     ],
   }),
   component: AuthPage,
@@ -54,6 +54,7 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [charityName, setCharityName] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -116,7 +117,7 @@ function AuthPage() {
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/app`,
-            data: { full_name: fullName },
+            data: { full_name: fullName, charity_name: charityName },
           },
         });
         if (error) throw error;
@@ -127,14 +128,29 @@ function AuthPage() {
           }).eq("id", data.user.id);
         }
         if (data.session) {
-          // Email confirmation disabled — go straight to app (or billing to pay if paid plan)
+          // Email confirmation disabled — create the charity org immediately
+          const orgSlug = slugify(charityName);
+          const { data: orgData, error: orgError } = await supabase
+            .from("organizations")
+            .insert({
+              name: charityName,
+              slug: orgSlug,
+              contact_email: email,
+              created_by: data.user!.id,
+            })
+            .select("id")
+            .single();
+          if (orgError) throw orgError;
+          await supabase
+            .from("organization_members")
+            .insert({ organization_id: orgData.id, user_id: data.user!.id, role: "owner" });
           if (selectedPlan && Number(selectedPlan.price_monthly) > 0) {
             navigate({ to: "/app/billing", search: { subscription: undefined, plan: selectedPlan.id } });
           } else {
             navigate({ to: "/app" });
           }
         } else {
-          // Email confirmation required — show holding screen
+          // Email confirmation required — show holding screen (org created after confirmation via AutoCreateOrg)
           setMode("confirm");
         }
       } else if (mode === "login") {
@@ -189,7 +205,7 @@ function AuthPage() {
             One home for every donor, gift and appeal
           </h2>
           <p className="mt-4 max-w-md text-navy-foreground/75">
-            Create your charity workspace, invite your team and start recording donations today.
+            Register your charity, invite your team and start recording donations today.
           </p>
         </div>
         <p className="text-xs text-navy-foreground/50">© {new Date().getFullYear()} Donorbook</p>
@@ -299,15 +315,27 @@ function AuthPage() {
                 <React.Fragment>
                   <form onSubmit={onSubmit} className="space-y-4">
                     {mode === "register" && (
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Your name</Label>
-                        <Input
-                          id="name"
-                          value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
-                          required
-                        />
-                      </div>
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="charity-name">Registered charity name</Label>
+                          <Input
+                            id="charity-name"
+                            value={charityName}
+                            onChange={(e) => setCharityName(e.target.value)}
+                            placeholder="e.g. Sunrise Children's Foundation"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="name">Your name</Label>
+                          <Input
+                            id="name"
+                            value={fullName}
+                            onChange={(e) => setFullName(e.target.value)}
+                            required
+                          />
+                        </div>
+                      </>
                     )}
                     <div className="space-y-2">
                       <Label htmlFor="email">Email</Label>

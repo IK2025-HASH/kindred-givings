@@ -13,7 +13,7 @@ import { downloadCsv, formatMoney } from "@/lib/format";
 export const Route = createFileRoute("/_authenticated/app/reports")({
   head: () => ({
     meta: [
-      { title: "Reports — Donorbook workspace" },
+      { title: "Reports — Donorbook" },
       {
         name: "description",
         content: "Filter giving by date, compare campaigns and methods, and export the numbers.",

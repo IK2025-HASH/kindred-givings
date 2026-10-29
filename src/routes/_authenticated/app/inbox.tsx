@@ -12,7 +12,7 @@ import { formatDate } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/app/inbox")({
   head: () => ({
-    meta: [{ title: "Inbox — Donorbook workspace" }],
+    meta: [{ title: "Inbox — Donorbook" }],
   }),
   component: InboxPage,
 });

@@ -22,7 +22,7 @@ import { formatDate, formatMoney } from "@/lib/format";
 export const Route = createFileRoute("/_authenticated/app/")({
   head: () => ({
     meta: [
-      { title: "Dashboard — Donorbook workspace" },
+      { title: "Dashboard — Donorbook" },
       {
         name: "description",
         content: "Track money raised, donors, average gift and campaign progress for your charity.",
@@ -44,7 +44,7 @@ function SetupChecklist({
   hasCampaigns: boolean;
 }) {
   const steps = [
-    { label: "Workspace created", done: true, to: null },
+    { label: "Charity registered", done: true, to: null },
     {
       label: "Add your recipient account (card link or bank details)",
       done: !!(org?.payment_link_url || org?.bank_account_number),
