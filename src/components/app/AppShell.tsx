@@ -10,6 +10,7 @@ import {
   LifeBuoy,
   LogOut,
   Megaphone,
+  X,
   Menu,
   MessageCircle,
   QrCode,
@@ -88,19 +89,9 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-function ContactSupportButton({
-  onNavigate,
-  open,
-  onOpenChange,
-}: {
-  onNavigate?: () => void;
-  open?: boolean;
-  onOpenChange?: (v: boolean) => void;
-}) {
+function ContactSupportButton({ onNavigate }: { onNavigate?: () => void }) {
   const { user, currentOrg } = useAuth();
-  const [localOpen, setLocalOpen] = useState(false);
-  const isOpen = open !== undefined ? open : localOpen;
-  const setIsOpen = onOpenChange ?? setLocalOpen;
+  const [isOpen, setIsOpen] = useState(false);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -147,15 +138,12 @@ function ContactSupportButton({
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      {/* Only render the sidebar trigger when NOT controlled externally (FAB mode) */}
-      {open === undefined && (
-        <DialogTrigger asChild>
-          <button className="flex items-center gap-2 rounded-md px-3 py-2 text-xs text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors">
-            <LifeBuoy className="size-3.5" />
-            Contact support
-          </button>
-        </DialogTrigger>
-      )}
+      <DialogTrigger asChild>
+        <button className="flex items-center gap-2 rounded-md px-3 py-2 text-xs text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors">
+          <LifeBuoy className="size-3.5" />
+          Contact support
+        </button>
+      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Contact support</DialogTitle>
@@ -190,6 +178,113 @@ function ContactSupportButton({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ChatSupportPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { user, currentOrg } = useAuth();
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  useEffect(() => {
+    if (!open) setSent(false);
+  }, [open]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!user || !subject.trim() || !message.trim()) return;
+    setBusy(true);
+    try {
+      const { data: conv, error: convErr } = await supabase
+        .from("support_conversations")
+        .insert({ org_id: currentOrg?.id ?? null, started_by: user.id, subject: subject.trim(), status: "open" })
+        .select("id")
+        .single();
+      if (convErr) throw convErr;
+      const { data: profile } = await supabase.from("profiles").select("full_name, email").eq("id", user.id).maybeSingle();
+      const { error: msgErr } = await supabase.from("support_messages").insert({
+        conversation_id: conv.id,
+        sender_id: user.id,
+        sender_name: profile?.full_name ?? profile?.email ?? user.email ?? null,
+        body: message.trim(),
+      });
+      if (msgErr) throw msgErr;
+      setSent(true);
+      setSubject("");
+      setMessage("");
+      toast.success("Support request sent");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not send request");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      className={cn(
+        "fixed bottom-0 right-0 top-16 z-40 flex w-80 flex-col border-l bg-background shadow-2xl transition-transform duration-200 ease-in-out",
+        open ? "translate-x-0" : "pointer-events-none translate-x-full",
+      )}
+    >
+      <div className="flex shrink-0 items-center justify-between border-b px-4 py-3">
+        <div className="flex items-center gap-2">
+          <MessageCircle className="size-4 text-primary" />
+          <span className="text-sm font-semibold">Contact support</span>
+        </div>
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4">
+        {sent ? (
+          <div className="flex flex-col items-center gap-3 py-8 text-center">
+            <div className="flex size-10 items-center justify-center rounded-full bg-primary/10">
+              <Check className="size-5 text-primary" />
+            </div>
+            <p className="text-sm font-medium">Request sent!</p>
+            <p className="text-xs text-muted-foreground">Our support team will be in touch soon.</p>
+            <Button size="sm" variant="outline" onClick={() => setSent(false)}>
+              Send another
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={(e) => void submit(e)} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="panel-subject">Subject</Label>
+              <Input
+                id="panel-subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="What do you need help with?"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="panel-message">Message</Label>
+              <Textarea
+                id="panel-message"
+                rows={7}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Describe your issue in detail…"
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={busy || !subject.trim() || !message.trim()}>
+              {busy ? "Sending…" : "Send request"}
+            </Button>
+          </form>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -576,14 +671,21 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
 
-      {/* Floating chat button — visible to all authenticated users on every page */}
-      <ContactSupportButton open={chatOpen} onOpenChange={setChatOpen} />
+      {/* Non-blocking slide-in support panel */}
+      <ChatSupportPanel open={chatOpen} onClose={() => setChatOpen(false)} />
+
+      {/* FAB toggle — sits above the panel (z-50 > z-40) */}
       <button
-        onClick={() => setChatOpen(true)}
-        aria-label="Contact support"
-        className="fixed bottom-20 right-6 z-50 flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
+        onClick={() => setChatOpen((v) => !v)}
+        aria-label={chatOpen ? "Close support" : "Contact support"}
+        className={cn(
+          "fixed bottom-20 right-6 z-50 flex size-12 items-center justify-center rounded-full shadow-lg transition-colors",
+          chatOpen
+            ? "bg-muted text-muted-foreground hover:bg-muted/80"
+            : "bg-primary text-primary-foreground hover:bg-primary/90",
+        )}
       >
-        <MessageCircle className="size-6" />
+        {chatOpen ? <X className="size-5" /> : <MessageCircle className="size-6" />}
       </button>
     </div>
   );
