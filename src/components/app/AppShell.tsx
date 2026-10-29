@@ -216,7 +216,12 @@ function ChatSupportPanel({ open, onClose }: { open: boolean; onClose: () => voi
       setMessage("");
       toast.success("Support request sent");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not send request");
+      console.error("[ChatSupportPanel] submit error:", err);
+      const msg =
+        err instanceof Error
+          ? err.message
+          : (err as { message?: string })?.message ?? "Could not send request";
+      toast.error(msg || "Could not send request");
     } finally {
       setBusy(false);
     }
