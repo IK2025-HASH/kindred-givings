@@ -848,25 +848,18 @@ function AdminPage() {
     }
   }
 
-  async function cleanupOrg(orgId: string, suspendMembers: boolean) {
+  async function deleteOrg(orgId: string) {
     setOrgCleanupBusy(true);
     try {
-      if (suspendMembers) {
-        const { data: members } = await supabase
-          .from("org_members" as never)
-          .select("user_id")
-          .eq("org_id", orgId);
-        for (const m of (members ?? []) as Array<{ user_id: string }>) {
-          await supabase.rpc("admin_set_user_suspended", { target_user_id: m.user_id, suspended: true });
-        }
-      }
-      await supabase.from("organizations").update({ status: "suspended" }).eq("id", orgId);
-      toast.success(suspendMembers ? "Organisation and all members suspended" : "Organisation suspended");
+      const { error } = await supabase.rpc("admin_delete_org" as never, { target_org_id: orgId } as never);
+      if (error) throw error;
+      toast.success("Organisation permanently deleted");
       setConfirmCleanupOrgId(null);
       void qc.invalidateQueries({ queryKey: ["admin-orgs"] });
       void qc.invalidateQueries({ queryKey: ["admin-users"] });
+      void qc.invalidateQueries({ queryKey: ["admin-stats"] });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not cleanup organisation");
+      toast.error((err as { message?: string })?.message ?? "Could not delete organisation");
     } finally {
       setOrgCleanupBusy(false);
     }
@@ -1177,14 +1170,10 @@ function AdminPage() {
                       {confirmCleanupOrgId === org.org_id ? (
                         <div className="flex items-center justify-end gap-1">
                           <AlertTriangle className="size-4 text-destructive" />
-                          <span className="text-xs text-destructive">Suspend:</span>
+                          <span className="text-xs text-destructive">Delete forever?</span>
                           <Button size="sm" variant="destructive" disabled={orgCleanupBusy}
-                            onClick={() => void cleanupOrg(org.org_id, true)}>
-                            Org + members
-                          </Button>
-                          <Button size="sm" variant="outline" disabled={orgCleanupBusy}
-                            onClick={() => void cleanupOrg(org.org_id, false)}>
-                            Org only
+                            onClick={() => void deleteOrg(org.org_id)}>
+                            Confirm
                           </Button>
                           <Button size="sm" variant="ghost" disabled={orgCleanupBusy}
                             onClick={() => setConfirmCleanupOrgId(null)}>
