@@ -143,9 +143,13 @@ function AuthPage() {
             .select("id")
             .single();
           if (orgError) throw orgError;
-          await supabase
+          const memberResult = await supabase
             .from("organization_members")
             .insert({ organization_id: orgData.id, user_id: data.user!.id, role: "owner" });
+          if (memberResult.error) {
+            await supabase.from("organizations").delete().eq("id", orgData.id);
+            throw memberResult.error;
+          }
           if (selectedPlan && Number(selectedPlan.price_monthly) > 0) {
             navigate({ to: "/app/billing", search: { subscription: undefined, plan: selectedPlan.id } });
           } else {
@@ -190,7 +194,8 @@ function AuthPage() {
         setMode("login");
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
+      const msg = (err instanceof Error ? err.message : (err as { message?: string })?.message) ?? "Something went wrong";
+      toast.error(msg);
     } finally {
       setBusy(false);
     }

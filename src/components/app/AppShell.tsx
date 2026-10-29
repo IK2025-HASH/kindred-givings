@@ -556,6 +556,20 @@ function AutoCreateOrg() {
     async function create() {
       if (!user) return;
       try {
+        // If the user already has a membership (e.g. org_members insert failed silently
+        // during registration leaving the org created but unlinked), recover immediately.
+        const { data: existing } = await supabase
+          .from("organization_members")
+          .select("organization_id")
+          .eq("user_id", user.id)
+          .limit(1)
+          .maybeSingle();
+        if (existing) {
+          setCurrentOrgId(existing.organization_id);
+          refreshMemberships();
+          return;
+        }
+
         const { data, error } = await supabase
           .from("organizations")
           .insert({
@@ -566,7 +580,31 @@ function AutoCreateOrg() {
           })
           .select("id")
           .single();
-        if (error) throw error;
+
+        if (error) {
+          const errMsg = (error as { message?: string })?.message ?? "";
+          if (errMsg.includes("organizations_slug_key")) {
+            // Org already created (e.g. from a previous registration attempt that
+            // failed after the org insert). Add the user as a member and recover.
+            const { data: existingOrg } = await supabase
+              .from("organizations")
+              .select("id")
+              .eq("slug", baseSlug)
+              .maybeSingle();
+            if (existingOrg) {
+              const m = await supabase.from("organization_members")
+                .insert({ organization_id: existingOrg.id, user_id: user.id, role: "owner" });
+              if (!m.error) {
+                setCurrentOrgId(existingOrg.id);
+                refreshMemberships();
+                toast.success("Charity ready — rename it any time in Settings");
+                return;
+              }
+            }
+          }
+          throw error;
+        }
+
         const member = await supabase
           .from("organization_members")
           .insert({ organization_id: data.id, user_id: user.id, role: "owner" });
@@ -578,12 +616,12 @@ function AutoCreateOrg() {
         refreshMemberships();
         toast.success("Charity ready — rename it any time in Settings");
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Could not create charity";
+        const msg = (err as { message?: string })?.message ?? "Could not create charity";
         if (msg.includes("organizations_slug_key")) {
-          // Slug collision — charity may have been created already; refresh
+          // Another concurrent attempt already succeeded; just refresh
           refreshMemberships();
         } else {
-          toast.error(msg);
+          toast.error(msg || "Could not create charity");
         }
       } finally {
         setDone(true);
