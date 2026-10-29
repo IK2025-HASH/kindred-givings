@@ -62,8 +62,10 @@ function AuthPage() {
   const { user, loading } = useAuth();
 
   useEffect(() => {
-    if (!loading && user) navigate({ to: "/app" });
-  }, [user, loading, navigate]);
+    // Don't redirect while the form is submitting — the onSubmit handler
+    // navigates explicitly (to /app/billing for paid plans, /app for free).
+    if (!loading && user && !busy) navigate({ to: "/app" });
+  }, [user, loading, navigate, busy]);
 
   // Reset register sub-step when leaving register mode
   useEffect(() => {
