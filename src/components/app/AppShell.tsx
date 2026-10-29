@@ -88,9 +88,19 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-function ContactSupportButton({ onNavigate }: { onNavigate?: () => void }) {
+function ContactSupportButton({
+  onNavigate,
+  open,
+  onOpenChange,
+}: {
+  onNavigate?: () => void;
+  open?: boolean;
+  onOpenChange?: (v: boolean) => void;
+}) {
   const { user, currentOrg } = useAuth();
-  const [open, setOpen] = useState(false);
+  const [localOpen, setLocalOpen] = useState(false);
+  const isOpen = open !== undefined ? open : localOpen;
+  const setIsOpen = onOpenChange ?? setLocalOpen;
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -126,7 +136,7 @@ function ContactSupportButton({ onNavigate }: { onNavigate?: () => void }) {
       toast.success("Support request sent");
       setSubject("");
       setMessage("");
-      setOpen(false);
+      setIsOpen(false);
       onNavigate?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not send request");
@@ -136,7 +146,7 @@ function ContactSupportButton({ onNavigate }: { onNavigate?: () => void }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <button className="flex items-center gap-2 rounded-md px-3 py-2 text-xs text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors">
           <LifeBuoy className="size-3.5" />
@@ -490,6 +500,7 @@ function AutoCreateOrg() {
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, memberships, membershipsLoading, currentOrg, signOut } = useAuth();
   const [open, setOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const navigate = useNavigate();
 
   if (membershipsLoading) {
@@ -561,6 +572,16 @@ export function AppShell({ children }: { children: ReactNode }) {
           {!currentOrg ? <AutoCreateOrg /> : children}
         </main>
       </div>
+
+      {/* Floating chat button — visible to all authenticated users on every page */}
+      <ContactSupportButton open={chatOpen} onOpenChange={setChatOpen} />
+      <button
+        onClick={() => setChatOpen(true)}
+        aria-label="Contact support"
+        className="fixed bottom-6 right-6 z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
+      >
+        <MessageCircle className="size-6" />
+      </button>
     </div>
   );
 }
