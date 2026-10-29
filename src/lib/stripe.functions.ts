@@ -87,10 +87,7 @@ const STRIPE_PLAN_DEFS = [
       "Custom integrations & API access",
       "White-label branding",
     ],
-    prices: [
-      { interval: "month" as const, amount_pence: 100000, nickname: "On Premise Monthly", lookup_key: "on_premise_monthly" },
-      { interval: "year"  as const, amount_pence: 100000, nickname: "On Premise Yearly",  lookup_key: "on_premise_yearly"  },
-    ],
+    prices: [], // No Stripe price — handled via "Contact us" lead form
   },
 ] as const;
 
