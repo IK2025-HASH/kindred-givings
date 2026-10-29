@@ -112,14 +112,19 @@ export const syncPlansToStripe = createServerFn({ method: "POST" })
     // Supabase's RLS on platform_admins enforces admin membership. The custom
     // fetch handles the new sb_publishable_* key format (apikey header, not
     // Bearer) — same pattern as client.ts and client.server.ts.
-    const supabaseUrl = process.env["SUPABASE_URL"];
-    const supabasePubKey = process.env["SUPABASE_PUBLISHABLE_KEY"];
+    // APP_SUPABASE_URL / APP_SUPABASE_ANON_KEY are our independent project's values
+    // set as Lovable secrets. They take priority over SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY
+    // which Lovable injects pointing at its own managed DB.
+    const supabaseUrl = process.env["APP_SUPABASE_URL"] || process.env["SUPABASE_URL"];
+    const supabasePubKey = process.env["APP_SUPABASE_ANON_KEY"] || process.env["SUPABASE_PUBLISHABLE_KEY"];
 
     if (DEBUG) {
       console.log("[syncPlansToStripe] env check", {
-        SUPABASE_URL: supabaseUrl ? supabaseUrl.substring(0, 35) + "…" : "MISSING",
-        SUPABASE_PUBLISHABLE_KEY: supabasePubKey ? supabasePubKey.substring(0, 22) + "…" : "MISSING",
-        SUPABASE_SERVICE_ROLE_KEY: process.env["SUPABASE_SERVICE_ROLE_KEY"] ? "present" : "MISSING",
+        APP_SUPABASE_URL: process.env["APP_SUPABASE_URL"] ? process.env["APP_SUPABASE_URL"].substring(0, 35) + "…" : "MISSING",
+        APP_SUPABASE_ANON_KEY: process.env["APP_SUPABASE_ANON_KEY"] ? process.env["APP_SUPABASE_ANON_KEY"].substring(0, 22) + "…" : "MISSING",
+        SUPABASE_URL_fallback: process.env["SUPABASE_URL"] ? process.env["SUPABASE_URL"].substring(0, 35) + "…" : "MISSING",
+        resolved_url: supabaseUrl ? supabaseUrl.substring(0, 35) + "…" : "MISSING",
+        resolved_key: supabasePubKey ? supabasePubKey.substring(0, 22) + "…" : "MISSING",
         STRIPE_SECRET_KEY: process.env["STRIPE_SECRET_KEY"] ? "present" : "MISSING",
         token_prefix: data.token.substring(0, 30) + "…",
         token_length: data.token.length,
