@@ -1,6 +1,6 @@
 import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CheckCircle2, CreditCard, Zap } from "lucide-react";
 import { PageHeader } from "@/components/app/AppShell";
@@ -14,6 +14,7 @@ import { createSubscriptionCheckout } from "@/lib/stripe.functions";
 export const Route = createFileRoute("/_authenticated/app/billing")({
   validateSearch: (s: Record<string, unknown>) => ({
     subscription: s['subscription'] as string | undefined,
+    plan: s['plan'] as string | undefined,
   }),
   head: () => ({
     meta: [
@@ -49,15 +50,10 @@ type Subscription = {
 
 function BillingPage() {
   const { currentOrg } = useAuth();
-  const { subscription: successParam } = useSearch({ from: "/_authenticated/app/billing" });
+  const { subscription: successParam, plan: planParam } = useSearch({ from: "/_authenticated/app/billing" });
   const [interval, setInterval] = useState<"monthly" | "yearly">("monthly");
   const [busy, setBusy] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (successParam === "success") {
-      toast.success("Subscription activated — thank you!");
-    }
-  }, [successParam]);
+  const autoTriggered = useRef(false);
 
   const plansQuery = useQuery({
     queryKey: ["public-plans"],
@@ -94,9 +90,10 @@ function BillingPage() {
   const currentSub = subQuery.data;
   const plans = plansQuery.data ?? [];
 
-  async function subscribe(plan: Plan) {
+  const subscribe = useCallback(async (plan: Plan, forceInterval?: "monthly" | "yearly") => {
     if (!currentOrg) return;
-    const priceId = interval === "yearly" ? plan.stripe_price_id_yearly : plan.stripe_price_id_monthly;
+    const iv = forceInterval ?? interval;
+    const priceId = iv === "yearly" ? plan.stripe_price_id_yearly : plan.stripe_price_id_monthly;
     if (!priceId) {
       toast.error("This plan is not yet available for online subscription. Please contact support.");
       return;
@@ -104,7 +101,7 @@ function BillingPage() {
     setBusy(plan.id);
     try {
       const { url } = await createSubscriptionCheckout({
-        data: { orgId: currentOrg.id, planId: plan.id, interval },
+        data: { orgId: currentOrg.id, planId: plan.id, interval: iv },
       });
       window.location.href = url;
     } catch (err) {
@@ -112,7 +109,22 @@ function BillingPage() {
     } finally {
       setBusy(null);
     }
-  }
+  }, [currentOrg, interval]);
+
+  // Toast on subscription success
+  useEffect(() => {
+    if (successParam === "success") toast.success("Subscription activated — thank you!");
+  }, [successParam]);
+
+  // Auto-trigger checkout when arriving from registration with a plan pre-selected
+  useEffect(() => {
+    if (!planParam || !currentOrg || plansQuery.isLoading || autoTriggered.current) return;
+    const target = plans.find((p) => p.id === planParam);
+    if (!target || Number(target.price_monthly) === 0) return;
+    if (!target.stripe_price_id_monthly) return;
+    autoTriggered.current = true;
+    void subscribe(target, "monthly");
+  }, [planParam, currentOrg, plansQuery.isLoading, plans, subscribe]);
 
   const activePlanId = currentSub?.status === "active" ? currentSub.plan_id : null;
 

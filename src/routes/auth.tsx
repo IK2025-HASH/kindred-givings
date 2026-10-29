@@ -127,9 +127,9 @@ function AuthPage() {
           }).eq("id", data.user.id);
         }
         if (data.session) {
-          // Email confirmation disabled — go straight to app (or billing if paid plan)
+          // Email confirmation disabled — go straight to app (or billing to pay if paid plan)
           if (selectedPlan && Number(selectedPlan.price_monthly) > 0) {
-            navigate({ to: "/app/billing", search: { subscription: undefined } });
+            navigate({ to: "/app/billing", search: { subscription: undefined, plan: selectedPlan.id } });
           } else {
             navigate({ to: "/app" });
           }
