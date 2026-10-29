@@ -147,12 +147,15 @@ function ContactSupportButton({
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <button className="flex items-center gap-2 rounded-md px-3 py-2 text-xs text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors">
-          <LifeBuoy className="size-3.5" />
-          Contact support
-        </button>
-      </DialogTrigger>
+      {/* Only render the sidebar trigger when NOT controlled externally (FAB mode) */}
+      {open === undefined && (
+        <DialogTrigger asChild>
+          <button className="flex items-center gap-2 rounded-md px-3 py-2 text-xs text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors">
+            <LifeBuoy className="size-3.5" />
+            Contact support
+          </button>
+        </DialogTrigger>
+      )}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Contact support</DialogTitle>
