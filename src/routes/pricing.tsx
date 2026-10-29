@@ -109,7 +109,7 @@ function Pricing() {
                   </Button>
                 ) : (
                   <Button asChild className="mt-4 w-full" variant={index === 1 ? "default" : "outline"}>
-                    <Link to="/auth" search={{ mode: "signup" }}>
+                    <Link to="/auth" search={{ mode: "register" }}>
                       Choose {plan.name}
                     </Link>
                   </Button>

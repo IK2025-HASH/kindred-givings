@@ -548,7 +548,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <DropdownMenuItem
                   onClick={async () => {
                     await signOut();
-                    navigate({ to: "/auth", search: { mode: "signin" as const }, replace: true });
+                    navigate({ to: "/auth", search: { mode: "login" as const }, replace: true });
                   }}
                 >
                   <LogOut className="mr-2 size-4" /> Sign out

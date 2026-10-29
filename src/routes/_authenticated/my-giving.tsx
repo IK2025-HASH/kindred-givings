@@ -81,7 +81,7 @@ function MyGivingPage() {
               size="sm"
               onClick={async () => {
                 await signOut();
-                navigate({ to: "/auth", search: { mode: "signin" as const }, replace: true });
+                navigate({ to: "/auth", search: { mode: "login" as const }, replace: true });
               }}
             >
               <LogOut className="size-4" />

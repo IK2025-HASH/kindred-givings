@@ -64,7 +64,7 @@ function InvitePage() {
     if (!user) {
       // Store token in sessionStorage so we can come back after sign-in
       sessionStorage.setItem("pendingInvite", token);
-      void navigate({ to: "/auth", search: { mode: "signup" } });
+      void navigate({ to: "/auth", search: { mode: "register" } });
       return;
     }
 
@@ -137,7 +137,7 @@ function InvitePage() {
             <CardContent className="space-y-3">
               {!user && (
                 <p className="rounded-lg bg-secondary p-3 text-sm text-muted-foreground">
-                  You'll need to sign in or create an account to accept this invitation.
+                  You'll need to log in or create an account to accept this invitation.
                 </p>
               )}
               <Button className="w-full" onClick={() => void accept()} disabled={busy}>
@@ -145,7 +145,7 @@ function InvitePage() {
                   ? "Accepting…"
                   : user
                     ? `Accept and join ${state.orgName}`
-                    : "Sign in to accept"}
+                    : "Log in to accept"}
               </Button>
             </CardContent>
           </>

@@ -29,7 +29,7 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/_authenticated/app/support")({
   beforeLoad: async () => {
     const { data } = await supabase.auth.getUser();
-    if (!data.user) throw redirect({ to: "/auth", search: { mode: "signin" as const } });
+    if (!data.user) throw redirect({ to: "/auth", search: { mode: "login" as const } });
     // Allow platform admins and chat support agents
     const [adminRow, agentRow] = await Promise.all([
       supabase.from("platform_admins").select("user_id").eq("user_id", data.user.id).maybeSingle(),

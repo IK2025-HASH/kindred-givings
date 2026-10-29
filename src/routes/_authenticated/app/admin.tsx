@@ -28,7 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/_authenticated/app/admin")({
   beforeLoad: async () => {
     const { data } = await supabase.auth.getUser();
-    if (!data.user) throw redirect({ to: "/auth", search: { mode: "signin" as const } });
+    if (!data.user) throw redirect({ to: "/auth", search: { mode: "login" as const } });
     const { data: adminRow } = await supabase
       .from("platform_admins")
       .select("user_id")
@@ -469,7 +469,7 @@ function ChatSupportSection() {
         .eq("email", newAgentEmail)
         .maybeSingle();
       if (profileError) throw profileError;
-      if (!profile) throw new Error("No user found with that email. They must sign up first.");
+      if (!profile) throw new Error("No user found with that email. They must register first.");
       const { error } = await supabase.from("chat_support_agents").insert({ user_id: profile.id });
       if (error) throw error;
       toast.success("Chat support agent added");
@@ -805,7 +805,7 @@ function AdminPage() {
         .eq("email", newAdminEmail)
         .maybeSingle();
       if (profileError) throw profileError;
-      if (!profile) throw new Error("No user found with that email. They must sign up first.");
+      if (!profile) throw new Error("No user found with that email. They must register first.");
       const { error } = await supabase
         .from("platform_admins")
         .insert({ user_id: profile.id });

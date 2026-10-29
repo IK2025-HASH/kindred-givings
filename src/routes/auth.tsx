@@ -15,8 +15,8 @@ import { formatMoney } from "@/lib/format";
 
 const TERMS_VERSION = "2025-09";
 
-type Mode = "signin" | "signup" | "reset" | "confirm";
-type SignupStep = "plan" | "form";
+type Mode = "login" | "register" | "reset" | "confirm";
+type RegisterStep = "plan" | "form";
 
 type Plan = {
   id: string;
@@ -30,16 +30,16 @@ type Plan = {
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (search: Record<string, unknown>) => ({
-    mode: search['mode'] === "signup" ? ("signup" as const) : ("signin" as const),
+    mode: search['mode'] === "register" ? ("register" as const) : ("login" as const),
   }),
   head: () => ({
     meta: [
-      { title: "Sign in — Donorbook" },
+      { title: "Log in — Donorbook" },
       {
         name: "description",
-        content: "Sign in to your Donorbook charity workspace or create a new one.",
+        content: "Log in to your Donorbook charity workspace or create a new one.",
       },
-      { property: "og:title", content: "Sign in to Donorbook" },
+      { property: "og:title", content: "Log in to Donorbook" },
       { property: "og:description", content: "Access your charity's donation workspace." },
     ],
   }),
@@ -49,7 +49,7 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   const { mode: initialMode } = Route.useSearch();
   const [mode, setMode] = useState<Mode>(initialMode);
-  const [signupStep, setSignupStep] = useState<SignupStep>("plan");
+  const [registerStep, setRegisterStep] = useState<RegisterStep>("plan");
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -64,10 +64,10 @@ function AuthPage() {
     if (!loading && user) navigate({ to: "/app" });
   }, [user, loading, navigate]);
 
-  // Reset signup sub-step when leaving signup mode
+  // Reset register sub-step when leaving register mode
   useEffect(() => {
-    if (mode !== "signup") {
-      setSignupStep("plan");
+    if (mode !== "register") {
+      setRegisterStep("plan");
       setSelectedPlan(null);
     }
   }, [mode]);
@@ -84,25 +84,25 @@ function AuthPage() {
       if (error) throw error;
       return (data ?? []) as Plan[];
     },
-    enabled: mode === "signup" && signupStep === "plan",
+    enabled: mode === "register" && registerStep === "plan",
   });
 
-  function goToSignup() {
-    setMode("signup");
-    setSignupStep("plan");
+  function goToRegister() {
+    setMode("register");
+    setRegisterStep("plan");
     setSelectedPlan(null);
   }
 
   function choosePlan(plan: Plan) {
     setSelectedPlan(plan);
-    setSignupStep("form");
+    setRegisterStep("form");
   }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     try {
-      if (mode === "signup") {
+      if (mode === "register") {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -129,7 +129,7 @@ function AuthPage() {
           // Email confirmation required — show holding screen
           setMode("confirm");
         }
-      } else if (mode === "signin") {
+      } else if (mode === "login") {
         const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         // If this user has no active subscription, send them to billing to pick a plan
@@ -161,7 +161,7 @@ function AuthPage() {
         });
         if (error) throw error;
         toast.success("Password reset link sent.");
-        setMode("signin");
+        setMode("login");
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
@@ -189,7 +189,7 @@ function AuthPage() {
 
       <div className="flex items-center justify-center bg-background px-4 py-12">
         {/* Plan selection step */}
-        {mode === "signup" && signupStep === "plan" && (
+        {mode === "register" && registerStep === "plan" && (
           <div className="w-full max-w-2xl">
             <div className="mb-6 text-center">
               <div className="lg:hidden mb-4">
@@ -240,33 +240,33 @@ function AuthPage() {
             </div>
             <p className="mt-6 text-center text-sm text-muted-foreground">
               Already have an account?{" "}
-              <button className="underline text-foreground" onClick={() => setMode("signin")}>
-                Sign in
+              <button className="underline text-foreground" onClick={() => setMode("login")}>
+                Log in
               </button>
             </p>
           </div>
         )}
 
         {/* Account creation form step + all other modes */}
-        {(mode !== "signup" || signupStep === "form") && (
+        {(mode !== "register" || registerStep === "form") && (
           <Card className="w-full max-w-md shadow-card">
             <CardHeader>
               <div className="lg:hidden">
                 <Logo />
               </div>
               <CardTitle className="font-display text-2xl">
-                {mode === "signup"
+                {mode === "register"
                   ? "Create your account"
                   : mode === "reset"
                     ? "Reset your password"
                     : "Welcome back"}
               </CardTitle>
-              {mode === "signup" && selectedPlan && (
+              {mode === "register" && selectedPlan && (
                 <p className="text-sm text-muted-foreground">
                   Selected plan:{" "}
                   <span className="font-medium text-foreground">{selectedPlan.name}</span>
                   {Number(selectedPlan.price_monthly) > 0 && (
-                    <span> — {formatMoney(Number(selectedPlan.price_monthly))}/mo (pay after sign-up)</span>
+                    <span> — {formatMoney(Number(selectedPlan.price_monthly))}/mo (pay after registration)</span>
                   )}
                 </p>
               )}
@@ -279,18 +279,18 @@ function AuthPage() {
                     <p className="font-semibold text-foreground">Check your email</p>
                     <p className="mt-1 text-sm text-muted-foreground">
                       We sent a confirmation link to <strong>{email}</strong>.
-                      Click it to activate your account, then come back to sign in.
+                      Click it to activate your account, then come back to log in.
                     </p>
                   </div>
-                  <Button variant="outline" className="w-full" onClick={() => setMode("signin")}>
-                    Back to sign in
+                  <Button variant="outline" className="w-full" onClick={() => setMode("login")}>
+                    Back to log in
                   </Button>
                 </div>
               )}
               {mode !== "confirm" && (
                 <React.Fragment>
                   <form onSubmit={onSubmit} className="space-y-4">
-                    {mode === "signup" && (
+                    {mode === "register" && (
                       <div className="space-y-2">
                         <Label htmlFor="name">Your name</Label>
                         <Input
@@ -336,7 +336,7 @@ function AuthPage() {
                         </div>
                       </div>
                     )}
-                    {mode === "signup" && (
+                    {mode === "register" && (
                       <label className="flex items-start gap-2 text-sm text-muted-foreground">
                         <input
                           type="checkbox"
@@ -361,15 +361,15 @@ function AuthPage() {
                         </span>
                       </label>
                     )}
-                    <Button type="submit" className="w-full" disabled={busy || (mode === "signup" && !termsAccepted)}>
-                      {mode === "signup" ? "Create account" : mode === "reset" ? "Send link" : "Sign in"}
+                    <Button type="submit" className="w-full" disabled={busy || (mode === "register" && !termsAccepted)}>
+                      {mode === "register" ? "Create account" : mode === "reset" ? "Send link" : "Log in"}
                     </Button>
                   </form>
                   <div className="mt-6 space-y-2 text-sm text-muted-foreground">
-                    {mode === "signin" && (
+                    {mode === "login" && (
                       <React.Fragment>
-                        <button className="underline" onClick={goToSignup}>
-                          Need an account? Sign up
+                        <button className="underline" onClick={goToRegister}>
+                          Need an account? Register
                         </button>
                         <br />
                         <button className="underline" onClick={() => setMode("reset")}>
@@ -377,14 +377,14 @@ function AuthPage() {
                         </button>
                       </React.Fragment>
                     )}
-                    {mode === "signup" && signupStep === "form" && (
-                      <button className="underline" onClick={() => setSignupStep("plan")}>
+                    {mode === "register" && registerStep === "form" && (
+                      <button className="underline" onClick={() => setRegisterStep("plan")}>
                         ← Change plan
                       </button>
                     )}
-                    {mode !== "signin" && mode !== "signup" && (
-                      <button className="underline" onClick={() => setMode("signin")}>
-                        Back to sign in
+                    {mode !== "login" && mode !== "register" && (
+                      <button className="underline" onClick={() => setMode("login")}>
+                        Back to log in
                       </button>
                     )}
                   </div>

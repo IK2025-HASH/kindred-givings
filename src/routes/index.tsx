@@ -483,7 +483,7 @@ function PricingTeaserCards() {
                 </Button>
               ) : (
                 <Button asChild className="mt-5 w-full" variant={i === 1 ? "default" : "outline"} size="sm">
-                  <Link to="/auth" search={{ mode: "signup" }}>Get started</Link>
+                  <Link to="/auth" search={{ mode: "register" }}>Get started</Link>
                 </Button>
               )}
             </div>
@@ -522,7 +522,7 @@ function Home() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild size="lg">
-                <Link to="/auth" search={{ mode: "signup" }}>
+                <Link to="/auth" search={{ mode: "register" }}>
                   Start free <ArrowRight className="size-4" />
                 </Link>
               </Button>
@@ -580,7 +580,7 @@ function Home() {
       <section className="mx-auto w-full max-w-6xl px-4 py-20">
         <h2 className="font-display text-3xl font-bold">How it works</h2>
         <p className="mt-3 max-w-xl text-muted-foreground">
-          Three steps from sign-up to accepting your first online donation.
+          Three steps from registration to accepting your first online donation.
         </p>
         <div className="mt-12 grid gap-8 lg:grid-cols-3">
           {[
@@ -926,7 +926,7 @@ function Home() {
           </div>
           <div className="flex flex-wrap gap-3">
             <Button asChild size="lg">
-              <Link to="/auth" search={{ mode: "signup" }}>
+              <Link to="/auth" search={{ mode: "register" }}>
                 Create free workspace <ArrowRight className="size-4" />
               </Link>
             </Button>
