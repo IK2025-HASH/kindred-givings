@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Check, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { Logo } from "@/components/site/MarketingShell";
@@ -58,14 +58,15 @@ function AuthPage() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const didNavigate = useRef(false);
   const navigate = useNavigate();
   const { user, loading } = useAuth();
 
+  // Redirect already-authenticated visitors, but never stomp an explicit
+  // navigation the onSubmit handler already performed (e.g. to /app/billing).
   useEffect(() => {
-    // Don't redirect while the form is submitting — the onSubmit handler
-    // navigates explicitly (to /app/billing for paid plans, /app for free).
-    if (!loading && user && !busy) navigate({ to: "/app" });
-  }, [user, loading, navigate, busy]);
+    if (!loading && user && !didNavigate.current) navigate({ to: "/app" });
+  }, [user, loading, navigate]);
 
   // Reset register sub-step when leaving register mode
   useEffect(() => {
@@ -150,6 +151,7 @@ function AuthPage() {
             await supabase.from("organizations").delete().eq("id", orgData.id);
             throw memberResult.error;
           }
+          didNavigate.current = true;
           if (selectedPlan && Number(selectedPlan.price_monthly) > 0) {
             navigate({ to: "/app/billing", search: { subscription: undefined, plan: selectedPlan.id } });
           } else {
@@ -179,11 +181,13 @@ function AuthPage() {
               .eq("status", "active")
               .maybeSingle();
             if (!sub) {
+              didNavigate.current = true;
               navigate({ to: "/app/billing", search: { subscription: undefined } });
               return;
             }
           }
         }
+        didNavigate.current = true;
         navigate({ to: "/app" });
       } else {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
