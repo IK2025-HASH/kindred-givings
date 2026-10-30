@@ -33,7 +33,9 @@ function createSupabaseAdminClient() {
   // APP_SUPABASE_URL takes priority over SUPABASE_URL (Lovable injects SUPABASE_URL
   // pointing at its own managed DB, not our independent Supabase project).
   const SUPABASE_URL = process.env['APP_SUPABASE_URL'] || process.env['SUPABASE_URL'];
-  const SUPABASE_SERVICE_ROLE_KEY = process.env['SUPABASE_SERVICE_ROLE_KEY'];
+  // APP_SUPABASE_SERVICE_ROLE_KEY takes priority — Lovable reserves the SUPABASE_ prefix
+  // so our independent project's service role key must use the APP_ prefix in Lovable secrets.
+  const SUPABASE_SERVICE_ROLE_KEY = process.env['APP_SUPABASE_SERVICE_ROLE_KEY'] || process.env['SUPABASE_SERVICE_ROLE_KEY'];
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     const missing = [
