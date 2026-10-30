@@ -355,6 +355,7 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
     // so it cannot be read from the request headers in getWebRequest()).
     const supabaseUrl = process.env["APP_SUPABASE_URL"] || process.env["SUPABASE_URL"];
     const supabasePubKey = process.env["APP_SUPABASE_ANON_KEY"] || process.env["SUPABASE_PUBLISHABLE_KEY"];
+    console.log("[checkout] env: url=", supabaseUrl?.substring(0, 45), "key=", supabasePubKey?.substring(0, 22), "svcKey=", process.env["SUPABASE_SERVICE_ROLE_KEY"] ? "present" : "MISSING");
     if (!supabaseUrl || !supabasePubKey) throw new Error("Server configuration error.");
     const { createClient: makeClient } = await import("@supabase/supabase-js");
     const isNewFmt = supabasePubKey.startsWith("sb_publishable_") || supabasePubKey.startsWith("sb_secret_");
@@ -369,16 +370,17 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
       global: { headers: { Authorization: `Bearer ${data.token}` }, fetch: authFetch },
       auth: { persistSession: false, autoRefreshToken: false },
     });
-    const { data: { user } } = await userClient.auth.getUser(data.token);
-    if (!user) throw new Error("Unauthorized");
+    const { data: { user }, error: getUserErr } = await userClient.auth.getUser(data.token);
+    if (!user) throw new Error(`Unauthorized (getUser: ${getUserErr?.message ?? "null user"})`);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: member } = await supabaseAdmin
+    const { data: member, error: memberErr } = await supabaseAdmin
       .from("organization_members")
       .select("role")
       .eq("organization_id", data.orgId)
       .eq("user_id", user.id)
       .maybeSingle();
-    if (!member) throw new Error("You are not a member of this organisation.");
+    console.log("[checkout] user.id=", user.id, "orgId=", data.orgId, "member=", member, "memberErr=", memberErr?.message);
+    if (!member) throw new Error(`You are not a member of this organisation. [uid=${user.id} org=${data.orgId} err=${memberErr?.message ?? "null"}]`);
     if (!["owner", "admin"].includes(member.role)) throw new Error("Insufficient permissions.");
     const stripe = await getStripe();
     const origin = appOrigin();
