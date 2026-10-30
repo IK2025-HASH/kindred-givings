@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { usePlatformSettings } from "@/hooks/usePlatformSettings";
+import { APP_VERSION, APP_VERSION_DATE } from "@/lib/version";
 
 export function Logo({ inverted = false }: { inverted?: boolean }) {
   const settings = usePlatformSettings();
@@ -78,6 +79,9 @@ export function MarketingShell({ children }: { children: ReactNode }) {
             </nav>
             <p className="text-sm text-navy-foreground/50">
               © {new Date().getFullYear()} {settings.company_name}. {settings.app_tagline}.
+            </p>
+            <p className="text-xs text-navy-foreground/30">
+              {APP_VERSION} · {APP_VERSION_DATE}
             </p>
           </div>
         </div>
