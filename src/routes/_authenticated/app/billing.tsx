@@ -98,10 +98,13 @@ function BillingPage() {
       toast.error("This plan is not yet available for online subscription. Please contact support.");
       return;
     }
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (!token) { toast.error("Session expired — please log in again."); return; }
     setBusy(plan.id);
     try {
       const { url } = await createSubscriptionCheckout({
-        data: { orgId: currentOrg.id, planId: plan.id, interval: iv },
+        data: { token, orgId: currentOrg.id, planId: plan.id, interval: iv },
       });
       window.location.href = url;
     } catch (err) {

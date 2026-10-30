@@ -4,9 +4,11 @@ import { STRIPE_API_VERSION } from "@/lib/stripe-config";
 import { requireOrgRole } from "@/lib/server-auth";
 
 function appOrigin() {
-  const url = process.env["APP_URL"];
-  if (!url) throw new Error("APP_URL is not set — Stripe redirects cannot be built.");
-  return url;
+  return (
+    process.env["APP_URL"] ??
+    process.env["VITE_APP_URL"] ??
+    "https://kindred-givings.nl-product-factory.com"
+  );
 }
 
 async function getStripe() {
@@ -343,14 +345,42 @@ export const checkStripeOnboarding = createServerFn({ method: "POST" })
 export const createSubscriptionCheckout = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z.object({
+      token: z.string(),
       orgId: z.string().uuid(),
       planId: z.string().uuid(),
       interval: z.enum(["monthly", "yearly"]),
     }).parse(d)
   )
   .handler(async ({ data }) => {
-    await requireOrgRole(data.orgId, ["owner", "admin"]);
+    // Auth via explicit token (Supabase session is in localStorage, not cookies,
+    // so it cannot be read from the request headers in getWebRequest()).
+    const supabaseUrl = process.env["APP_SUPABASE_URL"] || process.env["SUPABASE_URL"];
+    const supabasePubKey = process.env["APP_SUPABASE_ANON_KEY"] || process.env["SUPABASE_PUBLISHABLE_KEY"];
+    if (!supabaseUrl || !supabasePubKey) throw new Error("Server configuration error.");
+    const { createClient: makeClient } = await import("@supabase/supabase-js");
+    const isNewFmt = supabasePubKey.startsWith("sb_publishable_") || supabasePubKey.startsWith("sb_secret_");
+    const authFetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const hdrs = new Headers(init?.headers);
+      if (isNewFmt && hdrs.get("Authorization") === `Bearer ${supabasePubKey}`) hdrs.delete("Authorization");
+      hdrs.set("apikey", supabasePubKey);
+      if (!hdrs.has("Authorization")) hdrs.set("Authorization", `Bearer ${data.token}`);
+      return fetch(input, { ...init, headers: hdrs });
+    };
+    const userClient = makeClient(supabaseUrl, supabasePubKey, {
+      global: { headers: { Authorization: `Bearer ${data.token}` }, fetch: authFetch },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: { user } } = await userClient.auth.getUser(data.token);
+    if (!user) throw new Error("Unauthorized");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: member } = await supabaseAdmin
+      .from("organization_members")
+      .select("role")
+      .eq("organization_id", data.orgId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!member) throw new Error("You are not a member of this organisation.");
+    if (!["owner", "admin"].includes(member.role)) throw new Error("Insufficient permissions.");
     const stripe = await getStripe();
     const origin = appOrigin();
 
