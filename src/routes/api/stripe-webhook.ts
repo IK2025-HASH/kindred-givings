@@ -99,6 +99,7 @@ export const APIRoute = createAPIFileRoute("/api/stripe-webhook")({
         const { default: Stripe } = await import("stripe");
         const stripeClient = new Stripe(process.env["STRIPE_SECRET_KEY"]!, { apiVersion: STRIPE_API_VERSION });
         const sub = await stripeClient.subscriptions.retrieve(session.subscription as string);
+        const stripeSub = sub as import("stripe").Stripe.Subscription & { current_period_start: number; current_period_end: number };
         await supabaseAdmin
           .from("subscriptions")
           .upsert({
@@ -106,8 +107,9 @@ export const APIRoute = createAPIFileRoute("/api/stripe-webhook")({
             plan_id: planId,
             billing_period: interval ?? "monthly",
             status: sub.status,
-            current_period_end: new Date((sub as import("stripe").Stripe.Subscription & { current_period_end: number }).current_period_end * 1000).toISOString(),
             stripe_subscription_id: sub.id,
+            current_period_start: new Date(stripeSub.current_period_start * 1000).toISOString(),
+            current_period_end: new Date(stripeSub.current_period_end * 1000).toISOString(),
           } as never, { onConflict: "organization_id" });
       }
     }

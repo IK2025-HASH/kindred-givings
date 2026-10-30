@@ -1,5 +1,5 @@
 import { createFileRoute, useSearch } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CheckCircle2, CreditCard, Zap } from "lucide-react";
@@ -54,6 +54,7 @@ function BillingPage() {
   const [interval, setInterval] = useState<"monthly" | "yearly">("monthly");
   const [busy, setBusy] = useState<string | null>(null);
   const autoTriggered = useRef(false);
+  const queryClient = useQueryClient();
 
   const plansQuery = useQuery({
     queryKey: ["public-plans"],
@@ -114,10 +115,20 @@ function BillingPage() {
     }
   }, [currentOrg, interval]);
 
-  // Toast on subscription success
+  // After returning from Stripe, poll until the webhook fires and the subscription appears
   useEffect(() => {
-    if (successParam === "success") toast.success("Subscription activated — thank you!");
-  }, [successParam]);
+    if (successParam !== "success" || !currentOrg?.id) return;
+    toast.success("Payment confirmed — activating your subscription…");
+    let attempts = 0;
+    const id = setInterval(async () => {
+      attempts++;
+      await queryClient.invalidateQueries({ queryKey: ["org-subscription", currentOrg.id] });
+      const sub = queryClient.getQueryData<Subscription | null>(["org-subscription", currentOrg.id]);
+      if (sub || attempts >= 8) clearInterval(id);
+    }, 2000);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [successParam, currentOrg?.id]);
 
   // Auto-trigger checkout when arriving from registration with a plan pre-selected
   useEffect(() => {

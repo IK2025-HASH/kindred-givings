@@ -199,7 +199,7 @@ function AuthPage() {
               .from("subscriptions")
               .select("id")
               .eq("organization_id", orgId)
-              .eq("status", "active")
+              .in("status", ["active", "trialing", "past_due"])
               .maybeSingle();
             if (!sub) {
               didNavigate.current = true;

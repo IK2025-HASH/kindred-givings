@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { STRIPE_API_VERSION } from "@/lib/stripe-config";
-import { requireOrgRole } from "@/lib/server-auth";
 
 function appOrigin() {
   return (
@@ -269,9 +268,9 @@ export const syncPlansToStripe = createServerFn({ method: "POST" })
 
 // ── 1. Create/resume Stripe Connect Express onboarding link ──────────────────
 export const createConnectOnboardingLink = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ orgId: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => z.object({ token: z.string(), orgId: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
-    await requireOrgRole(data.orgId, ["owner", "admin"]);
+    await requireOrgRoleToken(data.token, data.orgId, ["owner", "admin"]);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const stripe = await getStripe();
 
@@ -314,9 +313,9 @@ export const createConnectOnboardingLink = createServerFn({ method: "POST" })
 
 // ── 2. Verify onboarding is complete and sync DB ─────────────────────────────
 export const checkStripeOnboarding = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ orgId: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => z.object({ token: z.string(), orgId: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
-    await requireOrgRole(data.orgId, ["owner", "admin"]);
+    await requireOrgRoleToken(data.token, data.orgId, ["owner", "admin"]);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: org } = await supabaseAdmin
@@ -549,6 +548,42 @@ async function requireAdminToken(token: string) {
   if (!adminRow) throw new Error("Unauthorized");
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   return supabaseAdmin;
+}
+
+// Helper: verify a user's org role using explicit token (mirrors requireAdminToken pattern)
+async function requireOrgRoleToken(
+  token: string,
+  orgId: string,
+  roles: ("owner" | "admin" | "fundraiser" | "viewer")[],
+) {
+  const supabaseUrl = process.env["APP_SUPABASE_URL"] || process.env["SUPABASE_URL"];
+  const supabasePubKey = process.env["APP_SUPABASE_ANON_KEY"] || process.env["SUPABASE_PUBLISHABLE_KEY"];
+  if (!supabaseUrl || !supabasePubKey) throw new Error("Server configuration error.");
+  const { createClient: makeClient } = await import("@supabase/supabase-js");
+  const isNewFmt = supabasePubKey.startsWith("sb_publishable_") || supabasePubKey.startsWith("sb_secret_");
+  const authFetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const hdrs = new Headers(init?.headers);
+    if (isNewFmt && hdrs.get("Authorization") === `Bearer ${supabasePubKey}`) hdrs.delete("Authorization");
+    hdrs.set("apikey", supabasePubKey);
+    if (!hdrs.has("Authorization")) hdrs.set("Authorization", `Bearer ${token}`);
+    return fetch(input, { ...init, headers: hdrs });
+  };
+  const userClient = makeClient(supabaseUrl, supabasePubKey, {
+    global: { headers: { Authorization: `Bearer ${token}` }, fetch: authFetch },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: { user } } = await userClient.auth.getUser(token);
+  if (!user) throw new Error("Unauthorized");
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: member } = await supabaseAdmin
+    .from("organization_members")
+    .select("role")
+    .eq("organization_id", orgId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!member) throw new Error("You are not a member of this organisation.");
+  if (!roles.includes(member.role as never)) throw new Error("Insufficient permissions.");
+  return { supabaseAdmin, user };
 }
 
 export type AdminSubscription = {
