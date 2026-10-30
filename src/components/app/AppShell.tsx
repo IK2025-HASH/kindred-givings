@@ -8,6 +8,7 @@ import {
   Inbox,
   LayoutDashboard,
   LifeBuoy,
+  Lock,
   LogOut,
   Megaphone,
   X,
