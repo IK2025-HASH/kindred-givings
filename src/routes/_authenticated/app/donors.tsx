@@ -28,6 +28,8 @@ import {
 } from "@/components/ui/table";
 import { canEdit, useAuth } from "@/hooks/useAuth";
 import { useDonations, useDonors, useSubscription, type Donor } from "@/hooks/useOrgData";
+import { FeatureGate, LimitBanner } from "@/components/app/PlanGate";
+import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 import { downloadCsv, formatDate, formatMoney } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -56,6 +58,7 @@ function DonorsPage() {
   const donations = useDonations(orgId);
   const subscription = useSubscription(orgId);
   const qc = useQueryClient();
+  const planFeatures = usePlanFeatures();
   const editable = canEdit(currentRole);
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -159,15 +162,20 @@ function DonorsPage() {
     void qc.invalidateQueries({ queryKey: ["donors", orgId] });
   }
 
-  const donorLimit = subscription.data?.plan?.max_donors ?? 100;
   const donorCount = donors.data?.length ?? 0;
-  const atDonorLimit = donorCount >= donorLimit;
+  // Use plan-features limit if loaded, fallback to subscription data
+  const donorLimit = planFeatures.getLimit("max_donors") ?? subscription.data?.plan?.max_donors ?? 100;
+  const atDonorLimit = planFeatures.isLoaded
+    ? planFeatures.isAtLimit("max_donors", donorCount)
+    : donorCount >= (donorLimit ?? 100);
 
   return (
+    <FeatureGate feature="donor_management">
     <div className="space-y-6">
+      <LimitBanner feature="max_donors" current={donorCount} label="donor records" />
       <PageHeader
         title="Donors"
-        description={donors.isLoading ? "Loading…" : `${donorCount} of ${donorLimit} donors used.`}
+        description={donors.isLoading ? "Loading…" : `${donorCount}${donorLimit != null ? ` of ${donorLimit}` : ""} donors`}
         action={
           editable ? (
             <div className="flex flex-wrap gap-2">
@@ -332,5 +340,6 @@ function DonorsPage() {
         </CardContent>
       </Card>
     </div>
+    </FeatureGate>
   );
 }

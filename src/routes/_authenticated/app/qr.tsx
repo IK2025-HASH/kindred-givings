@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useOrgData";
+import { FeatureGate } from "@/components/app/PlanGate";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney } from "@/lib/format";
 
@@ -258,6 +259,7 @@ function QrBoxesPage() {
   const grandCount = Object.values(stats).reduce((s, b) => s + b.count, 0);
 
   return (
+    <FeatureGate feature="qr_boxes">
     <div className="space-y-6">
       <PageHeader
         title="QR Donation Boxes"
@@ -435,5 +437,6 @@ function QrBoxesPage() {
         </div>
       )}
     </div>
+    </FeatureGate>
   );
 }

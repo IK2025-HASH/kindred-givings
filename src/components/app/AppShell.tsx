@@ -44,30 +44,35 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
 import { usePlatformSettings } from "@/hooks/usePlatformSettings";
+import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 import { APP_VERSION, APP_VERSION_DATE } from "@/lib/version";
 import { supabase } from "@/integrations/supabase/client";
 import { slugify } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+// featureKey: which plan feature gates this nav item (undefined = always visible)
 const NAV = [
-  { to: "/app", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { to: "/app/donors", label: "Donors", icon: Users },
-  { to: "/app/donations", label: "Donations", icon: Wallet },
-  { to: "/app/campaigns", label: "Campaigns", icon: Megaphone },
-  { to: "/app/reports", label: "Reports", icon: BarChart3 },
-  { to: "/app/qr", label: "QR Boxes", icon: QrCode },
-  { to: "/app/team", label: "Team", icon: Building2 },
-  { to: "/app/inbox", label: "Inbox", icon: Inbox },
-  { to: "/app/billing", label: "Billing", icon: CreditCard },
-  { to: "/app/settings", label: "Settings", icon: Settings },
+  { to: "/app",           label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { to: "/app/donors",    label: "Donors",    icon: Users,      featureKey: "donor_management" },
+  { to: "/app/donations", label: "Donations", icon: Wallet,     featureKey: "donation_tracking" },
+  { to: "/app/campaigns", label: "Campaigns", icon: Megaphone,  featureKey: "campaign_management" },
+  { to: "/app/reports",   label: "Reports",   icon: BarChart3,  featureKey: "reports_basic" },
+  { to: "/app/qr",        label: "QR Boxes",  icon: QrCode,     featureKey: "qr_boxes" },
+  { to: "/app/team",      label: "Team",      icon: Building2,  featureKey: "team_management" },
+  { to: "/app/inbox",     label: "Inbox",     icon: Inbox,      featureKey: "inbox" },
+  { to: "/app/billing",   label: "Billing",   icon: CreditCard },
+  { to: "/app/settings",  label: "Settings",  icon: Settings },
 ] as const;
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { hasFeature, isLoaded } = usePlanFeatures();
   return (
     <nav className="flex flex-col gap-1">
       {NAV.map((item) => {
         const active = item.to === "/app" ? pathname === "/app" : pathname.startsWith(item.to);
+        const fk = (item as { featureKey?: string }).featureKey;
+        const locked = isLoaded && !!fk && !hasFeature(fk);
         return (
           <Link
             key={item.to}
@@ -77,11 +82,14 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
               "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
               active
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+                : locked
+                  ? "text-sidebar-foreground/40 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground/60"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
             )}
           >
             <item.icon className="size-4" />
             {item.label}
+            {locked && <Lock className="ml-auto size-3 text-sidebar-foreground/30" />}
           </Link>
         );
       })}

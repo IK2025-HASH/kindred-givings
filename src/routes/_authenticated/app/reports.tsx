@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { useCampaigns, useDonations, useDonors } from "@/hooks/useOrgData";
+import { usePlanFeatures } from "@/hooks/usePlanFeatures";
+import { FeatureGate } from "@/components/app/PlanGate";
 import { downloadCsv, formatMoney } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/app/reports")({
@@ -34,6 +36,7 @@ function ReportsPage() {
   const donations = useDonations(orgId);
   const donors = useDonors(orgId);
   const campaigns = useCampaigns(orgId);
+  const { hasFeature } = usePlanFeatures();
 
   const today = new Date();
   const [from, setFrom] = useState(
@@ -85,25 +88,27 @@ function ReportsPage() {
         title="Reports"
         description="Giving performance for any date range."
         action={
-          <Button
-            variant="outline"
-            onClick={() =>
-              downloadCsv(
-                `report-${from}-to-${to}.csv`,
-                rows.map((d) => ({
-                  date: d.donated_on,
-                  amount: d.amount,
-                  method: d.method,
-                  campaign:
-                    campaigns.data?.find((c) => c.id === d.campaign_id)?.title ?? "General fund",
-                  gift_aid: d.gift_aid,
-                  recurring: d.is_recurring,
-                })),
-              )
-            }
-          >
-            Export range
-          </Button>
+          hasFeature("csv_export") ? (
+            <Button
+              variant="outline"
+              onClick={() =>
+                downloadCsv(
+                  `report-${from}-to-${to}.csv`,
+                  rows.map((d) => ({
+                    date: d.donated_on,
+                    amount: d.amount,
+                    method: d.method,
+                    campaign:
+                      campaigns.data?.find((c) => c.id === d.campaign_id)?.title ?? "General fund",
+                    gift_aid: d.gift_aid,
+                    recurring: d.is_recurring,
+                  })),
+                )
+              }
+            >
+              Export range
+            </Button>
+          ) : undefined
         }
       />
 
@@ -141,59 +146,61 @@ function ReportsPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>By campaign</CardTitle>
-          </CardHeader>
-          <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={byCampaign} margin={{ left: 4, right: 8, top: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-                <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={11} />
-                <YAxis tickLine={false} axisLine={false} fontSize={11} width={56} />
-                <Tooltip formatter={(v) => formatMoney(Number(v), currency)} />
-                <Bar dataKey="value" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      <FeatureGate feature="reports_advanced">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>By campaign</CardTitle>
+            </CardHeader>
+            <CardContent className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={byCampaign} margin={{ left: 4, right: 8, top: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                  <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={11} />
+                  <YAxis tickLine={false} axisLine={false} fontSize={11} width={56} />
+                  <Tooltip formatter={(v) => formatMoney(Number(v), currency)} />
+                  <Bar dataKey="value" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>By method</CardTitle>
+            </CardHeader>
+            <CardContent className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Tooltip formatter={(v) => formatMoney(Number(v), currency)} />
+                  <Pie data={byMethod} dataKey="value" nameKey="name" outerRadius={100} label>
+                    {byMethod.map((entry, i) => (
+                      <Cell key={entry.name} fill={COLORS[i % COLORS.length]} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>By method</CardTitle>
+            <CardTitle>Top donors</CardTitle>
           </CardHeader>
-          <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Tooltip formatter={(v) => formatMoney(Number(v), currency)} />
-                <Pie data={byMethod} dataKey="value" nameKey="name" outerRadius={100} label>
-                  {byMethod.map((entry, i) => (
-                    <Cell key={entry.name} fill={COLORS[i % COLORS.length]} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
+          <CardContent className="space-y-2">
+            {topDonors.map((d) => (
+              <div key={d.name} className="flex items-center justify-between text-sm">
+                <span>{d.name}</span>
+                <span className="font-semibold">{formatMoney(d.value, currency)}</span>
+              </div>
+            ))}
+            {topDonors.length === 0 && (
+              <p className="text-sm text-muted-foreground">No giving in this range.</p>
+            )}
           </CardContent>
         </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Top donors</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {topDonors.map((d) => (
-            <div key={d.name} className="flex items-center justify-between text-sm">
-              <span>{d.name}</span>
-              <span className="font-semibold">{formatMoney(d.value, currency)}</span>
-            </div>
-          ))}
-          {topDonors.length === 0 && (
-            <p className="text-sm text-muted-foreground">No giving in this range.</p>
-          )}
-        </CardContent>
-      </Card>
+      </FeatureGate>
     </div>
   );
 }

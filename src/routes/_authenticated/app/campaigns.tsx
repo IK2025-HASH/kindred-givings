@@ -26,6 +26,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { canEdit, useAuth } from "@/hooks/useAuth";
 import { useCampaigns, useDonations, useSubscription, type Campaign } from "@/hooks/useOrgData";
+import { FeatureGate, LimitBanner } from "@/components/app/PlanGate";
+import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 import { formatDate, formatMoney, slugify } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -54,6 +56,7 @@ function CampaignsPage() {
   const donations = useDonations(orgId);
   const subscription = useSubscription(orgId);
   const qc = useQueryClient();
+  const planFeatures = usePlanFeatures();
   const editable = canEdit(currentRole);
   const [draft, setDraft] = useState<Draft | null>(null);
 
@@ -102,15 +105,19 @@ function CampaignsPage() {
     void qc.invalidateQueries({ queryKey: ["campaigns", orgId] });
   }
 
-  const campaignLimit = subscription.data?.plan?.max_campaigns ?? 3;
   const campaignCount = campaigns.data?.length ?? 0;
-  const atCampaignLimit = campaignCount >= campaignLimit;
+  const campaignLimit = planFeatures.getLimit("max_campaigns") ?? subscription.data?.plan?.max_campaigns ?? 3;
+  const atCampaignLimit = planFeatures.isLoaded
+    ? planFeatures.isAtLimit("max_campaigns", campaignCount)
+    : campaignCount >= (campaignLimit ?? 3);
 
   return (
+    <FeatureGate feature="campaign_management">
     <div className="space-y-6">
+      <LimitBanner feature="max_campaigns" current={campaignCount} label="campaigns" />
       <PageHeader
         title="Campaigns"
-        description={campaigns.isLoading ? "Loading…" : `${campaignCount} of ${campaignLimit} campaigns used.`}
+        description={campaigns.isLoading ? "Loading…" : `${campaignCount}${campaignLimit != null ? ` of ${campaignLimit}` : ""} campaigns`}
         action={
           editable ? (
             <Button
@@ -266,5 +273,6 @@ function CampaignsPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </FeatureGate>
   );
 }

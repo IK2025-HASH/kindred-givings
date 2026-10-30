@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { FeatureGate } from "@/components/app/PlanGate";
 import { formatDate } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/app/inbox")({
@@ -77,6 +78,7 @@ function InboxPage() {
   }
 
   return (
+    <FeatureGate feature="inbox">
     <div className="space-y-6">
       <PageHeader
         title="Inbox"
@@ -184,6 +186,7 @@ function InboxPage() {
         </TabsContent>
       </Tabs>
     </div>
+    </FeatureGate>
   );
 }
 

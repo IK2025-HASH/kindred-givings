@@ -34,6 +34,8 @@ import {
 } from "@/components/ui/table";
 import { canManageOrg, useAuth, type OrgRole } from "@/hooks/useAuth";
 import { useSubscription, useTeam } from "@/hooks/useOrgData";
+import { usePlanFeatures } from "@/hooks/usePlanFeatures";
+import { FeatureGate, LimitBanner } from "@/components/app/PlanGate";
 import { formatDate } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -82,8 +84,11 @@ function TeamPage() {
   // row is missing from organization_members for this org (data integrity gap).
   const membersMissing = !team.isLoading && !team.isError && members.length === 0;
 
-  const planLimit = subscription.data?.plan?.max_members ?? 3;
-  const atLimit = members.length >= planLimit;
+  const planFeatures = usePlanFeatures();
+  const planLimit = planFeatures.getLimit("max_members") ?? subscription.data?.plan?.max_members ?? 3;
+  const atLimit = planFeatures.isLoaded
+    ? planFeatures.isAtLimit("max_members", members.length)
+    : members.length >= (planLimit ?? 3);
 
   function refresh() {
     void qc.invalidateQueries({ queryKey: ["team", orgId] });
@@ -160,10 +165,12 @@ function TeamPage() {
   }
 
   return (
+    <FeatureGate feature="team_management">
     <div className="space-y-6">
+      <LimitBanner feature="max_members" current={members.length} label="team seats" />
       <PageHeader
         title="Team"
-        description={team.isLoading ? "Loading…" : `${members.length} of ${planLimit} seats used.`}
+        description={team.isLoading ? "Loading…" : `${members.length}${planLimit != null ? ` of ${planLimit}` : ""} seats used`}
         action={
           canManage ? (
             <Button onClick={() => setInviteOpen(true)} disabled={atLimit}>
@@ -406,5 +413,6 @@ function TeamPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </FeatureGate>
   );
 }
