@@ -147,10 +147,12 @@ function AuthPage() {
           if (orgError) throw orgError;
           const memberResult = await supabase
             .from("organization_members")
-            .insert({ organization_id: orgData.id, user_id: data.user!.id, role: "owner" });
-          if (memberResult.error) {
+            .insert({ organization_id: orgData.id, user_id: data.user!.id, role: "owner" })
+            .select("id")
+            .single();
+          if (memberResult.error || !memberResult.data) {
             await supabase.from("organizations").delete().eq("id", orgData.id);
-            throw memberResult.error;
+            throw new Error(memberResult.error?.message ?? "Failed to set up organisation membership — please try again.");
           }
           if (selectedPlan && Number(selectedPlan.price_monthly) > 0) {
             // Call Stripe checkout directly — we have the session token and org ID right
