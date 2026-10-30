@@ -20,15 +20,16 @@ import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as LegalDocRouteImport } from './routes/legal.$doc'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app/index'
 import { Route as AuthenticatedAppAdminRouteImport } from './routes/_authenticated/app/admin'
+import { Route as AuthenticatedAppBillingRouteImport } from './routes/_authenticated/app/billing'
 import { Route as AuthenticatedAppCampaignsRouteImport } from './routes/_authenticated/app/campaigns'
 import { Route as AuthenticatedAppDonationsRouteImport } from './routes/_authenticated/app/donations'
 import { Route as AuthenticatedAppDonorsRouteImport } from './routes/_authenticated/app/donors'
+import { Route as AuthenticatedAppInboxRouteImport } from './routes/_authenticated/app/inbox'
 import { Route as AuthenticatedAppQrRouteImport } from './routes/_authenticated/app/qr'
 import { Route as AuthenticatedAppReportsRouteImport } from './routes/_authenticated/app/reports'
 import { Route as AuthenticatedAppSettingsRouteImport } from './routes/_authenticated/app/settings'
-import { Route as AuthenticatedAppTeamRouteImport } from './routes/_authenticated/app/team'
-import { Route as AuthenticatedAppBillingRouteImport } from './routes/_authenticated/app/billing'
 import { Route as AuthenticatedAppSupportRouteImport } from './routes/_authenticated/app/support'
+import { Route as AuthenticatedAppTeamRouteImport } from './routes/_authenticated/app/team'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -84,6 +85,11 @@ const AuthenticatedAppAdminRoute = AuthenticatedAppAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedAppRouteRoute,
 } as any)
+const AuthenticatedAppBillingRoute = AuthenticatedAppBillingRouteImport.update({
+  id: '/billing',
+  path: '/billing',
+  getParentRoute: () => AuthenticatedAppRouteRoute,
+} as any)
 const AuthenticatedAppCampaignsRoute =
   AuthenticatedAppCampaignsRouteImport.update({
     id: '/campaigns',
@@ -99,6 +105,11 @@ const AuthenticatedAppDonationsRoute =
 const AuthenticatedAppDonorsRoute = AuthenticatedAppDonorsRouteImport.update({
   id: '/donors',
   path: '/donors',
+  getParentRoute: () => AuthenticatedAppRouteRoute,
+} as any)
+const AuthenticatedAppInboxRoute = AuthenticatedAppInboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
   getParentRoute: () => AuthenticatedAppRouteRoute,
 } as any)
 const AuthenticatedAppQrRoute = AuthenticatedAppQrRouteImport.update({
@@ -117,19 +128,14 @@ const AuthenticatedAppSettingsRoute =
     path: '/settings',
     getParentRoute: () => AuthenticatedAppRouteRoute,
   } as any)
-const AuthenticatedAppTeamRoute = AuthenticatedAppTeamRouteImport.update({
-  id: '/team',
-  path: '/team',
-  getParentRoute: () => AuthenticatedAppRouteRoute,
-} as any)
-const AuthenticatedAppBillingRoute = AuthenticatedAppBillingRouteImport.update({
-  id: '/billing',
-  path: '/billing',
-  getParentRoute: () => AuthenticatedAppRouteRoute,
-} as any)
 const AuthenticatedAppSupportRoute = AuthenticatedAppSupportRouteImport.update({
   id: '/support',
   path: '/support',
+  getParentRoute: () => AuthenticatedAppRouteRoute,
+} as any)
+const AuthenticatedAppTeamRoute = AuthenticatedAppTeamRouteImport.update({
+  id: '/team',
+  path: '/team',
   getParentRoute: () => AuthenticatedAppRouteRoute,
 } as any)
 
@@ -143,15 +149,16 @@ export interface FileRoutesByFullPath {
   '/invite/$token': typeof InviteTokenRoute
   '/legal/$doc': typeof LegalDocRoute
   '/app/admin': typeof AuthenticatedAppAdminRoute
+  '/app/billing': typeof AuthenticatedAppBillingRoute
   '/app/campaigns': typeof AuthenticatedAppCampaignsRoute
   '/app/donations': typeof AuthenticatedAppDonationsRoute
   '/app/donors': typeof AuthenticatedAppDonorsRoute
+  '/app/inbox': typeof AuthenticatedAppInboxRoute
   '/app/qr': typeof AuthenticatedAppQrRoute
   '/app/reports': typeof AuthenticatedAppReportsRoute
   '/app/settings': typeof AuthenticatedAppSettingsRoute
-  '/app/team': typeof AuthenticatedAppTeamRoute
-  '/app/billing': typeof AuthenticatedAppBillingRoute
   '/app/support': typeof AuthenticatedAppSupportRoute
+  '/app/team': typeof AuthenticatedAppTeamRoute
   '/app/': typeof AuthenticatedAppIndexRoute
 }
 export interface FileRoutesByTo {
@@ -163,15 +170,16 @@ export interface FileRoutesByTo {
   '/invite/$token': typeof InviteTokenRoute
   '/legal/$doc': typeof LegalDocRoute
   '/app/admin': typeof AuthenticatedAppAdminRoute
+  '/app/billing': typeof AuthenticatedAppBillingRoute
   '/app/campaigns': typeof AuthenticatedAppCampaignsRoute
   '/app/donations': typeof AuthenticatedAppDonationsRoute
   '/app/donors': typeof AuthenticatedAppDonorsRoute
+  '/app/inbox': typeof AuthenticatedAppInboxRoute
   '/app/qr': typeof AuthenticatedAppQrRoute
   '/app/reports': typeof AuthenticatedAppReportsRoute
   '/app/settings': typeof AuthenticatedAppSettingsRoute
-  '/app/team': typeof AuthenticatedAppTeamRoute
-  '/app/billing': typeof AuthenticatedAppBillingRoute
   '/app/support': typeof AuthenticatedAppSupportRoute
+  '/app/team': typeof AuthenticatedAppTeamRoute
   '/app': typeof AuthenticatedAppIndexRoute
 }
 export interface FileRoutesById {
@@ -186,15 +194,16 @@ export interface FileRoutesById {
   '/invite/$token': typeof InviteTokenRoute
   '/legal/$doc': typeof LegalDocRoute
   '/_authenticated/app/admin': typeof AuthenticatedAppAdminRoute
+  '/_authenticated/app/billing': typeof AuthenticatedAppBillingRoute
   '/_authenticated/app/campaigns': typeof AuthenticatedAppCampaignsRoute
   '/_authenticated/app/donations': typeof AuthenticatedAppDonationsRoute
   '/_authenticated/app/donors': typeof AuthenticatedAppDonorsRoute
+  '/_authenticated/app/inbox': typeof AuthenticatedAppInboxRoute
   '/_authenticated/app/qr': typeof AuthenticatedAppQrRoute
   '/_authenticated/app/reports': typeof AuthenticatedAppReportsRoute
   '/_authenticated/app/settings': typeof AuthenticatedAppSettingsRoute
-  '/_authenticated/app/team': typeof AuthenticatedAppTeamRoute
-  '/_authenticated/app/billing': typeof AuthenticatedAppBillingRoute
   '/_authenticated/app/support': typeof AuthenticatedAppSupportRoute
+  '/_authenticated/app/team': typeof AuthenticatedAppTeamRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
 }
 export interface FileRouteTypes {
@@ -209,15 +218,16 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/legal/$doc'
     | '/app/admin'
+    | '/app/billing'
     | '/app/campaigns'
     | '/app/donations'
     | '/app/donors'
+    | '/app/inbox'
     | '/app/qr'
     | '/app/reports'
     | '/app/settings'
-    | '/app/team'
-    | '/app/billing'
     | '/app/support'
+    | '/app/team'
     | '/app/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -229,15 +239,16 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/legal/$doc'
     | '/app/admin'
+    | '/app/billing'
     | '/app/campaigns'
     | '/app/donations'
     | '/app/donors'
+    | '/app/inbox'
     | '/app/qr'
     | '/app/reports'
     | '/app/settings'
-    | '/app/team'
-    | '/app/billing'
     | '/app/support'
+    | '/app/team'
     | '/app'
   id:
     | '__root__'
@@ -251,15 +262,16 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/legal/$doc'
     | '/_authenticated/app/admin'
+    | '/_authenticated/app/billing'
     | '/_authenticated/app/campaigns'
     | '/_authenticated/app/donations'
     | '/_authenticated/app/donors'
+    | '/_authenticated/app/inbox'
     | '/_authenticated/app/qr'
     | '/_authenticated/app/reports'
     | '/_authenticated/app/settings'
-    | '/_authenticated/app/team'
-    | '/_authenticated/app/billing'
     | '/_authenticated/app/support'
+    | '/_authenticated/app/team'
     | '/_authenticated/app/'
   fileRoutesById: FileRoutesById
 }
@@ -352,6 +364,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppAdminRouteImport
       parentRoute: typeof AuthenticatedAppRouteRoute
     }
+    '/_authenticated/app/billing': {
+      id: '/_authenticated/app/billing'
+      path: '/billing'
+      fullPath: '/app/billing'
+      preLoaderRoute: typeof AuthenticatedAppBillingRouteImport
+      parentRoute: typeof AuthenticatedAppRouteRoute
+    }
     '/_authenticated/app/campaigns': {
       id: '/_authenticated/app/campaigns'
       path: '/campaigns'
@@ -371,6 +390,13 @@ declare module '@tanstack/react-router' {
       path: '/donors'
       fullPath: '/app/donors'
       preLoaderRoute: typeof AuthenticatedAppDonorsRouteImport
+      parentRoute: typeof AuthenticatedAppRouteRoute
+    }
+    '/_authenticated/app/inbox': {
+      id: '/_authenticated/app/inbox'
+      path: '/inbox'
+      fullPath: '/app/inbox'
+      preLoaderRoute: typeof AuthenticatedAppInboxRouteImport
       parentRoute: typeof AuthenticatedAppRouteRoute
     }
     '/_authenticated/app/qr': {
@@ -394,20 +420,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppSettingsRouteImport
       parentRoute: typeof AuthenticatedAppRouteRoute
     }
-    '/_authenticated/app/team': {
-      id: '/_authenticated/app/team'
-      path: '/team'
-      fullPath: '/app/team'
-      preLoaderRoute: typeof AuthenticatedAppTeamRouteImport
-      parentRoute: typeof AuthenticatedAppRouteRoute
-    }
-    '/_authenticated/app/billing': {
-      id: '/_authenticated/app/billing'
-      path: '/billing'
-      fullPath: '/app/billing'
-      preLoaderRoute: typeof AuthenticatedAppBillingRouteImport
-      parentRoute: typeof AuthenticatedAppRouteRoute
-    }
     '/_authenticated/app/support': {
       id: '/_authenticated/app/support'
       path: '/support'
@@ -415,34 +427,43 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppSupportRouteImport
       parentRoute: typeof AuthenticatedAppRouteRoute
     }
+    '/_authenticated/app/team': {
+      id: '/_authenticated/app/team'
+      path: '/team'
+      fullPath: '/app/team'
+      preLoaderRoute: typeof AuthenticatedAppTeamRouteImport
+      parentRoute: typeof AuthenticatedAppRouteRoute
+    }
   }
 }
 
 interface AuthenticatedAppRouteRouteChildren {
   AuthenticatedAppAdminRoute: typeof AuthenticatedAppAdminRoute
+  AuthenticatedAppBillingRoute: typeof AuthenticatedAppBillingRoute
   AuthenticatedAppCampaignsRoute: typeof AuthenticatedAppCampaignsRoute
   AuthenticatedAppDonationsRoute: typeof AuthenticatedAppDonationsRoute
   AuthenticatedAppDonorsRoute: typeof AuthenticatedAppDonorsRoute
+  AuthenticatedAppInboxRoute: typeof AuthenticatedAppInboxRoute
   AuthenticatedAppQrRoute: typeof AuthenticatedAppQrRoute
   AuthenticatedAppReportsRoute: typeof AuthenticatedAppReportsRoute
   AuthenticatedAppSettingsRoute: typeof AuthenticatedAppSettingsRoute
-  AuthenticatedAppTeamRoute: typeof AuthenticatedAppTeamRoute
-  AuthenticatedAppBillingRoute: typeof AuthenticatedAppBillingRoute
   AuthenticatedAppSupportRoute: typeof AuthenticatedAppSupportRoute
+  AuthenticatedAppTeamRoute: typeof AuthenticatedAppTeamRoute
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
 }
 
 const AuthenticatedAppRouteRouteChildren: AuthenticatedAppRouteRouteChildren = {
   AuthenticatedAppAdminRoute: AuthenticatedAppAdminRoute,
+  AuthenticatedAppBillingRoute: AuthenticatedAppBillingRoute,
   AuthenticatedAppCampaignsRoute: AuthenticatedAppCampaignsRoute,
   AuthenticatedAppDonationsRoute: AuthenticatedAppDonationsRoute,
   AuthenticatedAppDonorsRoute: AuthenticatedAppDonorsRoute,
+  AuthenticatedAppInboxRoute: AuthenticatedAppInboxRoute,
   AuthenticatedAppQrRoute: AuthenticatedAppQrRoute,
   AuthenticatedAppReportsRoute: AuthenticatedAppReportsRoute,
   AuthenticatedAppSettingsRoute: AuthenticatedAppSettingsRoute,
-  AuthenticatedAppTeamRoute: AuthenticatedAppTeamRoute,
-  AuthenticatedAppBillingRoute: AuthenticatedAppBillingRoute,
   AuthenticatedAppSupportRoute: AuthenticatedAppSupportRoute,
+  AuthenticatedAppTeamRoute: AuthenticatedAppTeamRoute,
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
 }
 
