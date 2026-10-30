@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { formatMoney, slugify } from "@/lib/format";
+import { createSubscriptionCheckout } from "@/lib/stripe.functions";
 
 const TERMS_VERSION = "2025-09";
 
@@ -151,10 +152,30 @@ function AuthPage() {
             await supabase.from("organizations").delete().eq("id", orgData.id);
             throw memberResult.error;
           }
-          didNavigate.current = true;
           if (selectedPlan && Number(selectedPlan.price_monthly) > 0) {
-            navigate({ to: "/app/billing", search: { subscription: undefined, plan: selectedPlan.id } });
+            // Call Stripe checkout directly — we have the session token and org ID right
+            // here, so we don't need to wait for useAuth's memberships query to resolve.
+            // (signUp fires auth state change immediately, before the org is inserted, so
+            // relying on currentOrg on the billing page is a race condition.)
+            try {
+              const { url } = await createSubscriptionCheckout({
+                data: {
+                  token: data.session.access_token,
+                  orgId: orgData.id,
+                  planId: selectedPlan.id,
+                  interval: "monthly",
+                },
+              });
+              didNavigate.current = true;
+              window.location.href = url;
+            } catch (checkoutErr) {
+              // Stripe call failed — fall back to billing page so user can retry
+              didNavigate.current = true;
+              navigate({ to: "/app/billing", search: { subscription: undefined, plan: selectedPlan.id } });
+              toast.error(checkoutErr instanceof Error ? checkoutErr.message : "Could not start payment — please subscribe from the billing page.");
+            }
           } else {
+            didNavigate.current = true;
             navigate({ to: "/app" });
           }
         } else {
