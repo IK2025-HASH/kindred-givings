@@ -272,6 +272,51 @@ function PlansSection() {
     }
   }
 
+  const [confirmDeletePlanId, setConfirmDeletePlanId] = useState<string | null>(null);
+  const [planActionBusy, setPlanActionBusy] = useState<string | null>(null);
+
+  async function togglePlanActive(plan: Plan) {
+    setPlanActionBusy(plan.id);
+    try {
+      const { error } = await supabase.from("plans").update({ is_active: !plan.is_active } as never).eq("id", plan.id);
+      if (error) throw error;
+      toast.success(plan.is_active ? `"${plan.name}" paused — no longer available for new signups` : `"${plan.name}" activated`);
+      void qc.invalidateQueries({ queryKey: ["admin-plans"] });
+      void qc.invalidateQueries({ queryKey: ["public-plans"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not update plan");
+    } finally {
+      setPlanActionBusy(null);
+    }
+  }
+
+  async function deletePlan(planId: string) {
+    setPlanActionBusy(planId);
+    try {
+      // Check for active subscriptions on this plan first
+      const { data: activeSubs } = await supabase
+        .from("subscriptions")
+        .select("id")
+        .eq("plan_id", planId)
+        .in("status", ["active", "trialing"]);
+      if (activeSubs && activeSubs.length > 0) {
+        toast.error(`Cannot delete: ${activeSubs.length} active subscription${activeSubs.length !== 1 ? "s" : ""} use this plan. Pause it instead.`);
+        setConfirmDeletePlanId(null);
+        return;
+      }
+      const { error } = await supabase.from("plans").delete().eq("id", planId);
+      if (error) throw error;
+      toast.success("Plan deleted — features and limits cleaned up automatically");
+      setConfirmDeletePlanId(null);
+      void qc.invalidateQueries({ queryKey: ["admin-plans"] });
+      void qc.invalidateQueries({ queryKey: ["public-plans"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not delete plan");
+    } finally {
+      setPlanActionBusy(null);
+    }
+  }
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -316,16 +361,48 @@ function PlansSection() {
                   {plan.max_members} members · {plan.max_donors.toLocaleString()} donors · {plan.max_campaigns} campaigns
                 </p>
               </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => expanded === plan.id ? setExpanded(null) : startEdit(plan)}
-              >
-                {expanded === plan.id
-                  ? <><ChevronUp className="mr-1 size-4" />Close</>
-                  : <><ChevronDown className="mr-1 size-4" />Edit</>
-                }
-              </Button>
+              <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={planActionBusy === plan.id}
+                  onClick={() => void togglePlanActive(plan)}
+                  title={plan.is_active ? "Pause plan" : "Activate plan"}
+                >
+                  {plan.is_active ? "Pause" : "Activate"}
+                </Button>
+                {confirmDeletePlanId === plan.id ? (
+                  <>
+                    <Button size="sm" variant="destructive" disabled={planActionBusy === plan.id}
+                      onClick={() => void deletePlan(plan.id)}>
+                      Confirm delete
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setConfirmDeletePlanId(null)}>
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={planActionBusy === plan.id}
+                    onClick={() => setConfirmDeletePlanId(plan.id)}
+                    title="Delete plan"
+                  >
+                    <Trash2 className="size-4 text-destructive" />
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => expanded === plan.id ? setExpanded(null) : startEdit(plan)}
+                >
+                  {expanded === plan.id
+                    ? <><ChevronUp className="mr-1 size-4" />Close</>
+                    : <><ChevronDown className="mr-1 size-4" />Edit</>
+                  }
+                </Button>
+              </div>
             </div>
             {expanded === plan.id && (
               <div className="border-t px-4 pb-4 pt-3">
