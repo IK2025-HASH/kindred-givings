@@ -526,3 +526,138 @@ export const createDonationCheckout = createServerFn({ method: "POST" })
 
     return { url: session.url! };
   });
+
+// Helper: build a user-scoped Supabase client + verify platform admin via RLS
+async function requireAdminToken(token: string) {
+  const supabaseUrl = process.env["APP_SUPABASE_URL"] || process.env["SUPABASE_URL"];
+  const supabasePubKey = process.env["APP_SUPABASE_ANON_KEY"] || process.env["SUPABASE_PUBLISHABLE_KEY"];
+  if (!supabaseUrl || !supabasePubKey) throw new Error("Server configuration error.");
+  const { createClient: makeClient } = await import("@supabase/supabase-js");
+  const isNewFmt = supabasePubKey.startsWith("sb_publishable_") || supabasePubKey.startsWith("sb_secret_");
+  const authFetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const hdrs = new Headers(init?.headers);
+    if (isNewFmt && hdrs.get("Authorization") === `Bearer ${supabasePubKey}`) hdrs.delete("Authorization");
+    hdrs.set("apikey", supabasePubKey);
+    if (!hdrs.has("Authorization")) hdrs.set("Authorization", `Bearer ${token}`);
+    return fetch(input, { ...init, headers: hdrs });
+  };
+  const userClient = makeClient(supabaseUrl, supabasePubKey, {
+    global: { headers: { Authorization: `Bearer ${token}` }, fetch: authFetch },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: adminRow } = await userClient.from("platform_admins").select("user_id").maybeSingle();
+  if (!adminRow) throw new Error("Unauthorized");
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
+
+export type AdminSubscription = {
+  id: string;
+  org_id: string;
+  org_name: string;
+  plan_name: string;
+  status: string;
+  billing_period: string | null;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  stripe_subscription_id: string | null;
+  created_at: string;
+  stripe_status: string | null;
+  stripe_amount: number | null;
+  stripe_currency: string | null;
+  stripe_latest_invoice_id: string | null;
+  stripe_payment_intent_id: string | null;
+  mismatch: boolean;
+};
+
+// ── 5. Admin: list all subscriptions reconciled against Stripe ──────────────
+export const getAdminSubscriptions = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({ token: z.string() }).parse(d))
+  .handler(async ({ data }): Promise<{ subscriptions: AdminSubscription[] }> => {
+    const supabaseAdmin = await requireAdminToken(data.token);
+    const stripe = await getStripe();
+
+    const { data: rows, error } = await supabaseAdmin
+      .from("subscriptions")
+      .select("id, organization_id, plan_id, status, billing_period, current_period_start, current_period_end, stripe_subscription_id, created_at, organizations(name), plans(name)")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+
+    const results: AdminSubscription[] = await Promise.all(
+      (rows ?? []).map(async (row) => {
+        const orgName = (row.organizations as { name: string } | null)?.name ?? "—";
+        const planName = (row.plans as { name: string } | null)?.name ?? "—";
+        let stripeStatus: string | null = null;
+        let stripeAmount: number | null = null;
+        let stripeCurrency: string | null = null;
+        let stripeLatestInvoiceId: string | null = null;
+        let stripePaymentIntentId: string | null = null;
+
+        if (row.stripe_subscription_id) {
+          try {
+            const stripeSub = await stripe.subscriptions.retrieve(row.stripe_subscription_id, {
+              expand: ["latest_invoice.payment_intent"],
+            });
+            stripeStatus = stripeSub.status;
+            const inv = stripeSub.latest_invoice as import("stripe").Stripe.Invoice | null;
+            if (inv && typeof inv === "object") {
+              stripeLatestInvoiceId = inv.id ?? null;
+              stripeAmount = typeof inv.amount_paid === "number" ? inv.amount_paid : null;
+              stripeCurrency = inv.currency ?? null;
+              const pi = inv.payment_intent as import("stripe").Stripe.PaymentIntent | string | null;
+              if (pi && typeof pi === "object") stripePaymentIntentId = pi.id;
+              else if (typeof pi === "string") stripePaymentIntentId = pi;
+            }
+          } catch {
+            stripeStatus = "fetch_error";
+          }
+        }
+
+        const dbActive = ["active", "trialing"].includes(row.status);
+        const stripeActive = stripeStatus ? ["active", "trialing"].includes(stripeStatus) : null;
+        const mismatch = stripeActive !== null && dbActive !== stripeActive;
+
+        return {
+          id: row.id,
+          org_id: row.organization_id,
+          org_name: orgName,
+          plan_name: planName,
+          status: row.status,
+          billing_period: (row as { billing_period?: string | null }).billing_period ?? null,
+          current_period_start: (row as { current_period_start?: string | null }).current_period_start ?? null,
+          current_period_end: (row as { current_period_end?: string | null }).current_period_end ?? null,
+          stripe_subscription_id: row.stripe_subscription_id ?? null,
+          created_at: row.created_at,
+          stripe_status: stripeStatus,
+          stripe_amount: stripeAmount,
+          stripe_currency: stripeCurrency,
+          stripe_latest_invoice_id: stripeLatestInvoiceId,
+          stripe_payment_intent_id: stripePaymentIntentId,
+          mismatch,
+        };
+      })
+    );
+
+    return { subscriptions: results };
+  });
+
+// ── 6. Admin: process a refund on a subscription's latest payment ────────────
+export const processAdminRefund = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    z.object({
+      token: z.string(),
+      paymentIntentId: z.string().min(1),
+      amountPence: z.number().int().positive(),
+      reason: z.enum(["duplicate", "fraudulent", "requested_by_customer"]),
+    }).parse(d)
+  )
+  .handler(async ({ data }): Promise<{ refundId: string; status: string; amountPence: number }> => {
+    await requireAdminToken(data.token);
+    const stripe = await getStripe();
+    const refund = await stripe.refunds.create({
+      payment_intent: data.paymentIntentId,
+      amount: data.amountPence,
+      reason: data.reason,
+    });
+    return { refundId: refund.id, status: refund.status ?? "unknown", amountPence: refund.amount };
+  });

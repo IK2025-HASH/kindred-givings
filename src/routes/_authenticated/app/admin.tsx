@@ -2,7 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, ChevronDown, ChevronUp, CreditCard, MessageCircle, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, CreditCard, ExternalLink, MessageCircle, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { PageHeader } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ import { usePlatformSettingsQuery } from "@/hooks/usePlatformSettings";
 import { DEFAULTS, type PlatformSettings } from "@/lib/platform-settings.functions";
 import { formatDate, formatMoney } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
-import { syncPlansToStripe } from "@/lib/stripe.functions";
+import { syncPlansToStripe, getAdminSubscriptions, processAdminRefund, type AdminSubscription } from "@/lib/stripe.functions";
 
 export const Route = createFileRoute("/_authenticated/app/admin")({
   beforeLoad: async () => {
@@ -782,6 +782,244 @@ function ChatSupportSection() {
   );
 }
 
+function PaymentsSection() {
+  const qc = useQueryClient();
+  const [refundTarget, setRefundTarget] = useState<AdminSubscription | null>(null);
+  const [refundAmountGbp, setRefundAmountGbp] = useState("");
+  const [refundReason, setRefundReason] = useState<"duplicate" | "fraudulent" | "requested_by_customer">("requested_by_customer");
+  const [refundBusy, setRefundBusy] = useState(false);
+
+  const subsQuery = useQuery({
+    queryKey: ["admin-payments"],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Not signed in");
+      return getAdminSubscriptions({ data: { token: session.access_token } });
+    },
+  });
+
+  async function handleRefund() {
+    if (!refundTarget?.stripe_payment_intent_id) return;
+    const amountPence = Math.round(parseFloat(refundAmountGbp) * 100);
+    if (!amountPence || amountPence <= 0) { toast.error("Enter a valid refund amount"); return; }
+    setRefundBusy(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Session expired");
+      const result = await processAdminRefund({
+        data: {
+          token: session.access_token,
+          paymentIntentId: refundTarget.stripe_payment_intent_id,
+          amountPence,
+          reason: refundReason,
+        },
+      });
+      toast.success(`Refund of £${(result.amountPence / 100).toFixed(2)} issued — Stripe ID: ${result.refundId} (${result.status})`);
+      setRefundTarget(null);
+      setRefundAmountGbp("");
+      void qc.invalidateQueries({ queryKey: ["admin-payments"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Refund failed");
+    } finally {
+      setRefundBusy(false);
+    }
+  }
+
+  const subs = subsQuery.data?.subscriptions ?? [];
+  const mismatches = subs.filter((s) => s.mismatch).length;
+
+  const STATUS_COLOR: Record<string, string> = {
+    active: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+    trialing: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+    canceled: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+    past_due: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
+    unpaid: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+    fetch_error: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
+  };
+
+  function statusBadge(status: string | null) {
+    if (!status) return <span className="text-xs text-muted-foreground">—</span>;
+    const cls = STATUS_COLOR[status] ?? "bg-muted text-muted-foreground";
+    return <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium capitalize ${cls}`}>{status.replace("_", " ")}</span>;
+  }
+
+  return (
+    <>
+      {/* Summary cards */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total subscriptions</p>
+            <p className="mt-2 font-display text-2xl font-bold">{subsQuery.isLoading ? "…" : subs.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Active</p>
+            <p className="mt-2 font-display text-2xl font-bold text-green-600">
+              {subsQuery.isLoading ? "…" : subs.filter((s) => s.stripe_status === "active" || (!s.stripe_status && s.status === "active")).length}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className={mismatches > 0 ? "border-yellow-400" : ""}>
+          <CardContent className="p-5">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">DB ↔ Stripe mismatches</p>
+            <p className={`mt-2 font-display text-2xl font-bold ${mismatches > 0 ? "text-yellow-600" : ""}`}>
+              {subsQuery.isLoading ? "…" : mismatches}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Subscriptions table */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>All subscriptions</CardTitle>
+          <Button size="sm" variant="outline" onClick={() => void qc.invalidateQueries({ queryKey: ["admin-payments"] })} disabled={subsQuery.isFetching}>
+            <RefreshCw className={`mr-1.5 size-4 ${subsQuery.isFetching ? "animate-spin" : ""}`} />
+            {subsQuery.isFetching ? "Loading…" : "Refresh from Stripe"}
+          </Button>
+        </CardHeader>
+        <CardContent className="overflow-x-auto p-0">
+          {subsQuery.isError && (
+            <p className="p-6 text-sm text-destructive">{subsQuery.error instanceof Error ? subsQuery.error.message : "Could not load subscriptions"}</p>
+          )}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Organisation</TableHead>
+                <TableHead className="hidden md:table-cell">Plan</TableHead>
+                <TableHead>DB status</TableHead>
+                <TableHead>Stripe status</TableHead>
+                <TableHead className="hidden lg:table-cell">Billing</TableHead>
+                <TableHead className="hidden lg:table-cell">Period ends</TableHead>
+                <TableHead className="hidden xl:table-cell">Last paid</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {subs.map((s) => (
+                <TableRow key={s.id} className={s.mismatch ? "bg-yellow-50/50 dark:bg-yellow-900/10" : ""}>
+                  <TableCell className="font-medium">
+                    {s.org_name}
+                    {s.mismatch && <AlertTriangle className="ml-1 inline size-3.5 text-yellow-600" title="DB and Stripe statuses differ" />}
+                  </TableCell>
+                  <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{s.plan_name}</TableCell>
+                  <TableCell>{statusBadge(s.status)}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      {statusBadge(s.stripe_status)}
+                      {s.stripe_subscription_id && (
+                        <a
+                          href={`https://dashboard.stripe.com/subscriptions/${s.stripe_subscription_id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-muted-foreground/60 hover:text-muted-foreground"
+                          title="Open in Stripe"
+                        >
+                          <ExternalLink className="size-3" />
+                        </a>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden text-sm text-muted-foreground capitalize lg:table-cell">
+                    {s.billing_period ?? "—"}
+                  </TableCell>
+                  <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">
+                    {s.current_period_end ? new Date(s.current_period_end).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                  </TableCell>
+                  <TableCell className="hidden text-sm text-muted-foreground xl:table-cell">
+                    {s.stripe_amount !== null
+                      ? `${(s.stripe_currency ?? "gbp").toUpperCase()} ${(s.stripe_amount / 100).toFixed(2)}`
+                      : "—"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {s.stripe_payment_intent_id && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setRefundTarget(s);
+                          setRefundAmountGbp(s.stripe_amount ? (s.stripe_amount / 100).toFixed(2) : "");
+                          setRefundReason("requested_by_customer");
+                        }}
+                      >
+                        Refund
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {subs.length === 0 && !subsQuery.isLoading && !subsQuery.isError && (
+                <TableRow>
+                  <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
+                    No subscriptions yet.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Refund dialog */}
+      {refundTarget && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <CreditCard className="mt-0.5 size-5 shrink-0 text-destructive" />
+              <div className="flex-1 space-y-3">
+                <div>
+                  <p className="font-medium text-sm">Issue refund — {refundTarget.org_name}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Stripe payment: <code className="font-mono">{refundTarget.stripe_payment_intent_id}</code>
+                    {refundTarget.stripe_amount !== null && ` · Charged: £${(refundTarget.stripe_amount / 100).toFixed(2)}`}
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="refund-amount">Amount to refund (£)</Label>
+                    <Input
+                      id="refund-amount"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={refundAmountGbp}
+                      onChange={(e) => setRefundAmountGbp(e.target.value)}
+                      placeholder="9.00"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="refund-reason">Reason</Label>
+                    <select
+                      id="refund-reason"
+                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      value={refundReason}
+                      onChange={(e) => setRefundReason(e.target.value as typeof refundReason)}
+                    >
+                      <option value="requested_by_customer">Customer request</option>
+                      <option value="duplicate">Duplicate payment</option>
+                      <option value="fraudulent">Fraudulent</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="destructive" disabled={refundBusy || !refundAmountGbp} onClick={() => void handleRefund()}>
+                    {refundBusy ? "Processing…" : `Refund £${refundAmountGbp || "0.00"}`}
+                  </Button>
+                  <Button size="sm" variant="ghost" disabled={refundBusy} onClick={() => { setRefundTarget(null); setRefundAmountGbp(""); }}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </>
+  );
+}
+
 function AdminPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -1384,21 +1622,9 @@ function AdminPage() {
       <div className="space-y-4">
         <div className="border-b pb-2">
           <h2 className="text-base font-semibold">Payments</h2>
-          <p className="text-sm text-muted-foreground">Take payment through Stripe and see subscriptions and invoices.</p>
+          <p className="text-sm text-muted-foreground">All platform subscriptions — reconciled against Stripe in real time. Issue refunds from here.</p>
         </div>
-        <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-            <CreditCard className="size-8 text-muted-foreground/50" />
-            <div>
-              <p className="font-medium">Stripe integration not yet connected</p>
-              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                Add your Stripe secret key and webhook secret to enable subscription management,
-                invoice history, and payment analytics.
-              </p>
-            </div>
-            <Badge variant="secondary">Coming soon</Badge>
-          </CardContent>
-        </Card>
+        <PaymentsSection />
       </div>
 
       {/* ── MODULE 5: CHAT & SUPPORT ───────────────────────────────── */}
