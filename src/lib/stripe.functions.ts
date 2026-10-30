@@ -421,12 +421,68 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
       mode: "subscription",
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${origin}/app/billing?subscription=success`,
+      success_url: `${origin}/app/billing?subscription=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/app/billing`,
       metadata: { org_id: org.id, plan_id: plan.id, interval: data.interval },
     });
 
     return { url: session.url! };
+  });
+
+// ── 3b. Sync subscription from a completed Stripe Checkout session ────────────
+// Called immediately after the user lands on billing?subscription=success&session_id=...
+// This is a fallback for when the webhook hasn't fired yet.
+export const syncSubscriptionFromCheckout = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    z.object({
+      token: z.string().min(1),
+      orgId: z.string().uuid(),
+      sessionId: z.string().min(1),
+    }).parse(d)
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(data.token);
+    if (authError || !user) throw new Error("Unauthorized");
+
+    const { data: member } = await supabaseAdmin
+      .from("organization_members")
+      .select("id")
+      .eq("organization_id", data.orgId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!member) throw new Error("Not a member of this organization");
+
+    const stripe = await getStripe();
+    const session = await stripe.checkout.sessions.retrieve(data.sessionId);
+
+    if (session.mode !== "subscription" || !session.subscription) return { synced: false };
+
+    const orgId = session.metadata?.['org_id'];
+    const planId = session.metadata?.['plan_id'];
+    const interval = session.metadata?.['interval'];
+    if (!orgId || !planId || orgId !== data.orgId) return { synced: false };
+
+    const sub = await stripe.subscriptions.retrieve(session.subscription as string);
+    const stripeSub = sub as import("stripe").Stripe.Subscription & {
+      current_period_start: number;
+      current_period_end: number;
+    };
+
+    await supabaseAdmin
+      .from("subscriptions")
+      .upsert({
+        organization_id: orgId,
+        plan_id: planId,
+        billing_period: interval ?? "monthly",
+        status: sub.status,
+        stripe_subscription_id: sub.id,
+        current_period_start: new Date(stripeSub.current_period_start * 1000).toISOString(),
+        current_period_end: new Date(stripeSub.current_period_end * 1000).toISOString(),
+      } as never, { onConflict: "organization_id" });
+
+    return { synced: true };
   });
 
 // ── 4. Create Stripe Checkout session for a donor ────────────────────────────

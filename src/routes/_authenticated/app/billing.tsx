@@ -9,12 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { createSubscriptionCheckout } from "@/lib/stripe.functions";
+import { createSubscriptionCheckout, syncSubscriptionFromCheckout } from "@/lib/stripe.functions";
 
 export const Route = createFileRoute("/_authenticated/app/billing")({
   validateSearch: (s: Record<string, unknown>) => ({
     subscription: s['subscription'] as string | undefined,
     plan: s['plan'] as string | undefined,
+    session_id: s['session_id'] as string | undefined,
   }),
   head: () => ({
     meta: [
@@ -50,7 +51,7 @@ type Subscription = {
 
 function BillingPage() {
   const { currentOrg } = useAuth();
-  const { subscription: successParam, plan: planParam } = useSearch({ from: "/_authenticated/app/billing" });
+  const { subscription: successParam, plan: planParam, session_id: sessionId } = useSearch({ from: "/_authenticated/app/billing" });
   const [interval, setInterval] = useState<"monthly" | "yearly">("monthly");
   const [busy, setBusy] = useState<string | null>(null);
   const autoTriggered = useRef(false);
@@ -115,20 +116,31 @@ function BillingPage() {
     }
   }, [currentOrg, interval]);
 
-  // After returning from Stripe, poll until the webhook fires and the subscription appears
+  // After returning from Stripe, sync subscription directly from the checkout session
   useEffect(() => {
-    if (successParam !== "success" || !currentOrg?.id) return;
+    if (successParam !== "success" || !currentOrg?.id || !sessionId) return;
     toast.success("Payment confirmed — activating your subscription…");
-    let attempts = 0;
-    const id = setInterval(async () => {
-      attempts++;
-      await queryClient.invalidateQueries({ queryKey: ["org-subscription", currentOrg.id] });
-      const sub = queryClient.getQueryData<Subscription | null>(["org-subscription", currentOrg.id]);
-      if (sub || attempts >= 8) clearInterval(id);
-    }, 2000);
-    return () => clearInterval(id);
+    void (async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (!token) return;
+        await syncSubscriptionFromCheckout({ data: { token, orgId: currentOrg.id, sessionId } });
+        await queryClient.invalidateQueries({ queryKey: ["org-subscription", currentOrg.id] });
+        toast.success("Subscription activated!");
+      } catch {
+        // Fallback: poll a few times in case webhook arrives
+        let attempts = 0;
+        const id = setInterval(async () => {
+          attempts++;
+          await queryClient.invalidateQueries({ queryKey: ["org-subscription", currentOrg.id] });
+          const sub = queryClient.getQueryData<Subscription | null>(["org-subscription", currentOrg.id]);
+          if (sub || attempts >= 5) clearInterval(id);
+        }, 2000);
+      }
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [successParam, currentOrg?.id]);
+  }, [successParam, currentOrg?.id, sessionId]);
 
   // Auto-trigger checkout when arriving from registration with a plan pre-selected
   useEffect(() => {
