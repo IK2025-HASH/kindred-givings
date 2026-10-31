@@ -71,12 +71,10 @@ function CampaignsPage() {
 
   async function save() {
     if (!orgId || !draft?.title) return;
-    if (!draft.id) {
-      const limit = subscription.data?.plan?.max_campaigns ?? 3;
-      if ((campaigns.data?.length ?? 0) >= limit) {
-        toast.error(`Your plan allows ${limit} campaigns. Upgrade to add more.`);
-        return;
-      }
+    if (!draft.id && planFeatures.isAtLimit("max_campaigns", campaigns.data?.length ?? 0)) {
+      const limit = planFeatures.getLimit("max_campaigns");
+      toast.error(limit != null ? `Your plan allows ${limit} campaigns. Upgrade to add more.` : "Campaign limit reached. Upgrade to add more.");
+      return;
     }
     const payload = {
       organization_id: orgId,

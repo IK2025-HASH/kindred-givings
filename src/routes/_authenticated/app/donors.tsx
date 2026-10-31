@@ -88,12 +88,10 @@ function DonorsPage() {
 
   async function save() {
     if (!orgId || !draft?.full_name) return;
-    if (!draft.id) {
-      const limit = subscription.data?.plan?.max_donors ?? 100;
-      if ((donors.data?.length ?? 0) >= limit) {
-        toast.error(`Your plan allows ${limit} donors. Upgrade to add more.`);
-        return;
-      }
+    if (!draft.id && planFeatures.isAtLimit("max_donors", donors.data?.length ?? 0)) {
+      const limit = planFeatures.getLimit("max_donors");
+      toast.error(limit != null ? `Your plan allows ${limit} donors. Upgrade to add more.` : "Donor limit reached. Upgrade to add more.");
+      return;
     }
     setBusy(true);
     try {
@@ -179,38 +177,42 @@ function DonorsPage() {
         action={
           editable ? (
             <div className="flex flex-wrap gap-2">
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".csv"
-                hidden
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void importCsv(f);
-                  e.target.value = "";
-                }}
-              />
-              <Button variant="outline" onClick={() => fileRef.current?.click()}>
-                Import CSV
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  downloadCsv(
-                    "donors.csv",
-                    list.map((d) => ({
-                      full_name: d.full_name,
-                      email: d.email,
-                      phone: d.phone,
-                      city: d.city,
-                      postcode: d.postcode,
-                      lifetime_total: totals.get(d.id)?.total ?? 0,
-                    })),
-                  )
-                }
-              >
-                Export
-              </Button>
+              {planFeatures.hasFeature("csv_export") && (
+                <>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept=".csv"
+                    hidden
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void importCsv(f);
+                      e.target.value = "";
+                    }}
+                  />
+                  <Button variant="outline" onClick={() => fileRef.current?.click()}>
+                    Import CSV
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      downloadCsv(
+                        "donors.csv",
+                        list.map((d) => ({
+                          full_name: d.full_name,
+                          email: d.email,
+                          phone: d.phone,
+                          city: d.city,
+                          postcode: d.postcode,
+                          lifetime_total: totals.get(d.id)?.total ?? 0,
+                        })),
+                      )
+                    }
+                  >
+                    Export
+                  </Button>
+                </>
+              )}
               <Dialog
                 open={!!draft}
                 onOpenChange={(o) => setDraft(o ? (draft ?? { full_name: "" }) : null)}
