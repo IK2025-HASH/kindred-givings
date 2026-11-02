@@ -64,17 +64,18 @@ type Message = {
 };
 
 function SupportPage() {
-  const { user, isPlatformAdmin } = useAuth();
+  const { user, isPlatformAdmin, isChatSupportAgent } = useAuth();
   const qc = useQueryClient();
   const [selected, setSelected] = useState<Conversation | null>(null);
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Include admin/agent status in queryKey so query re-runs once auth resolves
   const convosQuery = useQuery({
-    queryKey: ["support-inbox", user?.id],
+    queryKey: ["support-inbox", user?.id, isPlatformAdmin, isChatSupportAgent],
     enabled: !!user,
     queryFn: async (): Promise<Conversation[]> => {
-      const q = supabase
+      let q = supabase
         .from("support_conversations")
         .select(
           "id, subject, status, created_at, org:org_id(name), started_by_profile:started_by(full_name, email)",
@@ -82,8 +83,9 @@ function SupportPage() {
         .neq("status", "closed")
         .order("created_at", { ascending: false });
 
-      if (!isPlatformAdmin) {
-        q.eq("assigned_to", user!.id);
+      // Non-admin, non-agent users: only their own assigned conversations
+      if (!isPlatformAdmin && !isChatSupportAgent) {
+        q = q.eq("assigned_to", user!.id);
       }
 
       const { data, error } = await q;
@@ -154,7 +156,7 @@ function SupportPage() {
     <div className="space-y-6">
       <PageHeader
         title="Support inbox"
-        description={`${convos.length} open conversation${convos.length !== 1 ? "s" : ""} assigned to you.`}
+        description={`${convos.length} open conversation${convos.length !== 1 ? "s" : ""}${isPlatformAdmin ? " across all organisations." : " assigned to you."}`}
       />
 
       <Card>
