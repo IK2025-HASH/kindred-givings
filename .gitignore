@@ -1,3 +1,7 @@
+# Test cycle — credentials + output artefacts (never commit)
+Test - Cycles/test_config.json
+Test - Cycles/TestRun_*/
+
 # Logs
 logs
 *.log
