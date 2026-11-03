@@ -573,6 +573,37 @@ def complete_stripe_payment(d, cfg, steps, img_dir, cardholder_name, email):
     try:
         time.sleep(2)  # let the checkout page settle
 
+        # ── Step 1: select "Card" payment method radio button ─────────────
+        # Stripe shows Card / Klarna / Revolut Pay radio buttons.
+        # Card is not selected by default — click it to expand the card form.
+        card_radio_clicked = False
+        for sel in [
+            # Stripe hosted checkout uses a radio inside a label containing "Card"
+            '//label[contains(normalize-space(),"Card")]//input[@type="radio"]',
+            '//label[.//span[normalize-space()="Card"]]//input[@type="radio"]',
+        ]:
+            try:
+                rb = d.find_element(By.XPATH, sel)
+                d.execute_script("arguments[0].scrollIntoView({block:'center'});", rb)
+                rb.click()
+                card_radio_clicked = True
+                break
+            except Exception:
+                pass
+
+        if not card_radio_clicked:
+            # Fallback: find all radio inputs and click the first one (Card)
+            radios = d.find_elements(By.CSS_SELECTOR, 'input[type="radio"]')
+            if radios:
+                d.execute_script("arguments[0].click();", radios[0])
+                card_radio_clicked = True
+
+        if card_radio_clicked:
+            time.sleep(1.5)  # wait for card form to expand
+            _ok("Card payment method selected", _shot(d, img_dir, "stripe_01b_card_selected"), steps)
+        else:
+            _info("Could not click Card radio — form may already be expanded", None, steps)
+
         # Email — pre-populated from Stripe session; only fill if blank
         try:
             em = d.find_element(By.CSS_SELECTOR,
@@ -629,8 +660,10 @@ def complete_stripe_payment(d, cfg, steps, img_dir, cardholder_name, email):
         )
         time.sleep(0.4)
 
-        # Name on card (outside iframes)
-        for sel in ['input[name="billingName"]',
+        # Name on card (outside iframes — "Full name on card" placeholder)
+        for sel in ['input[placeholder*="Full name" i]',
+                    'input[placeholder*="name on card" i]',
+                    'input[name="billingName"]',
                     'input[autocomplete="cc-name"]',
                     'input[placeholder*="Name" i]']:
             try:
@@ -642,7 +675,8 @@ def complete_stripe_payment(d, cfg, steps, img_dir, cardholder_name, email):
                 pass
 
         # Postal / postcode (sometimes required for UK cards)
-        for sel in ['input[name="billingAddressPostalCode"]',
+        for sel in ['input[placeholder*="Postal code" i]',
+                    'input[name="billingAddressPostalCode"]',
                     'input[autocomplete="postal-code"]',
                     'input[placeholder*="post" i]',
                     'input[placeholder*="zip" i]']:
