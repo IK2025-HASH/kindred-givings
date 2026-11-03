@@ -1,0 +1,161 @@
+{
+  "next_id": 14,
+  "bugs": [
+    {
+      "id": "BUG-001",
+      "date_found": "2026-11-03 09:37",
+      "version_found": "v1.1.1",
+      "journey": "Journey 4: Registration Security Check (v111-03112026@networklogic.uk)",
+      "step": "Login before confirmation",
+      "error": "Message: \nStacktrace:\nSymbols not available. Dumping unresolved backtrace:\n\t(No symbol) [0x7ff63dc5be65]\n\t(No symbol) [0x7ff63db635f0]\n\t(No symbol) [0x7ff63d9d26d3]\n\t(No symbol) [0x7ff63e1dd8e1]\n\t(No symbol) [0x7ff63e1ddb3c]\n\t(No symbol) [0x7ff63e20bbb7]\n\t(No symbol) [0x7ff63da06661]\n\t(No symbol) [0x7ff63d9eb969]\n\t(No symbol) [0x7ff63d9ecca3]\n\t(No symbol) [0x7ff63e0d5af1]\n\t(No symbol) [0x7ff63e0f67f7]\n\t(No symbol) [0x7ff63e0ece20]\n\t(No symbol) [0x7ff63dd7ff8e]\n\t(No symbol) [0x7ff63db72865]\n\t(No symbol) [0x7ff63db6d1d4]\n\t(No symbol) [0x7ff63db6d364]\n\t(No symbol) [0x7ff63db5644c]\n\t(No symbol) [0x7ff894c2dda7]\n\t(No symbol) [0x7ff89673ee4c]\n",
+      "screenshot": "C:\\Users\\Ilyas\\OneDrive\\donorbook-local\\Test - Cycles\\bug_screenshots\\BUG-001.png",
+      "status": "Open",
+      "date_fixed": "",
+      "fixed_version": ""
+    },
+    {
+      "id": "BUG-002",
+      "date_found": "2026-11-03 09:56",
+      "version_found": "v1.1.1",
+      "journey": "Journey 4: Registration Security Check (v111-031120260956@networklogic.uk)",
+      "step": "Login before confirmation",
+      "error": "Message: \nStacktrace:\nSymbols not available. Dumping unresolved backtrace:\n\t(No symbol) [0x7ff7eec2be65]\n\t(No symbol) [0x7ff7eeb335f0]\n\t(No symbol) [0x7ff7ee9a26d3]\n\t(No symbol) [0x7ff7ef1ad8e1]\n\t(No symbol) [0x7ff7ef1adb3c]\n\t(No symbol) [0x7ff7ef1dbbb7]\n\t(No symbol) [0x7ff7ee9d6661]\n\t(No symbol) [0x7ff7ee9bb969]\n\t(No symbol) [0x7ff7ee9bcca3]\n\t(No symbol) [0x7ff7ef0a5af1]\n\t(No symbol) [0x7ff7ef0c67f7]\n\t(No symbol) [0x7ff7ef0bce20]\n\t(No symbol) [0x7ff7eed4ff8e]\n\t(No symbol) [0x7ff7eeb42865]\n\t(No symbol) [0x7ff7eeb3d1d4]\n\t(No symbol) [0x7ff7eeb3d364]\n\t(No symbol) [0x7ff7eeb2644c]\n\t(No symbol) [0x7ff894c2dda7]\n\t(No symbol) [0x7ff89673ee4c]\n",
+      "screenshot": "C:\\Users\\Ilyas\\OneDrive\\donorbook-local\\Test - Cycles\\bug_screenshots\\BUG-002.png",
+      "status": "Open",
+      "date_fixed": "",
+      "fixed_version": ""
+    },
+    {
+      "id": "BUG-003",
+      "date_found": "2026-11-03 11:14",
+      "version_found": "v1.1.1",
+      "journey": "Journey 3: New Charity Registration & Onboarding",
+      "step": "Could not find card number field on Stripe page",
+      "error": "",
+      "screenshot": "C:\\Users\\Ilyas\\OneDrive\\donorbook-local\\Test - Cycles\\bug_screenshots\\BUG-003.png",
+      "status": "Open",
+      "date_fixed": "",
+      "fixed_version": ""
+    },
+    {
+      "id": "BUG-004",
+      "date_found": "2026-11-03 11:14",
+      "version_found": "v1.1.1",
+      "journey": "Journey 4: Registration Security Check (v111-031120261114@networklogic.uk)",
+      "step": "New user registration",
+      "error": "Message: \nStacktrace:\nSymbols not available. Dumping unresolved backtrace:\n\t(No symbol) [0x7ff68a34be65]\n\t(No symbol) [0x7ff68a2535f0]\n\t(No symbol) [0x7ff68a0c26d3]\n\t(No symbol) [0x7ff68a8cd8e1]\n\t(No symbol) [0x7ff68a8cdb3c]\n\t(No symbol) [0x7ff68a8fbbb7]\n\t(No symbol) [0x7ff68a0f6661]\n\t(No symbol) [0x7ff68a0db969]\n\t(No symbol) [0x7ff68a0dcca3]\n\t(No symbol) [0x7ff68a7c5af1]\n\t(No symbol) [0x7ff68a7e67f7]\n\t(No symbol) [0x7ff68a7dce20]\n\t(No symbol) [0x7ff68a46ff8e]\n\t(No symbol) [0x7ff68a262865]\n\t(No symbol) [0x7ff68a25d1d4]\n\t(No symbol) [0x7ff68a25d364]\n\t(No symbol) [0x7ff68a24644c]\n\t(No symbol) [0x7ff894c2dda7]\n\t(No symbol) [0x7ff89673ee4c]\n",
+      "screenshot": "C:\\Users\\Ilyas\\OneDrive\\donorbook-local\\Test - Cycles\\bug_screenshots\\BUG-004.png",
+      "status": "Open",
+      "date_fixed": "",
+      "fixed_version": ""
+    },
+    {
+      "id": "BUG-005",
+      "date_found": "2026-11-03 11:14",
+      "version_found": "v1.1.1",
+      "journey": "Journey 4: Registration Security Check (v111-031120261114@networklogic.uk)",
+      "step": "Login before confirmation",
+      "error": "Message: \nStacktrace:\nSymbols not available. Dumping unresolved backtrace:\n\t(No symbol) [0x7ff68a34be65]\n\t(No symbol) [0x7ff68a2535f0]\n\t(No symbol) [0x7ff68a0c26d3]\n\t(No symbol) [0x7ff68a8cd8e1]\n\t(No symbol) [0x7ff68a8cdb3c]\n\t(No symbol) [0x7ff68a8fbbb7]\n\t(No symbol) [0x7ff68a0f6661]\n\t(No symbol) [0x7ff68a0db969]\n\t(No symbol) [0x7ff68a0dcca3]\n\t(No symbol) [0x7ff68a7c5af1]\n\t(No symbol) [0x7ff68a7e67f7]\n\t(No symbol) [0x7ff68a7dce20]\n\t(No symbol) [0x7ff68a46ff8e]\n\t(No symbol) [0x7ff68a262865]\n\t(No symbol) [0x7ff68a25d1d4]\n\t(No symbol) [0x7ff68a25d364]\n\t(No symbol) [0x7ff68a24644c]\n\t(No symbol) [0x7ff894c2dda7]\n\t(No symbol) [0x7ff89673ee4c]\n",
+      "screenshot": "C:\\Users\\Ilyas\\OneDrive\\donorbook-local\\Test - Cycles\\bug_screenshots\\BUG-005.png",
+      "status": "Open",
+      "date_fixed": "",
+      "fixed_version": ""
+    },
+    {
+      "id": "BUG-006",
+      "date_found": "2026-11-03 11:14",
+      "version_found": "v1.1.1",
+      "journey": "Journey 6: Admin Post-Registration Verification (ilyas@networklogic.uk)",
+      "step": "Login as ilyas@networklogic.uk",
+      "error": "Message: \nStacktrace:\nSymbols not available. Dumping unresolved backtrace:\n\t(No symbol) [0x7ff68a34be65]\n\t(No symbol) [0x7ff68a2535f0]\n\t(No symbol) [0x7ff68a0c26d3]\n\t(No symbol) [0x7ff68a8cd8e1]\n\t(No symbol) [0x7ff68a8cdb3c]\n\t(No symbol) [0x7ff68a8fbbb7]\n\t(No symbol) [0x7ff68a0f6661]\n\t(No symbol) [0x7ff68a0db969]\n\t(No symbol) [0x7ff68a0dcca3]\n\t(No symbol) [0x7ff68a7c5af1]\n\t(No symbol) [0x7ff68a7e67f7]\n\t(No symbol) [0x7ff68a7dce20]\n\t(No symbol) [0x7ff68a46ff8e]\n\t(No symbol) [0x7ff68a262865]\n\t(No symbol) [0x7ff68a25d1d4]\n\t(No symbol) [0x7ff68a25d364]\n\t(No symbol) [0x7ff68a24644c]\n\t(No symbol) [0x7ff894c2dda7]\n\t(No symbol) [0x7ff89673ee4c]\n",
+      "screenshot": "C:\\Users\\Ilyas\\OneDrive\\donorbook-local\\Test - Cycles\\bug_screenshots\\BUG-006.png",
+      "status": "Open",
+      "date_fixed": "",
+      "fixed_version": ""
+    },
+    {
+      "id": "BUG-007",
+      "date_found": "2026-11-03 11:20",
+      "version_found": "v1.1.1",
+      "journey": "Journey 4: Registration Security Check (v111-031120261120@networklogic.uk)",
+      "step": "New user registration",
+      "error": "Message: \nStacktrace:\nSymbols not available. Dumping unresolved backtrace:\n\t(No symbol) [0x7ff7d56abe65]\n\t(No symbol) [0x7ff7d55b35f0]\n\t(No symbol) [0x7ff7d54226d3]\n\t(No symbol) [0x7ff7d5c2d8e1]\n\t(No symbol) [0x7ff7d5c2db3c]\n\t(No symbol) [0x7ff7d5c5bbb7]\n\t(No symbol) [0x7ff7d5456661]\n\t(No symbol) [0x7ff7d543b969]\n\t(No symbol) [0x7ff7d543cca3]\n\t(No symbol) [0x7ff7d5b25af1]\n\t(No symbol) [0x7ff7d5b467f7]\n\t(No symbol) [0x7ff7d5b3ce20]\n\t(No symbol) [0x7ff7d57cff8e]\n\t(No symbol) [0x7ff7d55c2865]\n\t(No symbol) [0x7ff7d55bd1d4]\n\t(No symbol) [0x7ff7d55bd364]\n\t(No symbol) [0x7ff7d55a644c]\n\t(No symbol) [0x7ff894c2dda7]\n\t(No symbol) [0x7ff89673ee4c]\n",
+      "screenshot": "C:\\Users\\Ilyas\\OneDrive\\donorbook-local\\Test - Cycles\\bug_screenshots\\BUG-007.png",
+      "status": "Open",
+      "date_fixed": "",
+      "fixed_version": ""
+    },
+    {
+      "id": "BUG-008",
+      "date_found": "2026-11-03 11:20",
+      "version_found": "v1.1.1",
+      "journey": "Journey 4: Registration Security Check (v111-031120261120@networklogic.uk)",
+      "step": "Login before confirmation",
+      "error": "Message: \nStacktrace:\nSymbols not available. Dumping unresolved backtrace:\n\t(No symbol) [0x7ff7d56abe65]\n\t(No symbol) [0x7ff7d55b35f0]\n\t(No symbol) [0x7ff7d54226d3]\n\t(No symbol) [0x7ff7d5c2d8e1]\n\t(No symbol) [0x7ff7d5c2db3c]\n\t(No symbol) [0x7ff7d5c5bbb7]\n\t(No symbol) [0x7ff7d5456661]\n\t(No symbol) [0x7ff7d543b969]\n\t(No symbol) [0x7ff7d543cca3]\n\t(No symbol) [0x7ff7d5b25af1]\n\t(No symbol) [0x7ff7d5b467f7]\n\t(No symbol) [0x7ff7d5b3ce20]\n\t(No symbol) [0x7ff7d57cff8e]\n\t(No symbol) [0x7ff7d55c2865]\n\t(No symbol) [0x7ff7d55bd1d4]\n\t(No symbol) [0x7ff7d55bd364]\n\t(No symbol) [0x7ff7d55a644c]\n\t(No symbol) [0x7ff894c2dda7]\n\t(No symbol) [0x7ff89673ee4c]\n",
+      "screenshot": "C:\\Users\\Ilyas\\OneDrive\\donorbook-local\\Test - Cycles\\bug_screenshots\\BUG-008.png",
+      "status": "Open",
+      "date_fixed": "",
+      "fixed_version": ""
+    },
+    {
+      "id": "BUG-009",
+      "date_found": "2026-11-03 11:30",
+      "version_found": "v1.1.1",
+      "journey": "Journey 4: Registration Security Check (v111-031120261130@networklogic.uk)",
+      "step": "New user registration",
+      "error": "Message: \nStacktrace:\nSymbols not available. Dumping unresolved backtrace:\n\t(No symbol) [0x7ff6ce0dbe65]\n\t(No symbol) [0x7ff6cdfe35f0]\n\t(No symbol) [0x7ff6cde526d3]\n\t(No symbol) [0x7ff6ce65d8e1]\n\t(No symbol) [0x7ff6ce65db3c]\n\t(No symbol) [0x7ff6ce68bbb7]\n\t(No symbol) [0x7ff6cde86661]\n\t(No symbol) [0x7ff6cde6b969]\n\t(No symbol) [0x7ff6cde6cca3]\n\t(No symbol) [0x7ff6ce555af1]\n\t(No symbol) [0x7ff6ce5767f7]\n\t(No symbol) [0x7ff6ce56ce20]\n\t(No symbol) [0x7ff6ce1fff8e]\n\t(No symbol) [0x7ff6cdff2865]\n\t(No symbol) [0x7ff6cdfed1d4]\n\t(No symbol) [0x7ff6cdfed364]\n\t(No symbol) [0x7ff6cdfd644c]\n\t(No symbol) [0x7ff894c2dda7]\n\t(No symbol) [0x7ff89673ee4c]\n",
+      "screenshot": "C:\\Users\\Ilyas\\OneDrive\\donorbook-local\\Test - Cycles\\bug_screenshots\\BUG-009.png",
+      "status": "Open",
+      "date_fixed": "",
+      "fixed_version": ""
+    },
+    {
+      "id": "BUG-010",
+      "date_found": "2026-11-03 11:30",
+      "version_found": "v1.1.1",
+      "journey": "Journey 4: Registration Security Check (v111-031120261130@networklogic.uk)",
+      "step": "Login before confirmation",
+      "error": "Message: \nStacktrace:\nSymbols not available. Dumping unresolved backtrace:\n\t(No symbol) [0x7ff6ce0dbe65]\n\t(No symbol) [0x7ff6cdfe35f0]\n\t(No symbol) [0x7ff6cde526d3]\n\t(No symbol) [0x7ff6ce65d8e1]\n\t(No symbol) [0x7ff6ce65db3c]\n\t(No symbol) [0x7ff6ce68bbb7]\n\t(No symbol) [0x7ff6cde86661]\n\t(No symbol) [0x7ff6cde6b969]\n\t(No symbol) [0x7ff6cde6cca3]\n\t(No symbol) [0x7ff6ce555af1]\n\t(No symbol) [0x7ff6ce5767f7]\n\t(No symbol) [0x7ff6ce56ce20]\n\t(No symbol) [0x7ff6ce1fff8e]\n\t(No symbol) [0x7ff6cdff2865]\n\t(No symbol) [0x7ff6cdfed1d4]\n\t(No symbol) [0x7ff6cdfed364]\n\t(No symbol) [0x7ff6cdfd644c]\n\t(No symbol) [0x7ff894c2dda7]\n\t(No symbol) [0x7ff89673ee4c]\n",
+      "screenshot": "C:\\Users\\Ilyas\\OneDrive\\donorbook-local\\Test - Cycles\\bug_screenshots\\BUG-010.png",
+      "status": "Open",
+      "date_fixed": "",
+      "fixed_version": ""
+    },
+    {
+      "id": "BUG-011",
+      "date_found": "2026-11-03 11:33",
+      "version_found": "v1.1.1",
+      "journey": "Journey 4: Registration Security Check (v111-031120261133@networklogic.uk)",
+      "step": "New user registration",
+      "error": "Message: \nStacktrace:\nSymbols not available. Dumping unresolved backtrace:\n\t(No symbol) [0x7ff6ce0dbe65]\n\t(No symbol) [0x7ff6cdfe35f0]\n\t(No symbol) [0x7ff6cde526d3]\n\t(No symbol) [0x7ff6ce65d8e1]\n\t(No symbol) [0x7ff6ce65db3c]\n\t(No symbol) [0x7ff6ce68bbb7]\n\t(No symbol) [0x7ff6cde86661]\n\t(No symbol) [0x7ff6cde6b969]\n\t(No symbol) [0x7ff6cde6cca3]\n\t(No symbol) [0x7ff6ce555af1]\n\t(No symbol) [0x7ff6ce5767f7]\n\t(No symbol) [0x7ff6ce56ce20]\n\t(No symbol) [0x7ff6ce1fff8e]\n\t(No symbol) [0x7ff6cdff2865]\n\t(No symbol) [0x7ff6cdfed1d4]\n\t(No symbol) [0x7ff6cdfed364]\n\t(No symbol) [0x7ff6cdfd644c]\n\t(No symbol) [0x7ff894c2dda7]\n\t(No symbol) [0x7ff89673ee4c]\n",
+      "screenshot": "C:\\Users\\Ilyas\\OneDrive\\donorbook-local\\Test - Cycles\\bug_screenshots\\BUG-011.png",
+      "status": "Open",
+      "date_fixed": "",
+      "fixed_version": ""
+    },
+    {
+      "id": "BUG-013",
+      "date_found": "2026-11-03 16:33",
+      "version_found": "v1.1.1",
+      "journey": "Journey 3: New Charity Registration - Card",
+      "step": "Charity user active without payment",
+      "error": "When a charity selects a paid plan and registers, the Supabase user and org are created immediately BEFORE Stripe payment is completed. If the user abandons the Stripe checkout (or automation fails at that step), the account is marked Active in the system with no subscription and no plan. The _authenticated route guard only checks if the user exists and is not suspended — it does NOT check for an active subscription — so the user can log in and access the full app without ever paying.",
+      "screenshot": "",
+      "status": "Fixed",
+      "date_fixed": "2026-11-03",
+      "fixed_version": "v1.1.2"
+    },
+    {
+      "id": "BUG-012",
+      "date_found": "2026-11-03 11:33",
+      "version_found": "v1.1.1",
+      "journey": "Journey 4: Registration Security Check (v111-031120261133@networklogic.uk)",
+      "step": "Login before confirmation",
+      "error": "Message: \nStacktrace:\nSymbols not available. Dumping unresolved backtrace:\n\t(No symbol) [0x7ff6ce0dbe65]\n\t(No symbol) [0x7ff6cdfe35f0]\n\t(No symbol) [0x7ff6cde526d3]\n\t(No symbol) [0x7ff6ce65d8e1]\n\t(No symbol) [0x7ff6ce65db3c]\n\t(No symbol) [0x7ff6ce68bbb7]\n\t(No symbol) [0x7ff6cde86661]\n\t(No symbol) [0x7ff6cde6b969]\n\t(No symbol) [0x7ff6cde6cca3]\n\t(No symbol) [0x7ff6ce555af1]\n\t(No symbol) [0x7ff6ce5767f7]\n\t(No symbol) [0x7ff6ce56ce20]\n\t(No symbol) [0x7ff6ce1fff8e]\n\t(No symbol) [0x7ff6cdff2865]\n\t(No symbol) [0x7ff6cdfed1d4]\n\t(No symbol) [0x7ff6cdfed364]\n\t(No symbol) [0x7ff6cdfd644c]\n\t(No symbol) [0x7ff894c2dda7]\n\t(No symbol) [0x7ff89673ee4c]\n",
+      "screenshot": "C:\\Users\\Ilyas\\OneDrive\\donorbook-local\\Test - Cycles\\bug_screenshots\\BUG-012.png",
+      "status": "Open",
+      "date_fixed": "",
+      "fixed_version": ""
+    }
+  ]
+}
