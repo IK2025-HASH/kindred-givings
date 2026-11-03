@@ -684,7 +684,7 @@ def write_report(sections, app_ver, ver_date, run_ts, new_email, out: Path):
         setattr(sec, attr, Inches(0.75))
 
     # Cover
-    h = doc.add_heading("GiveWell Platform — Test Cycle Report", 0)
+    h = doc.add_heading(f"Donorbook Platform — Test Cycle Report  {app_ver}", 0)
     h.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     meta = doc.add_table(rows=5, cols=2); meta.style = "Table Grid"
@@ -906,7 +906,9 @@ def main():
         d.quit()
 
     # ── Word report ───────────────────────────────────────────────────────────
-    out = HERE / f"TestRun_{tag}_{app_ver}.docx"
+    # One fixed file per app version — overwrites on each run so there is
+    # always exactly one document to open.  Screenshots are embedded in it.
+    out = HERE / f"TestCycle_{app_ver}.docx"
     write_report(sections, app_ver, ver_date, run_ts, new_email, out)
 
     total  = sum(len(s) for _, s in sections)
