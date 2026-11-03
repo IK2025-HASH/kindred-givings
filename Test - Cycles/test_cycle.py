@@ -580,12 +580,30 @@ def complete_stripe_payment(d, cfg, steps, img_dir, cardholder_name, email):
         time.sleep(2)  # let the checkout page settle
 
         # ── Step 1: select "Card" payment method ──────────────────────────
-        # Card is the first radio on the page — click it via JS so there
-        # is no pointer-positioning issue, then wait for the form to expand.
-        d.execute_script(
-            "var r = document.querySelectorAll('input[type=\"radio\"]')[0];"
-            "if(r) r.click();"
-        )
+        # Move the mouse onto the Card radio button and click it.
+        from selenium.webdriver.common.action_chains import ActionChains
+        card_radio = None
+        # Try label first (larger target), then the raw radio input
+        for by, sel in [
+            (By.XPATH,       '//label[contains(normalize-space(.), "Card")]'),
+            (By.CSS_SELECTOR,'input[type="radio"]'),
+        ]:
+            try:
+                els = d.find_elements(by, sel)
+                if els:
+                    card_radio = els[0]
+                    break
+            except Exception:
+                pass
+
+        if card_radio:
+            ActionChains(d).move_to_element(card_radio).click().perform()
+        else:
+            # Last resort: Tab to the first radio and press Space
+            d.find_element(By.TAG_NAME, "body").send_keys(Keys.TAB)
+            time.sleep(0.3)
+            d.switch_to.active_element.send_keys(Keys.SPACE)
+
         time.sleep(1.5)
         _ok("Card payment method selected", _shot(d, img_dir, "stripe_01b_card_selected"), steps)
 
