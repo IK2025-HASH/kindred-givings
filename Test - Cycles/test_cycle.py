@@ -732,145 +732,194 @@ def write_report(sections, app_ver, ver_date, run_ts, new_email, out: Path):
     print(f"\n[REPORT] → {out}", flush=True)
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 14.  Main
+# 17.  Console helpers
+# ──────────────────────────────────────────────────────────────────────────────
+def _print_journey(num, title, user=""):
+    bar = "-" * 60
+    print(f"\n{bar}", flush=True)
+    print(f"  JOURNEY {num}: {title}", flush=True)
+    if user:
+        print(f"  User: {user}", flush=True)
+    print(f"{bar}", flush=True)
+
+def _print_summary(num, steps):
+    p = sum(x.status == "PASS" for x in steps)
+    f = sum(x.status == "FAIL" for x in steps)
+    s = sum(x.status == "SKIP" for x in steps)
+    print(f"  Journey {num} done: {p} PASS / {f} FAIL / {s} SKIP / {len(steps)} steps",
+          flush=True)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 18.  Main — five user journeys
 # ──────────────────────────────────────────────────────────────────────────────
 def main():
-    cfg = load_cfg()
+    cfg      = load_cfg()
     app_ver, ver_date = read_version()
     now      = datetime.datetime.now()
     run_ts   = now.strftime("%Y-%m-%d %H:%M")
     tag      = now.strftime("%Y%m%d_%H%M")
+    safe_ver = re.sub(r"[^0-9]", "", app_ver)
+    date_tag = now.strftime("%d%m%Y")
 
-    safe_ver  = re.sub(r'[^0-9]', '', app_ver)   # e.g. "111"
-    date_tag  = now.strftime("%d%m%Y")
+    # Individual new-user email (used in J4 + J5)
     new_email = f"v{safe_ver}-{date_tag}@networklogic.uk"
     new_pw    = "TestPass_Auto123!"
 
     print(f"\n{'='*60}", flush=True)
     print(f"  GiveWell Test Cycle  |  {app_ver}  |  {run_ts}", flush=True)
-    print(f"  New user: {new_email}", flush=True)
+    print(f"  Individual test user : {new_email}", flush=True)
     print(f"{'='*60}\n", flush=True)
 
     run_dir = HERE / f"TestRun_{tag}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
+    # Route subsets by role
+    ADMIN_ROUTES = [(p, l) for p, l, adm, *_ in ROUTES if adm]
+    AGENT_ROUTES = [(p, l) for p, l, _, ag, *_ in ROUTES if ag]
+    USER_ROUTES  = [(p, l) for p, l, _, _, u in ROUTES if u]
+
+    print("  Starting Chrome (one window for all journeys) ...", flush=True)
+    d = make_driver()
     sections = []
 
-    # ── Role helpers ──────────────────────────────────────────────────────────
-    ADMIN_ROUTES = [(p,l) for p,l,adm,*_ in ROUTES if adm]
-    AGENT_ROUTES = [(p,l) for p,l,_,ag,*_ in ROUTES if ag]
-    USER_ROUTES  = [(p,l) for p,l,_,_,u in ROUTES if u]
-
-    # ── Single browser for the entire test run ───────────────────────────────
-    print("  Starting Chrome (one window for all sessions) …", flush=True)
-    d = make_driver()
     try:
-        # ── SESSION A — Platform Admin ────────────────────────────────────────
-        print("[SESSION A] Platform Admin:", cfg["admin_email"], flush=True)
-        steps_a = []
+        # ══════════════════════════════════════════════════════════════════
+        # JOURNEY 1 — Platform Admin Workflow
+        #   Login as platform admin → visit all admin routes → donor
+        #   management dialog → inbox tabs → support submit → logout.
+        # ══════════════════════════════════════════════════════════════════
+        _print_journey(1, "Platform Admin Workflow", cfg["admin_email"])
+        steps_j1 = []
+        d1 = run_dir / "j1_admin"
         try:
-            if do_login(d, cfg, cfg["admin_email"], cfg["admin_password"],
-                        steps_a, run_dir / "admin"):
-                smoke_routes(d, cfg, steps_a, run_dir / "admin",
-                             [(p,l) for p,l in ADMIN_ROUTES])
-                test_add_donor(d, cfg, steps_a, run_dir / "admin")
-                test_inbox_tabs(d, cfg, steps_a, run_dir / "admin")
-                test_support_submit(d, cfg, steps_a, run_dir / "admin",
-                                    f"Automated cycle {run_ts}")
-                do_logout(d, cfg, steps_a, run_dir / "admin", "admin")
+            if do_login(d, cfg, cfg["admin_email"], cfg["admin_password"], steps_j1, d1):
+                smoke_routes(d, cfg, steps_j1, d1, ADMIN_ROUTES)
+                test_add_donor(d, cfg, steps_j1, d1)
+                test_inbox_tabs(d, cfg, steps_j1, d1)
+                test_support_submit(d, cfg, steps_j1, d1, f"Admin cycle test {run_ts}")
+                do_logout(d, cfg, steps_j1, d1, "admin")
         except Exception as e:
-            steps_a.append(Step("Session A — unexpected error", "FAIL", None, str(e)))
+            steps_j1.append(Step("Journey 1 — unexpected error", "FAIL", None, str(e)))
             traceback.print_exc()
-        sections.append((f"Session A — Admin ({cfg['admin_email']})", steps_a))
-        _print_summary("A", steps_a)
+        sections.append((f"Journey 1: Platform Admin Workflow ({cfg['admin_email']})", steps_j1))
+        _print_summary(1, steps_j1)
 
-        # ── SESSION B — Agent / Staff ─────────────────────────────────────────
+        # ══════════════════════════════════════════════════════════════════
+        # JOURNEY 2 — Support Agent Workflow
+        #   Login as support agent → visit all agent routes → inbox tabs
+        #   → support submit → logout.
+        #   Skipped when agent credentials are not configured.
+        # ══════════════════════════════════════════════════════════════════
         ag_email = cfg.get("agent_email", "")
         ag_pw    = cfg.get("agent_password", "")
         if ag_email and ag_pw and ag_pw not in ("", "FILL_IN"):
-            print(f"\n[SESSION B] Agent: {ag_email}", flush=True)
-            steps_b = []
+            _print_journey(2, "Support Agent Workflow", ag_email)
+            steps_j2 = []
+            d2 = run_dir / "j2_agent"
             try:
-                if do_login(d, cfg, ag_email, ag_pw, steps_b, run_dir / "agent"):
-                    smoke_routes(d, cfg, steps_b, run_dir / "agent",
-                                 [(p,l) for p,l in AGENT_ROUTES])
-                    test_inbox_tabs(d, cfg, steps_b, run_dir / "agent")
-                    test_support_submit(d, cfg, steps_b, run_dir / "agent",
-                                        f"Agent test {run_ts}")
-                    do_logout(d, cfg, steps_b, run_dir / "agent", "agent")
+                if do_login(d, cfg, ag_email, ag_pw, steps_j2, d2):
+                    smoke_routes(d, cfg, steps_j2, d2, AGENT_ROUTES)
+                    test_inbox_tabs(d, cfg, steps_j2, d2)
+                    test_support_submit(d, cfg, steps_j2, d2, f"Agent workflow test {run_ts}")
+                    do_logout(d, cfg, steps_j2, d2, "agent")
             except Exception as e:
-                steps_b.append(Step("Session B — error", "FAIL", None, str(e)))
+                steps_j2.append(Step("Journey 2 — error", "FAIL", None, str(e)))
                 traceback.print_exc()
-            sections.append((f"Session B — Agent ({ag_email})", steps_b))
-            _print_summary("B", steps_b)
+            sections.append((f"Journey 2: Support Agent Workflow ({ag_email})", steps_j2))
+            _print_summary(2, steps_j2)
         else:
-            sections.append(
-                ("Session B — Agent (SKIPPED)",
-                 [Step("No agent credentials — fill agent_email/agent_password in test_config.json",
-                       "SKIP")]))
+            sections.append((
+                "Journey 2: Support Agent Workflow (SKIPPED)",
+                [Step("No agent credentials — add agent_email / agent_password to test_config.json",
+                      "SKIP")]))
+            print("  Journey 2: SKIPPED (no agent credentials)\n", flush=True)
 
-        # ── SESSION C — New user + New charity ───────────────────────────────
-        print(f"\n[SESSION C] New user: {new_email}", flush=True)
-        steps_c = []
+        # ══════════════════════════════════════════════════════════════════
+        # JOURNEY 3 — New Charity Registration & Onboarding
+        #   Start from login page → Tab+Enter to register → select Growth
+        #   (£9/mo) plan → fill charity details → submit → Stripe checkout
+        #   or in-app → send support chat → logout.
+        # ══════════════════════════════════════════════════════════════════
+        _print_journey(3, "New Charity Registration & Onboarding")
+        steps_j3 = []
+        d3 = run_dir / "j3_charity"
         try:
-            # C-1: Register new individual user
-            ok = register_user(d, cfg, new_email, new_pw, steps_c, run_dir / "new_user")
-
-            # C-2: Login before email confirmation — expected to be blocked (PASS)
-            test_login_before_confirmation(d, cfg, new_email, new_pw,
-                                           steps_c, run_dir / "new_user")
-
-            # C-3: Register a new charity organisation (fresh email each cycle)
-            print("  [C-3] Register new charity …", flush=True)
-            charity_ok = register_new_charity(
-                d, cfg, steps_c, run_dir / "new_user", app_ver, date_tag)
-
-            # C-4: Select £9 plan — always attempt (admin can confirm email first if needed)
-            select_nine_pound_plan(d, cfg, steps_c, run_dir / "new_user")
-
-            # C-5: New charity sends a support chat message (if logged in)
+            charity_ok = register_new_charity(d, cfg, steps_j3, d3, app_ver, date_tag)
             if charity_ok:
-                test_support_submit(d, cfg, steps_c, run_dir / "new_user",
-                                    f"New charity needs help — cycle {run_ts}")
-                do_logout(d, cfg, steps_c, run_dir / "new_user", "charity")
-
-            # Smoke tests only when original new-user confirmed+logged-in
-            if ok:
-                smoke_routes(d, cfg, steps_c, run_dir / "new_user",
-                             [(p,l) for p,l in USER_ROUTES])
-                test_inbox_tabs(d, cfg, steps_c, run_dir / "new_user")
-                do_logout(d, cfg, steps_c, run_dir / "new_user", "new_user")
-            else:
-                steps_c.append(Step(
-                    "New-user smoke tests skipped — awaiting email confirmation", "SKIP", None,
-                    f"Confirm {new_email} then run again"))
+                test_support_submit(d, cfg, steps_j3, d3,
+                                    f"New charity onboarding — cycle {run_ts}")
+                do_logout(d, cfg, steps_j3, d3, "charity")
         except Exception as e:
-            steps_c.append(Step("Session C — error", "FAIL", None, str(e)))
+            steps_j3.append(Step("Journey 3 — error", "FAIL", None, str(e)))
             traceback.print_exc()
-        sections.append((f"Session C — New User ({new_email})", steps_c))
-        _print_summary("C", steps_c)
+        sections.append(("Journey 3: New Charity Registration & Onboarding", steps_j3))
+        _print_summary(3, steps_j3)
+
+        # ══════════════════════════════════════════════════════════════════
+        # JOURNEY 4 — Registration Security Check
+        #   Register a new individual user (free Starter plan) then
+        #   immediately attempt to log in before email is confirmed.
+        #   Expected outcome: login is blocked → PASS.
+        # ══════════════════════════════════════════════════════════════════
+        _print_journey(4, "Registration Security Check", new_email)
+        steps_j4 = []
+        d4 = run_dir / "j4_security"
+        user_ok = False
+        try:
+            user_ok = register_user(d, cfg, new_email, new_pw, steps_j4, d4)
+            test_login_before_confirmation(d, cfg, new_email, new_pw, steps_j4, d4)
+        except Exception as e:
+            steps_j4.append(Step("Journey 4 — error", "FAIL", None, str(e)))
+            traceback.print_exc()
+        sections.append((
+            f"Journey 4: Registration Security Check ({new_email})", steps_j4))
+        _print_summary(4, steps_j4)
+
+        # ══════════════════════════════════════════════════════════════════
+        # JOURNEY 5 — New User App Access
+        #   Only runs when the user registered in J4 is auto-confirmed
+        #   (email confirmation disabled in Supabase).  Visits all user-
+        #   role routes and checks inbox tabs, then logs out.
+        # ══════════════════════════════════════════════════════════════════
+        _print_journey(5, "New User App Access", new_email)
+        steps_j5 = []
+        d5 = run_dir / "j5_newuser"
+        try:
+            if user_ok:
+                smoke_routes(d, cfg, steps_j5, d5, USER_ROUTES)
+                test_inbox_tabs(d, cfg, steps_j5, d5)
+                do_logout(d, cfg, steps_j5, d5, "new_user")
+            else:
+                steps_j5.append(Step(
+                    "Skipped — new user email not yet confirmed",
+                    "SKIP", None,
+                    f"Confirm {new_email} in Supabase or via the confirmation email, then re-run"))
+        except Exception as e:
+            steps_j5.append(Step("Journey 5 — error", "FAIL", None, str(e)))
+            traceback.print_exc()
+        sections.append((
+            f"Journey 5: New User App Access ({new_email})", steps_j5))
+        _print_summary(5, steps_j5)
 
     finally:
         d.quit()
 
-    # ── Report ────────────────────────────────────────────────────────────────
+    # ── Word report ───────────────────────────────────────────────────────────
     out = HERE / f"TestRun_{tag}_{app_ver}.docx"
     write_report(sections, app_ver, ver_date, run_ts, new_email, out)
 
     total  = sum(len(s) for _, s in sections)
-    passed = sum(x.status=="PASS" for _, s in sections for x in s)
-    failed = sum(x.status=="FAIL" for _, s in sections for x in s)
+    passed = sum(x.status == "PASS" for _, s in sections for x in s)
+    failed = sum(x.status == "FAIL" for _, s in sections for x in s)
     print(f"\n{'='*60}", flush=True)
     print(f"  DONE  {passed} PASS  /  {failed} FAIL  /  {total} steps", flush=True)
-    if failed: print(f"  !! Check FAILs in: {out.name}", flush=True)
-    else:       print(f"  ALL PASS!", flush=True)
+    if failed:
+        print(f"  !! Check FAILs in: {out.name}", flush=True)
+    else:
+        print(f"  ALL PASS!", flush=True)
     print(f"  Report: {out}", flush=True)
     print(f"{'='*60}\n", flush=True)
-
-def _print_summary(label, steps):
-    p = sum(x.status=="PASS" for x in steps)
-    f = sum(x.status=="FAIL" for x in steps)
-    print(f"  Session {label}: {p} PASS / {f} FAIL / {len(steps)} steps\n", flush=True)
 
 if __name__ == "__main__":
     main()
