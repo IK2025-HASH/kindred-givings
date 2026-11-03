@@ -7,3 +7,4 @@ J5,New User App Access,Y,Smoke all user routes + inbox tabs as newly registered 
 J6,Admin Post-Registration Verification,Y,Logs in as admin and verifies all registered users / charity orgs / Growth subscriptions are visible
 J7,New Charity Registration - Klarna,Y,Registers new charity on Growth plan via Klarna test payment authorisation
 J8,New Charity Registration - Revolut Pay,Y,Registers new charity on Growth plan via Revolut Pay test payment authorisation
+J9,Charity User Chat,Y,All 3 registered charity users send a chat message to portal admin via the chat FAB icon

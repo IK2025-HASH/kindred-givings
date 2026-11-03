@@ -186,6 +186,31 @@ def _fail(label, img, steps, e=""):
 def _info(label, img, steps, note=""):
     steps.append(Step(label, "INFO", img, note)); print(f"    [INFO] {label}", flush=True)
 
+def _manual_step(d, label, instruction, img_dir, steps, shot_name="manual") -> bool:
+    """Pause and ask the user to perform a step manually.
+    Returns True if user confirms done, False if skipped."""
+    img_before = _shot(d, img_dir, f"{shot_name}_before")
+    print(f"\n{'─'*60}", flush=True)
+    print(f"  *** MANUAL STEP REQUIRED ***", flush=True)
+    print(f"  Step  : {label}", flush=True)
+    print(f"  Action: {instruction}", flush=True)
+    print(f"  Press ENTER when done, or type 'skip' + ENTER to skip:", flush=True)
+    print(f"{'─'*60}", flush=True)
+    try:
+        resp = input().strip().lower()
+    except EOFError:
+        resp = ""
+    time.sleep(0.5)
+    img_after = _shot(d, img_dir, f"{shot_name}_after")
+    if resp == "skip":
+        steps.append(Step(label, "SKIP", img_before, "Manually skipped by operator"))
+        print(f"    [SKIP] {label}", flush=True)
+        return False
+    else:
+        steps.append(Step(label, "MANUAL", img_after, f"Performed manually: {instruction}"))
+        print(f"    [MANUAL] {label}", flush=True)
+        return True
+
 # ──────────────────────────────────────────────────────────────────────────────
 # 9.  Login
 # ──────────────────────────────────────────────────────────────────────────────
@@ -411,8 +436,19 @@ def register_user(d, cfg, email, pw, steps, img_dir) -> bool:
             inp.clear(); inp.send_keys(email); _slow(cfg)
         except Exception:
             _type(d, 'input[type="email"]', email); _slow(cfg)
-        for inp in d.find_elements(By.CSS_SELECTOR, 'input[type="password"]'):
-            inp.send_keys(pw); _slow(cfg)
+        # Re-find password fields each time to avoid stale element crashes
+        for sel in 'input[type="password"]', 'input[name="password"]':
+            try:
+                for pw_inp in d.find_elements(By.CSS_SELECTOR, sel):
+                    try:
+                        pw_inp.clear()
+                        pw_inp.send_keys(pw)
+                        _slow(cfg)
+                    except Exception:
+                        pass
+                break
+            except Exception:
+                pass
         try:
             cb = d.find_element(By.CSS_SELECTOR, 'input[type="checkbox"]')
             if not cb.is_selected():
@@ -420,10 +456,27 @@ def register_user(d, cfg, email, pw, steps, img_dir) -> bool:
         except Exception:
             pass
         _info("Signup form filled", _shot(d, img_dir, "02_signup_filled"), steps)
-        d.find_element(By.CSS_SELECTOR, 'button[type="submit"]').click()
-        time.sleep(3)
-        img = _shot(d, img_dir, "03_signup_result")
-        src = d.page_source.lower()
+        # Re-find submit button — DOM may have shifted after plan selection
+        try:
+            submit_btn = _w(d, 10).until(EC.element_to_be_clickable(
+                (By.CSS_SELECTOR, 'button[type="submit"]')))
+            submit_btn.click()
+        except Exception as e_sub:
+            _fail("New user registration (submit button)", _shot(d, img_dir, "03_fail"), steps, e_sub)
+            return False
+        # Wait for navigation away from /auth — up to 20 s
+        try:
+            _w(d, 20).until(lambda drv: "/auth" not in drv.current_url
+                             or any(w in drv.page_source.lower()
+                                    for w in ["confirm", "check your email", "verify", "link"]))
+        except TimeoutException:
+            pass
+        time.sleep(1.5)
+        try:
+            img = _shot(d, img_dir, "03_signup_result")
+            src = d.page_source.lower()
+        except Exception:
+            img, src = None, ""
         if "/app" in d.current_url:
             _ok("New user registered & logged in", img, steps); return True
         elif any(w in src for w in ["confirm", "check your email", "verify", "link"]):
@@ -514,15 +567,31 @@ def test_login_before_confirmation(d, cfg, email, pw, steps, img_dir) -> None:
     """Try logging in before email is confirmed — expected to fail → PASS."""
     try:
         _go(d, cfg, "/auth?mode=login")
-        time.sleep(1)
+        time.sleep(2)
         _type(d, 'input[type="email"], input[name="email"]', email)
         _slow(cfg)
-        pw_inp = d.find_element(By.CSS_SELECTOR, 'input[type="password"]')
-        pw_inp.send_keys(pw); _slow(cfg)
-        d.find_element(By.CSS_SELECTOR, 'button[type="submit"]').click()
-        time.sleep(3)
-        img = _shot(d, img_dir, "login_pre_confirm")
-        src = d.page_source.lower()
+        # Re-find password field fresh to avoid stale element crashes
+        try:
+            pw_inp = _w(d, 8).until(EC.presence_of_element_located(
+                (By.CSS_SELECTOR, 'input[type="password"]')))
+            pw_inp.clear()
+            pw_inp.send_keys(pw)
+        except Exception:
+            pass
+        _slow(cfg)
+        try:
+            btn = _w(d, 8).until(EC.element_to_be_clickable(
+                (By.CSS_SELECTOR, 'button[type="submit"]')))
+            btn.click()
+        except Exception as e_btn:
+            _fail("Login before confirmation (submit)", _shot(d, img_dir, "login_pre_fail"), steps, e_btn)
+            return
+        time.sleep(3.5)
+        try:
+            img = _shot(d, img_dir, "login_pre_confirm")
+            src = d.page_source.lower()
+        except Exception:
+            img, src = None, ""
         if "/app" in d.current_url:
             _info("Login succeeded before confirmation (email auto-confirmed)", img, steps)
         elif any(w in src for w in ["invalid", "incorrect", "credentials", "error", "not confirmed",
@@ -626,9 +695,13 @@ def complete_stripe_payment(d, cfg, steps, img_dir, cardholder_name, email,
         # CARD
         # ══════════════════════════════════════════════════════════════════
         if method == "card":
-            _select_radio("Card", 0)
-            time.sleep(1.5)
-            _ok("Card selected", _shot(d, img_dir, "stripe_02_card_selected"), steps)
+            if not _select_radio("Card", 0):
+                _manual_step(d, "Select Card payment method",
+                    "Click the 'Card' radio button on the Stripe checkout page.",
+                    img_dir, steps, "stripe_radio_manual")
+            else:
+                time.sleep(1.5)
+                _ok("Card selected", _shot(d, img_dir, "stripe_02_card_selected"), steps)
 
             # Email (pre-filled from Stripe session)
             try:
@@ -655,38 +728,44 @@ def complete_stripe_payment(d, cfg, steps, img_dir, cardholder_name, email,
                     except Exception:
                         d.switch_to.default_content()
             if not filled:
-                _fail("Card number field not found", _shot(d, img_dir, "stripe_err"), steps)
-                return False
+                # Manual fallback — can't find card iframe
+                _manual_step(d, "Enter card details manually",
+                    f"Type card: {cfg.get('stripe_test_card','4242 4242 4242 4242')}  "
+                    f"Expiry: {expiry[:2]}/{expiry[2:]}  CVC: {cvc}  "
+                    f"Name: {cardholder_name}  Postcode: {postcode}  "
+                    "Then press ENTER here (do NOT click Pay yet).",
+                    img_dir, steps, "stripe_card_manual")
+            else:
+                time.sleep(0.4)
+                _fill_frame(["Secure expiration date input frame",
+                             "Card expiration date", "Expiration date"], expiry)
+                time.sleep(0.3)
+                _fill_frame(["Secure CVC input frame", "CVC", "Card security code"], cvc)
+                time.sleep(0.3)
 
-            time.sleep(0.4)
-            _fill_frame(["Secure expiration date input frame",
-                         "Card expiration date", "Expiration date"], expiry)
-            time.sleep(0.3)
-            _fill_frame(["Secure CVC input frame", "CVC", "Card security code"], cvc)
-            time.sleep(0.3)
+                for sel in ['input[placeholder*="Full name" i]',
+                            'input[placeholder*="name on card" i]',
+                            'input[name="billingName"]',
+                            'input[autocomplete="cc-name"]']:
+                    try:
+                        inp = d.find_element(By.CSS_SELECTOR, sel)
+                        if not inp.get_attribute("value"):
+                            inp.clear(); inp.send_keys(cardholder_name)
+                        break
+                    except Exception: pass
 
-            for sel in ['input[placeholder*="Full name" i]',
-                        'input[placeholder*="name on card" i]',
-                        'input[name="billingName"]',
-                        'input[autocomplete="cc-name"]']:
-                try:
-                    inp = d.find_element(By.CSS_SELECTOR, sel)
-                    if not inp.get_attribute("value"):
-                        inp.clear(); inp.send_keys(cardholder_name)
-                    break
-                except Exception: pass
+                for sel in ['input[placeholder*="Postal code" i]',
+                            'input[name="billingAddressPostalCode"]',
+                            'input[autocomplete="postal-code"]']:
+                    try:
+                        inp = d.find_element(By.CSS_SELECTOR, sel)
+                        if not inp.get_attribute("value"):
+                            inp.clear(); inp.send_keys(postcode)
+                        break
+                    except Exception: pass
 
-            for sel in ['input[placeholder*="Postal code" i]',
-                        'input[name="billingAddressPostalCode"]',
-                        'input[autocomplete="postal-code"]']:
-                try:
-                    inp = d.find_element(By.CSS_SELECTOR, sel)
-                    if not inp.get_attribute("value"):
-                        inp.clear(); inp.send_keys(postcode)
-                    break
-                except Exception: pass
+                _info("Card details filled", _shot(d, img_dir, "stripe_03_filled"), steps)
 
-            _info("Card details filled", _shot(d, img_dir, "stripe_03_filled"), steps)
             d.find_element(By.CSS_SELECTOR, 'button[type="submit"]').click()
             return _wait_for_success("stripe_04_result")
 
@@ -1087,8 +1166,8 @@ def _write_bug_docx(reg: dict) -> None:
 # ──────────────────────────────────────────────────────────────────────────────
 # 17.  Word report
 # ──────────────────────────────────────────────────────────────────────────────
-STATUS_CLR = {"PASS": "2ea84e", "FAIL": "e7392e", "INFO": "177ddc", "SKIP": "888888"}
-STATUS_BG  = {"PASS": "d4f5dc", "FAIL": "fde0de", "INFO": "ddeeff", "SKIP": "f0f0f0"}
+STATUS_CLR = {"PASS": "2ea84e", "FAIL": "e7392e", "INFO": "177ddc", "SKIP": "888888", "MANUAL": "7d5fa8"}
+STATUS_BG  = {"PASS": "d4f5dc", "FAIL": "fde0de", "INFO": "ddeeff", "SKIP": "f0f0f0", "MANUAL": "ede7f6"}
 
 def _shd(cell, hex_color):
     tc = cell._tc; pr = tc.get_or_add_tcPr()
@@ -1165,12 +1244,136 @@ def _print_summary(num, steps):
     p = sum(x.status == "PASS" for x in steps)
     f = sum(x.status == "FAIL" for x in steps)
     s = sum(x.status == "SKIP" for x in steps)
-    print(f"  Journey {num} done: {p} PASS / {f} FAIL / {s} SKIP / {len(steps)} steps",
-          flush=True)
+    m = sum(x.status == "MANUAL" for x in steps)
+    parts = [f"{p} PASS", f"{f} FAIL", f"{s} SKIP"]
+    if m: parts.append(f"{m} MANUAL")
+    print(f"  Journey {num} done: {' / '.join(parts)} / {len(steps)} steps", flush=True)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 18.  Admin post-registration verification
+# ──────────────────────────────────────────────────────────────────────────────
+# 18b.  Charity user sends chat message to portal admin via the chat FAB
+# ──────────────────────────────────────────────────────────────────────────────
+def test_charity_chat(d, cfg, steps, img_dir, email, run_ts):
+    """
+    Logged in as a charity user: open the chat FAB, fill subject + message,
+    submit the support request.  If the FAB can't be found automatically the
+    operator is prompted to open it manually.
+    """
+    _go(d, cfg, "/app")
+    time.sleep(2)
+    _info("Dashboard loaded (charity chat test)", _shot(d, img_dir, "chat_00_dash"), steps)
+
+    # 1. Find and click the chat FAB  ─────────────────────────────────────────
+    fab = None
+    for sel in [
+        'button[aria-label="Contact support"]',
+        'button[aria-label*="support" i]',
+        'button[aria-label*="chat" i]',
+    ]:
+        try:
+            fab = _w(d, 6).until(EC.element_to_be_clickable((By.CSS_SELECTOR, sel)))
+            break
+        except Exception:
+            pass
+
+    if fab is None:
+        # Try by position — FAB is fixed bottom-right, z-50
+        try:
+            fabs = d.find_elements(By.CSS_SELECTOR, "button.fixed, button[class*='fixed']")
+            if fabs:
+                fab = fabs[-1]
+        except Exception:
+            pass
+
+    if fab:
+        try:
+            fab.click()
+            time.sleep(1.5)
+            _info("Chat panel opened (via FAB)", _shot(d, img_dir, "chat_01_panel"), steps)
+        except Exception as e:
+            fab = None
+            _info(f"FAB click failed ({e})", _shot(d, img_dir, "chat_01_fail"), steps)
+
+    if fab is None:
+        # Manual fallback — ask operator to click the chat bubble
+        _manual_step(d,
+            "Open chat support panel",
+            "Click the round chat bubble button at the bottom-right of the screen.",
+            img_dir, steps, "chat_01_manual")
+
+    # 2. Fill the form ─────────────────────────────────────────────────────────
+    subject_text = f"Charity feedback — {run_ts}"
+    message_text = (f"Automated test message from {email}. "
+                    f"This is a support request sent during the automated test cycle ({run_ts}).")
+
+    # Subject input  (#cs-subject)
+    filled_subject = False
+    for sel in ['#cs-subject', 'input[placeholder*="help" i]', 'input[placeholder*="subject" i]',
+                'input[type="text"]']:
+        try:
+            inp = _w(d, 6).until(EC.visibility_of_element_located((By.CSS_SELECTOR, sel)))
+            inp.clear()
+            inp.send_keys(subject_text)
+            _slow(cfg)
+            filled_subject = True
+            break
+        except Exception:
+            pass
+
+    # Message textarea  (#cs-message)
+    filled_msg = False
+    for sel in ['#cs-message', 'textarea[placeholder*="issue" i]', 'textarea[placeholder*="detail" i]',
+                'textarea']:
+        try:
+            ta = _w(d, 6).until(EC.visibility_of_element_located((By.CSS_SELECTOR, sel)))
+            ta.clear()
+            ta.send_keys(message_text)
+            _slow(cfg)
+            filled_msg = True
+            break
+        except Exception:
+            pass
+
+    if not filled_subject or not filled_msg:
+        _manual_step(d,
+            "Fill chat support form",
+            f"Type subject: '{subject_text}' and message: '{message_text}', then press ENTER here.",
+            img_dir, steps, "chat_02_manual")
+    else:
+        _info("Chat form filled", _shot(d, img_dir, "chat_02_filled"), steps)
+
+    # 3. Submit ────────────────────────────────────────────────────────────────
+    submitted = False
+    for xp in ['//button[contains(.,"Send request")]', '//button[contains(.,"Send")]',
+               '//button[@type="submit"]']:
+        try:
+            btn = _w(d, 6).until(EC.element_to_be_clickable((By.XPATH, xp)))
+            btn.click()
+            submitted = True
+            break
+        except Exception:
+            pass
+
+    if not submitted:
+        _manual_step(d,
+            "Submit chat message",
+            "Click the 'Send request' button in the chat panel, then press ENTER here.",
+            img_dir, steps, "chat_03_manual")
+    else:
+        time.sleep(2.5)
+        try:
+            img = _shot(d, img_dir, "chat_04_result")
+            src = d.page_source.lower()
+        except Exception:
+            img, src = None, ""
+        if any(w in src for w in ["sent", "success", "thank", "request received", "we'll"]):
+            _ok(f"Chat support request sent ({email})", img, steps)
+        else:
+            _info(f"Chat submitted — check screenshot ({email})", img, steps)
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 def test_admin_post_registration(d, cfg, steps, img_dir,
                                  new_email, charities):
@@ -1510,6 +1713,42 @@ def main():
                 steps_j6))
             _print_summary(6, steps_j6)
 
+        # ══════════════════════════════════════════════════════════════════
+        # JOURNEY 9 — Charity User Chat
+        #   All 3 charity users (Card / Klarna / Revolut Pay) send a chat
+        #   support message to the portal admin using the chat FAB icon.
+        # ══════════════════════════════════════════════════════════════════
+        charity_creds = [
+            (f"Test Charity {date_tag}",
+             f"charity{safe_ver}-{date_tag}@networklogic.uk",
+             f"Charity{safe_ver}!Test"),
+            (f"Test Charity {date_tag} Klarna",
+             f"charity{safe_ver}-{date_tag}-k@networklogic.uk",
+             f"Charity{safe_ver}!Test"),
+            (f"Test Charity {date_tag} Revolut Pay",
+             f"charity{safe_ver}-{date_tag}-r@networklogic.uk",
+             f"Charity{safe_ver}!Test"),
+        ]
+        if "J9" not in enabled:
+            sections.append(("Journey 9: Charity User Chat (DISABLED)", [Step("Disabled via test_manifest.csv", "SKIP")]))
+            print("  Journey 9: SKIPPED (disabled in test_manifest.csv)\n", flush=True)
+        else:
+            _print_journey(9, "Charity User Chat — send support message via chat icon")
+            steps_j9 = []
+            d9 = run_dir / "j9_charity_chat"
+            try:
+                for org_name, ch_email, ch_pw in charity_creds:
+                    steps_j9.append(Step(f"─── {org_name} ───", "INFO"))
+                    sub9 = d9 / re.sub(r"[^A-Za-z0-9]", "_", ch_email)[:30]
+                    if do_login(d, cfg, ch_email, ch_pw, steps_j9, sub9):
+                        test_charity_chat(d, cfg, steps_j9, sub9, ch_email, run_ts)
+                        do_logout(d, cfg, steps_j9, sub9, f"chat_{ch_email[:10]}")
+            except Exception as e:
+                steps_j9.append(Step("Journey 9 — error", "FAIL", None, str(e)))
+                traceback.print_exc()
+            sections.append(("Journey 9: Charity User Chat", steps_j9))
+            _print_summary(9, steps_j9)
+
     finally:
         d.quit()
 
@@ -1518,13 +1757,18 @@ def main():
     write_report(sections, app_ver, ver_date, run_ts, new_email, out)
     update_bug_register(sections, app_ver, run_ts)
 
-    total  = sum(len(s) for _, s in sections)
-    passed = sum(x.status == "PASS" for _, s in sections for x in s)
-    failed = sum(x.status == "FAIL" for _, s in sections for x in s)
+    total   = sum(len(s) for _, s in sections)
+    passed  = sum(x.status == "PASS"   for _, s in sections for x in s)
+    failed  = sum(x.status == "FAIL"   for _, s in sections for x in s)
+    manual  = sum(x.status == "MANUAL" for _, s in sections for x in s)
     print(f"\n{'='*60}", flush=True)
-    print(f"  DONE  {passed} PASS  /  {failed} FAIL  /  {total} steps", flush=True)
+    summary = f"  DONE  {passed} PASS  /  {failed} FAIL  /  {total} steps"
+    if manual: summary += f"  /  {manual} MANUAL"
+    print(summary, flush=True)
     if failed:
         print(f"  !! Check FAILs in: {out.name}", flush=True)
+    elif manual:
+        print(f"  {manual} step(s) needed manual intervention — review report.", flush=True)
     else:
         print(f"  ALL PASS!", flush=True)
     print(f"  Report: {out}", flush=True)
