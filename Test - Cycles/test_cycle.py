@@ -573,36 +573,15 @@ def complete_stripe_payment(d, cfg, steps, img_dir, cardholder_name, email):
     try:
         time.sleep(2)  # let the checkout page settle
 
-        # ── Step 1: select "Card" payment method radio button ─────────────
-        # Stripe shows Card / Klarna / Revolut Pay radio buttons.
-        # Card is not selected by default — click it to expand the card form.
-        card_radio_clicked = False
-        for sel in [
-            # Stripe hosted checkout uses a radio inside a label containing "Card"
-            '//label[contains(normalize-space(),"Card")]//input[@type="radio"]',
-            '//label[.//span[normalize-space()="Card"]]//input[@type="radio"]',
-        ]:
-            try:
-                rb = d.find_element(By.XPATH, sel)
-                d.execute_script("arguments[0].scrollIntoView({block:'center'});", rb)
-                rb.click()
-                card_radio_clicked = True
-                break
-            except Exception:
-                pass
-
-        if not card_radio_clicked:
-            # Fallback: find all radio inputs and click the first one (Card)
-            radios = d.find_elements(By.CSS_SELECTOR, 'input[type="radio"]')
-            if radios:
-                d.execute_script("arguments[0].click();", radios[0])
-                card_radio_clicked = True
-
-        if card_radio_clicked:
-            time.sleep(1.5)  # wait for card form to expand
-            _ok("Card payment method selected", _shot(d, img_dir, "stripe_01b_card_selected"), steps)
-        else:
-            _info("Could not click Card radio — form may already be expanded", None, steps)
+        # ── Step 1: select "Card" payment method ──────────────────────────
+        # Card is the first radio on the page — click it via JS so there
+        # is no pointer-positioning issue, then wait for the form to expand.
+        d.execute_script(
+            "var r = document.querySelectorAll('input[type=\"radio\"]')[0];"
+            "if(r) r.click();"
+        )
+        time.sleep(1.5)
+        _ok("Card payment method selected", _shot(d, img_dir, "stripe_01b_card_selected"), steps)
 
         # Email — pre-populated from Stripe session; only fill if blank
         try:
