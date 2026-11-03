@@ -906,9 +906,7 @@ def main():
         d.quit()
 
     # ── Word report ───────────────────────────────────────────────────────────
-    # One fixed file per app version — overwrites on each run so there is
-    # always exactly one document to open.  Screenshots are embedded in it.
-    out = HERE / f"TestCycle_{app_ver}.docx"
+    out = HERE / f"TestRun_{tag}_{app_ver}.docx"
     write_report(sections, app_ver, ver_date, run_ts, new_email, out)
 
     total  = sum(len(s) for _, s in sections)
