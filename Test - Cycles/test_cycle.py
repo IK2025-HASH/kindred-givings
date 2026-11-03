@@ -541,8 +541,12 @@ def complete_stripe_payment(d, cfg, steps, img_dir, cardholder_name, email):
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
 
+    card     = cfg.get("stripe_test_card",     "4242 4242 4242 4242").replace(" ", "")
+    expiry   = cfg.get("stripe_test_expiry",   "1229")
+    cvc      = cfg.get("stripe_test_cvc",      "123")
+    postcode = cfg.get("stripe_test_postcode", "SW1A 1AA")
     _info("Completing Stripe test payment", _shot(d, img_dir, "stripe_01_loaded"),
-          steps, "Card: 4242 4242 4242 4242 | Exp 12/29 | CVC 123")
+          steps, f"Card: {cfg.get('stripe_test_card','4242 4242 4242 4242')} | Exp {expiry[:2]}/{expiry[2:]} | CVC {cvc}")
 
     def _switch_frame_and_type(titles, keys, label):
         """Try each iframe title, switch in, type, switch back to default."""
@@ -584,7 +588,7 @@ def complete_stripe_payment(d, cfg, steps, img_dir, cardholder_name, email):
             ["Secure card number input frame",
              "Card number",
              "Credit or debit card number"],
-            "4242424242424242", "card number"
+            card, "card number"
         )
         if not card_filled:
             # Fallback: send to first visible iframe input
@@ -593,7 +597,7 @@ def complete_stripe_payment(d, cfg, steps, img_dir, cardholder_name, email):
                     d.switch_to.frame(fr)
                     inps = d.find_elements(By.TAG_NAME, "input")
                     if inps:
-                        inps[0].click(); inps[0].send_keys("4242424242424242")
+                        inps[0].click(); inps[0].send_keys(card)
                         d.switch_to.default_content()
                         card_filled = True
                         break
@@ -612,7 +616,7 @@ def complete_stripe_payment(d, cfg, steps, img_dir, cardholder_name, email):
             ["Secure expiration date input frame",
              "Card expiration date",
              "Expiration date"],
-            "1229", "expiry"
+            expiry, "expiry"
         )
         time.sleep(0.4)
 
@@ -621,7 +625,7 @@ def complete_stripe_payment(d, cfg, steps, img_dir, cardholder_name, email):
             ["Secure CVC input frame",
              "CVC",
              "Card security code"],
-            "123", "CVC"
+            cvc, "CVC"
         )
         time.sleep(0.4)
 
@@ -645,7 +649,7 @@ def complete_stripe_payment(d, cfg, steps, img_dir, cardholder_name, email):
             try:
                 inp = d.find_element(By.CSS_SELECTOR, sel)
                 if not inp.get_attribute("value"):
-                    inp.clear(); inp.send_keys("SW1A 1AA")
+                    inp.clear(); inp.send_keys(postcode)
                 break
             except Exception:
                 pass
