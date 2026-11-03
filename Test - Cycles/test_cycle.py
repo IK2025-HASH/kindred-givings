@@ -529,7 +529,165 @@ def test_login_before_confirmation(d, cfg, email, pw, steps, img_dir) -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 15.  Register a new charity organisation
+# 15.  Complete Stripe hosted checkout with test card 4242 4242 4242 4242
+# ──────────────────────────────────────────────────────────────────────────────
+def complete_stripe_payment(d, cfg, steps, img_dir, cardholder_name, email):
+    """
+    Drive the Stripe hosted checkout page (checkout.stripe.com) to completion
+    using Stripe's standard test card 4242 4242 4242 4242.
+    Must be called while the driver is already on checkout.stripe.com.
+    Returns True when Stripe redirects to /app/billing?subscription=success.
+    """
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+
+    _info("Completing Stripe test payment", _shot(d, img_dir, "stripe_01_loaded"),
+          steps, "Card: 4242 4242 4242 4242 | Exp 12/29 | CVC 123")
+
+    def _switch_frame_and_type(titles, keys, label):
+        """Try each iframe title, switch in, type, switch back to default."""
+        for title in titles:
+            try:
+                fr = WebDriverWait(d, 8).until(
+                    EC.presence_of_element_located(
+                        (By.CSS_SELECTOR, f'iframe[title="{title}"]')
+                    )
+                )
+                d.switch_to.frame(fr)
+                inp = WebDriverWait(d, 5).until(
+                    EC.presence_of_element_located((By.TAG_NAME, "input"))
+                )
+                inp.click()
+                inp.send_keys(keys)
+                d.switch_to.default_content()
+                return True
+            except Exception:
+                try: d.switch_to.default_content()
+                except Exception: pass
+        return False
+
+    try:
+        time.sleep(2)  # let the checkout page settle
+
+        # Email — pre-populated from Stripe session; only fill if blank
+        try:
+            em = d.find_element(By.CSS_SELECTOR,
+                                'input[type="email"], input[id*="email"], input[name*="email"]')
+            if not em.get_attribute("value"):
+                em.clear(); em.send_keys(email)
+            _slow(cfg)
+        except Exception:
+            pass
+
+        # Card number
+        card_filled = _switch_frame_and_type(
+            ["Secure card number input frame",
+             "Card number",
+             "Credit or debit card number"],
+            "4242424242424242", "card number"
+        )
+        if not card_filled:
+            # Fallback: send to first visible iframe input
+            for fr in d.find_elements(By.TAG_NAME, "iframe"):
+                try:
+                    d.switch_to.frame(fr)
+                    inps = d.find_elements(By.TAG_NAME, "input")
+                    if inps:
+                        inps[0].click(); inps[0].send_keys("4242424242424242")
+                        d.switch_to.default_content()
+                        card_filled = True
+                        break
+                except Exception:
+                    d.switch_to.default_content()
+
+        if not card_filled:
+            _fail("Could not find card number field on Stripe page",
+                  _shot(d, img_dir, "stripe_err_card"), steps)
+            return False
+
+        time.sleep(0.5)
+
+        # Expiry
+        _switch_frame_and_type(
+            ["Secure expiration date input frame",
+             "Card expiration date",
+             "Expiration date"],
+            "1229", "expiry"
+        )
+        time.sleep(0.4)
+
+        # CVC
+        _switch_frame_and_type(
+            ["Secure CVC input frame",
+             "CVC",
+             "Card security code"],
+            "123", "CVC"
+        )
+        time.sleep(0.4)
+
+        # Name on card (outside iframes)
+        for sel in ['input[name="billingName"]',
+                    'input[autocomplete="cc-name"]',
+                    'input[placeholder*="Name" i]']:
+            try:
+                inp = d.find_element(By.CSS_SELECTOR, sel)
+                if not inp.get_attribute("value"):
+                    inp.clear(); inp.send_keys(cardholder_name)
+                break
+            except Exception:
+                pass
+
+        # Postal / postcode (sometimes required for UK cards)
+        for sel in ['input[name="billingAddressPostalCode"]',
+                    'input[autocomplete="postal-code"]',
+                    'input[placeholder*="post" i]',
+                    'input[placeholder*="zip" i]']:
+            try:
+                inp = d.find_element(By.CSS_SELECTOR, sel)
+                if not inp.get_attribute("value"):
+                    inp.clear(); inp.send_keys("SW1A 1AA")
+                break
+            except Exception:
+                pass
+
+        _info("Payment details filled", _shot(d, img_dir, "stripe_02_filled"), steps)
+
+        # Submit
+        d.find_element(By.CSS_SELECTOR, 'button[type="submit"]').click()
+        time.sleep(10)  # Stripe processes → webhook fires → redirect
+
+        img_done = _shot(d, img_dir, "stripe_03_result")
+        cur  = d.current_url
+        src  = d.page_source.lower()
+
+        if "subscription=success" in cur:
+            _ok("Stripe payment confirmed — redirected to billing success page",
+                img_done, steps)
+            time.sleep(3)  # wait for webhook to settle in Supabase
+            return True
+        elif "checkout.stripe.com" not in cur and ("/app" in cur or cfg["app_url"] in cur):
+            _ok(f"Stripe payment completed — redirected to app: {cur}",
+                img_done, steps)
+            time.sleep(3)
+            return True
+        elif "success" in src or "thank" in src:
+            _ok("Stripe payment success indicated on page", img_done, steps)
+            time.sleep(3)
+            return True
+        else:
+            _fail("Payment may not have completed — still on or near Stripe",
+                  img_done, steps, f"URL: {cur}")
+            return False
+
+    except Exception as e:
+        _fail("Stripe payment error", _shot(d, img_dir, "stripe_err"), steps, e)
+        try: d.switch_to.default_content()
+        except Exception: pass
+        return False
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 16.  Register a new charity organisation
 # ──────────────────────────────────────────────────────────────────────────────
 def register_new_charity(d, cfg, steps, img_dir, app_ver, run_date) -> bool:
     """Register a brand-new charity via the 4-step auth.tsx flow:
@@ -648,8 +806,9 @@ def register_new_charity(d, cfg, steps, img_dir, app_ver, run_date) -> bool:
         if "stripe.com" in cur or "checkout.stripe.com" in cur:
             _ok(f"Charity registered — Stripe checkout opened ({charity_email})",
                 img_result, steps)
-            d.back(); time.sleep(2)  # go back; auth redirects to /app
-            return True
+            paid = complete_stripe_payment(d, cfg, steps, img_dir,
+                                           charity_admin, charity_email)
+            return paid
         elif "/app" in cur:
             _ok(f"Charity registered & in app: {charity_email}", img_result, steps)
             return True
@@ -943,7 +1102,7 @@ def test_admin_post_registration(d, cfg, steps, img_dir,
          pending (expected when the test stopped at Stripe redirect).
     """
     _go(d, cfg, "/app/admin")
-    time.sleep(3)
+    time.sleep(5)  # allow React to load all async sections
 
     src = d.page_source
 
@@ -1006,15 +1165,15 @@ def test_admin_post_registration(d, cfg, steps, img_dir,
     if charity_in_subs and growth_in_subs:
         _ok(f"Growth plan subscription confirmed for {charity_name}", img_subs, steps)
     elif charity_in_subs:
-        steps.append(Step(
-            f"Charity org in subscriptions but Growth plan not yet active: {charity_name}",
-            "SKIP", img_subs,
-            "Stripe webhook not yet received — re-run after completing payment in Stripe"))
+        _fail(
+            f"Charity in subscriptions but Growth plan not visible: {charity_name}",
+            img_subs, steps,
+            "Payment completed but Growth plan badge missing — check Stripe webhook")
     else:
-        steps.append(Step(
-            "Charity not yet in All Subscriptions — Stripe payment pending",
-            "SKIP", img_subs,
-            f"Expected: test registered {charity_email} then stopped at Stripe redirect"))
+        _fail(
+            f"Charity NOT found in All Subscriptions: {charity_name}",
+            img_subs, steps,
+            "Stripe payment was completed — subscription should be active. Check webhook.")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1175,8 +1334,8 @@ def main():
         #     • new individual user (J4) visible in All Users with
         #       Starter plan allocation
         #     • charity org (J3) visible in All Organisations
-        #     • All Subscriptions checked for Growth plan entry
-        #       (SKIP if Stripe payment still pending)
+        #     • Growth plan subscription active in All Subscriptions
+        #       (payment was completed via Stripe test card in J3)
         # ══════════════════════════════════════════════════════════════════
         charity_email_j6 = f"charity{safe_ver}-{date_tag}@networklogic.uk"
         charity_name_j6  = f"Test Charity {date_tag}"
