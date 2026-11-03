@@ -666,7 +666,181 @@ def register_new_charity(d, cfg, steps, img_dir, app_ver, run_date) -> bool:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 16.  Word report
+# 16.  Bug register  (bug_register.json  +  BugRegister.docx)
+# ──────────────────────────────────────────────────────────────────────────────
+BUG_JSON      = HERE / "bug_register.json"
+BUG_DOCX      = HERE / "BugRegister.docx"
+BUG_SHOTS_DIR = HERE / "bug_screenshots"   # stable copies; TestRun dirs may be deleted
+
+_BUG_STATUS_BG = {"Open": "fde0de", "Fixed": "d4f5dc", "Investigating": "fff3cd"}
+_BUG_HDR_CLR   = "1e3a5f"
+
+def _load_reg() -> dict:
+    if BUG_JSON.exists():
+        try:
+            return json.loads(BUG_JSON.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {"next_id": 1, "bugs": []}
+
+def _save_reg(reg: dict) -> None:
+    BUG_JSON.write_text(json.dumps(reg, indent=2, ensure_ascii=False), encoding="utf-8")
+
+def update_bug_register(sections, app_ver, run_ts) -> None:
+    """Add new FAILs to the register and auto-close bugs that now PASS."""
+    reg  = _load_reg()
+    bugs = reg["bugs"]
+
+    # Index open bugs by (journey, step) for fast lookup
+    open_idx: dict[tuple, dict] = {
+        (b["journey"], b["step"]): b
+        for b in bugs if b["status"] == "Open"
+    }
+
+    # Collect passing and failing steps from this run
+    passing: set[tuple] = set()
+    failing: list[tuple] = []
+    for journey_title, steps in sections:
+        for step in steps:
+            key = (journey_title, step.label)
+            if step.status == "PASS":
+                passing.add(key)
+            elif step.status == "FAIL":
+                failing.append((journey_title, step))
+
+    # Auto-close open bugs whose step is now passing
+    for key in passing:
+        if key in open_idx:
+            b = open_idx[key]
+            b["status"]        = "Fixed"
+            b["date_fixed"]    = run_ts
+            b["fixed_version"] = app_ver
+
+    # Add new bugs for FAILs not already open
+    BUG_SHOTS_DIR.mkdir(parents=True, exist_ok=True)
+    for journey_title, step in failing:
+        key = (journey_title, step.label)
+        if key in open_idx:
+            continue   # already tracked
+        bug_id = f"BUG-{reg['next_id']:03d}"
+        reg["next_id"] += 1
+
+        # Copy screenshot to a stable location
+        shot = ""
+        if step.img and Path(step.img).exists():
+            dest = BUG_SHOTS_DIR / f"{bug_id}.png"
+            try:
+                shutil.copy2(step.img, dest)
+                shot = str(dest)
+            except Exception:
+                shot = step.img   # keep original path as fallback
+
+        bugs.append({
+            "id":            bug_id,
+            "date_found":    run_ts,
+            "version_found": app_ver,
+            "journey":       journey_title,
+            "step":          step.label,
+            "error":         step.note or "",
+            "screenshot":    shot,
+            "status":        "Open",
+            "date_fixed":    "",
+            "fixed_version": "",
+        })
+        open_idx[key] = bugs[-1]
+
+    _save_reg(reg)
+    _write_bug_docx(reg)
+    open_count  = sum(1 for b in bugs if b["status"] == "Open")
+    fixed_count = sum(1 for b in bugs if b["status"] == "Fixed")
+    print(f"[BUG REGISTER] {len(bugs)} total  |  {open_count} open  |  {fixed_count} fixed  -> {BUG_DOCX.name}",
+          flush=True)
+
+def _write_bug_docx(reg: dict) -> None:
+    doc  = Document()
+    sect = doc.sections[0]
+    for attr in ("left_margin","right_margin","top_margin","bottom_margin"):
+        setattr(sect, attr, Inches(0.75))
+
+    h = doc.add_heading("Donorbook Platform — Bug Register", 0)
+    h.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    bugs        = reg["bugs"]
+    open_count  = sum(1 for b in bugs if b["status"] == "Open")
+    fixed_count = sum(1 for b in bugs if b["status"] == "Fixed")
+
+    p = doc.add_paragraph()
+    r = p.add_run(f"Total: {len(bugs)}    Open: {open_count}    Fixed: {fixed_count}")
+    r.bold = True
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    doc.add_paragraph()
+
+    # Main table
+    COLS  = ["ID", "Found", "Version", "Journey", "Step / Error", "Status", "Fixed"]
+    WIDTHS= [0.65,  1.0,    0.65,       1.3,        2.5,           0.7,      0.9]
+    tbl = doc.add_table(rows=1, cols=len(COLS))
+    tbl.style = "Table Grid"
+    for i, (col, w) in enumerate(zip(COLS, WIDTHS)):
+        cell = tbl.rows[0].cells[i]
+        cell.width = int(Inches(w))
+        cell.text  = col
+        _shd(cell, _BUG_HDR_CLR)
+        run = cell.paragraphs[0].runs[0]
+        run.bold = True
+        run.font.color.rgb = RGBColor(255, 255, 255)
+        run.font.size = Pt(9)
+
+    for bug in sorted(bugs, key=lambda b: b["id"]):
+        j_short = bug["journey"]
+        # "Journey 3: New Charity Registration & Onboarding" -> "J3: New Charity..."
+        j_short = re.sub(r"Journey (\d+):", r"J\1:", j_short)
+        if len(j_short) > 45:
+            j_short = j_short[:44] + "..."
+        err_text = bug["step"]
+        if bug["error"]:
+            err_text += "\n" + bug["error"][:120]
+        row_vals = [
+            bug["id"],
+            bug["date_found"],
+            bug["version_found"],
+            j_short,
+            err_text,
+            bug["status"],
+            bug["date_fixed"] or "-",
+        ]
+        row = tbl.add_row()
+        for i, (val, w) in enumerate(zip(row_vals, WIDTHS)):
+            c = row.cells[i]
+            c.width = int(Inches(w))
+            c.text  = val
+            if COLS[i] == "Status":
+                _shd(c, _BUG_STATUS_BG.get(bug["status"], "f0f0f0"))
+            for run in c.paragraphs[0].runs:
+                run.font.size = Pt(8)
+
+    # Screenshots page for open bugs
+    open_with_shots = [b for b in bugs
+                       if b["status"] == "Open" and b.get("screenshot")
+                       and Path(b["screenshot"]).exists()]
+    if open_with_shots:
+        doc.add_page_break()
+        doc.add_heading("Evidence — Open Bugs", 1)
+        for bug in open_with_shots:
+            p = doc.add_paragraph()
+            p.add_run(f"{bug['id']}  ({bug['date_found']})  {bug['step']}").bold = True
+            if bug["error"]:
+                doc.add_paragraph(f"Error: {bug['error']}", style="Body Text")
+            try:
+                doc.add_picture(bug["screenshot"], width=Inches(6.2))
+            except Exception:
+                doc.add_paragraph(f"[screenshot: {bug['screenshot']}]")
+            doc.add_paragraph()
+
+    doc.save(str(BUG_DOCX))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 17.  Word report
 # ──────────────────────────────────────────────────────────────────────────────
 STATUS_CLR = {"PASS": "2ea84e", "FAIL": "e7392e", "INFO": "177ddc", "SKIP": "888888"}
 STATUS_BG  = {"PASS": "d4f5dc", "FAIL": "fde0de", "INFO": "ddeeff", "SKIP": "f0f0f0"}
@@ -905,9 +1079,10 @@ def main():
     finally:
         d.quit()
 
-    # ── Word report ───────────────────────────────────────────────────────────
+    # ── Word report + bug register ────────────────────────────────────────────
     out = HERE / f"TestRun_{tag}_{app_ver}.docx"
     write_report(sections, app_ver, ver_date, run_ts, new_email, out)
+    update_bug_register(sections, app_ver, run_ts)
 
     total  = sum(len(s) for _, s in sections)
     passed = sum(x.status == "PASS" for _, s in sections for x in s)
