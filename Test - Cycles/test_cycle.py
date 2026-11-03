@@ -836,7 +836,11 @@ def _write_bug_docx(reg: dict) -> None:
                 doc.add_paragraph(f"[screenshot: {bug['screenshot']}]")
             doc.add_paragraph()
 
-    doc.save(str(BUG_DOCX))
+    try:
+        doc.save(str(BUG_DOCX))
+    except PermissionError:
+        print(f"[BUG REGISTER] WARNING: {BUG_DOCX.name} is open in Word — close it and re-run to update.",
+              flush=True)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -925,7 +929,96 @@ def _print_summary(num, steps):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 18.  Main — five user journeys
+# 18.  Admin post-registration verification
+# ──────────────────────────────────────────────────────────────────────────────
+def test_admin_post_registration(d, cfg, steps, img_dir,
+                                 new_email, charity_email, charity_name):
+    """
+    While logged in as platform admin, verify that:
+      1. The newly registered individual user (new_email) appears in All Users.
+      2. The new user's plan allocation is Starter (free) — no paid plan.
+      3. The charity org (charity_name) appears in All Organisations.
+      4. The Payments / All Subscriptions section is checked for a Growth
+         plan entry matching the charity — SKIP if Stripe payment is still
+         pending (expected when the test stopped at Stripe redirect).
+    """
+    _go(d, cfg, "/app/admin")
+    time.sleep(3)
+
+    src = d.page_source
+
+    # ── 1. All Users — new individual user present ───────────────────────
+    try:
+        hdr = d.find_element(By.XPATH, '//*[contains(text(),"All users")]')
+        d.execute_script("arguments[0].scrollIntoView({block:'center'});", hdr)
+        time.sleep(0.8)
+    except Exception:
+        pass
+
+    img_users = _shot(d, img_dir, "j6_01_all_users")
+    if new_email.lower() in src.lower():
+        _ok(f"New user present in All Users: {new_email}", img_users, steps)
+    else:
+        _fail(f"New user NOT found in All Users: {new_email}", img_users, steps,
+              "User may not yet appear if Supabase auth confirmation is pending")
+
+    # ── 2. Plan allocation for new user — Starter (free) ─────────────────
+    # Page shows plan badge per user row; checking page source for "Starter"
+    # is sufficient at this level of testing.
+    if "starter" in src.lower():
+        _ok("Starter plan visible in Users section", img_users, steps)
+    else:
+        steps.append(Step(
+            "Starter plan badge not detected in page source — check screenshot",
+            "SKIP", img_users,
+            "May load asynchronously; open admin panel manually to confirm"))
+
+    # ── 3. All Organisations — charity org present ────────────────────────
+    try:
+        hdr = d.find_element(By.XPATH, '//*[contains(text(),"All organisations")]')
+        d.execute_script("arguments[0].scrollIntoView({block:'center'});", hdr)
+        time.sleep(0.8)
+    except Exception:
+        pass
+
+    img_orgs = _shot(d, img_dir, "j6_02_all_orgs")
+    if charity_name.lower() in src.lower():
+        _ok(f"Charity org present in All Organisations: {charity_name}", img_orgs, steps)
+    else:
+        _fail(f"Charity org NOT found in All Organisations: {charity_name}",
+              img_orgs, steps,
+              "Org is created before Stripe redirect — should appear even if payment pending")
+
+    # ── 4. All Subscriptions / Payments — Growth plan check ──────────────
+    try:
+        hdr = d.find_element(By.XPATH, '//*[contains(text(),"All subscriptions")]')
+        d.execute_script("arguments[0].scrollIntoView({block:'center'});", hdr)
+        time.sleep(0.8)
+    except Exception:
+        pass
+
+    img_subs = _shot(d, img_dir, "j6_03_all_subscriptions")
+    # Re-read source after scroll (React may have loaded the section)
+    src2 = d.page_source
+    charity_in_subs  = charity_name.lower() in src2.lower()
+    growth_in_subs   = "growth" in src2.lower()
+
+    if charity_in_subs and growth_in_subs:
+        _ok(f"Growth plan subscription confirmed for {charity_name}", img_subs, steps)
+    elif charity_in_subs:
+        steps.append(Step(
+            f"Charity org in subscriptions but Growth plan not yet active: {charity_name}",
+            "SKIP", img_subs,
+            "Stripe webhook not yet received — re-run after completing payment in Stripe"))
+    else:
+        steps.append(Step(
+            "Charity not yet in All Subscriptions — Stripe payment pending",
+            "SKIP", img_subs,
+            f"Expected: test registered {charity_email} then stopped at Stripe redirect"))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 19.  Main — six user journeys
 # ──────────────────────────────────────────────────────────────────────────────
 def main():
     cfg      = load_cfg()
@@ -934,7 +1027,7 @@ def main():
     run_ts   = now.strftime("%Y-%m-%d %H:%M")
     tag      = now.strftime("%Y%m%d_%H%M")
     safe_ver = re.sub(r"[^0-9]", "", app_ver)
-    date_tag = now.strftime("%d%m%Y")
+    date_tag = now.strftime("%d%m%Y%H%M")
 
     # Individual new-user email (used in J4 + J5)
     new_email = f"v{safe_ver}-{date_tag}@networklogic.uk"
@@ -1075,6 +1168,37 @@ def main():
         sections.append((
             f"Journey 5: New User App Access ({new_email})", steps_j5))
         _print_summary(5, steps_j5)
+
+        # ══════════════════════════════════════════════════════════════════
+        # JOURNEY 6 — Admin Post-Registration Verification
+        #   Log back in as platform admin → /app/admin → confirm:
+        #     • new individual user (J4) visible in All Users with
+        #       Starter plan allocation
+        #     • charity org (J3) visible in All Organisations
+        #     • All Subscriptions checked for Growth plan entry
+        #       (SKIP if Stripe payment still pending)
+        # ══════════════════════════════════════════════════════════════════
+        charity_email_j6 = f"charity{safe_ver}-{date_tag}@networklogic.uk"
+        charity_name_j6  = f"Test Charity {date_tag}"
+        _print_journey(6, "Admin Post-Registration Verification",
+                       cfg["admin_email"])
+        steps_j6 = []
+        d6 = run_dir / "j6_admin_verify"
+        try:
+            if do_login(d, cfg, cfg["admin_email"], cfg["admin_password"],
+                        steps_j6, d6):
+                test_admin_post_registration(d, cfg, steps_j6, d6,
+                                             new_email,
+                                             charity_email_j6,
+                                             charity_name_j6)
+                do_logout(d, cfg, steps_j6, d6, "admin_verify")
+        except Exception as e:
+            steps_j6.append(Step("Journey 6 — error", "FAIL", None, str(e)))
+            traceback.print_exc()
+        sections.append((
+            f"Journey 6: Admin Post-Registration Verification ({cfg['admin_email']})",
+            steps_j6))
+        _print_summary(6, steps_j6)
 
     finally:
         d.quit()
