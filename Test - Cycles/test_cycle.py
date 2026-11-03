@@ -535,40 +535,42 @@ def test_login_before_confirmation(d, cfg, email, pw, steps, img_dir) -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 15.  Complete Stripe hosted checkout with test card 4242 4242 4242 4242
+# 15.  Complete Stripe hosted checkout — Card / Klarna / Revolut Pay
 # ──────────────────────────────────────────────────────────────────────────────
-def complete_stripe_payment(d, cfg, steps, img_dir, cardholder_name, email):
+def complete_stripe_payment(d, cfg, steps, img_dir, cardholder_name, email,
+                            method="card"):
     """
-    Drive the Stripe hosted checkout page (checkout.stripe.com) to completion
-    using Stripe's standard test card 4242 4242 4242 4242.
-    Must be called while the driver is already on checkout.stripe.com.
-    Returns True when Stripe redirects to /app/billing?subscription=success.
+    Drive the Stripe hosted checkout page to completion.
+      method="card"    — fill card details (4242 4242 4242 4242)
+      method="klarna"  — select Klarna radio, submit, authorise test page
+      method="revolut" — select Revolut Pay radio, submit, authorise test page
+    Returns True on successful redirect to /app/billing?subscription=success.
     """
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
+    from selenium.webdriver.common.action_chains import ActionChains
 
     card     = cfg.get("stripe_test_card",     "4242 4242 4242 4242").replace(" ", "")
     expiry   = cfg.get("stripe_test_expiry",   "1229")
     cvc      = cfg.get("stripe_test_cvc",      "123")
     postcode = cfg.get("stripe_test_postcode", "SW1A 1AA")
-    _info("Completing Stripe test payment", _shot(d, img_dir, "stripe_01_loaded"),
-          steps, f"Card: {cfg.get('stripe_test_card','4242 4242 4242 4242')} | Exp {expiry[:2]}/{expiry[2:]} | CVC {cvc}")
 
-    def _switch_frame_and_type(titles, keys, label):
-        """Try each iframe title, switch in, type, switch back to default."""
+    _info(f"Completing Stripe payment via {method.upper()}",
+          _shot(d, img_dir, "stripe_01_loaded"), steps,
+          f"Card: {cfg.get('stripe_test_card','4242...')} | {expiry[:2]}/{expiry[2:]} | {cvc}"
+          if method == "card" else f"Method: {method}")
+
+    # ── helper: switch iframe by title, type, switch back ─────────────────
+    def _fill_frame(titles, keys):
         for title in titles:
             try:
                 fr = WebDriverWait(d, 8).until(
                     EC.presence_of_element_located(
-                        (By.CSS_SELECTOR, f'iframe[title="{title}"]')
-                    )
-                )
+                        (By.CSS_SELECTOR, f'iframe[title="{title}"]')))
                 d.switch_to.frame(fr)
                 inp = WebDriverWait(d, 5).until(
-                    EC.presence_of_element_located((By.TAG_NAME, "input"))
-                )
-                inp.click()
-                inp.send_keys(keys)
+                    EC.presence_of_element_located((By.TAG_NAME, "input")))
+                inp.click(); inp.send_keys(keys)
                 d.switch_to.default_content()
                 return True
             except Exception:
@@ -576,152 +578,185 @@ def complete_stripe_payment(d, cfg, steps, img_dir, cardholder_name, email):
                 except Exception: pass
         return False
 
-    try:
-        time.sleep(2)  # let the checkout page settle
-
-        # ── Step 1: select "Card" payment method ──────────────────────────
-        # Move the mouse onto the Card radio button and click it.
-        from selenium.webdriver.common.action_chains import ActionChains
-        card_radio = None
-        # Try label first (larger target), then the raw radio input
+    # ── helper: click payment method radio by label keyword ───────────────
+    def _select_radio(keyword, index_fallback):
+        """Move mouse to the label containing keyword and click it."""
+        # Try the label (bigger click target)
         for by, sel in [
-            (By.XPATH,       '//label[contains(normalize-space(.), "Card")]'),
-            (By.CSS_SELECTOR,'input[type="radio"]'),
+            (By.XPATH, f'//label[contains(normalize-space(.), "{keyword}")]'),
+            (By.XPATH, f'//span[normalize-space(text())="{keyword}"]/ancestor::label'),
         ]:
             try:
-                els = d.find_elements(by, sel)
-                if els:
-                    card_radio = els[0]
-                    break
+                el = d.find_elements(by, sel)
+                if el:
+                    ActionChains(d).move_to_element(el[0]).click().perform()
+                    return True
             except Exception:
                 pass
+        # Fallback: click the Nth radio button by index
+        radios = d.find_elements(By.CSS_SELECTOR, 'input[type="radio"]')
+        if len(radios) > index_fallback:
+            ActionChains(d).move_to_element(radios[index_fallback]).click().perform()
+            return True
+        return False
 
-        if card_radio:
-            ActionChains(d).move_to_element(card_radio).click().perform()
+    # ── helper: wait for redirect away from Stripe and report ─────────────
+    def _wait_for_success(shot_name):
+        time.sleep(10)
+        img = _shot(d, img_dir, shot_name)
+        cur = d.current_url
+        src = d.page_source.lower()
+        if "subscription=success" in cur:
+            _ok("Payment confirmed — redirected to billing success", img, steps)
+            time.sleep(3); return True
+        elif "checkout.stripe.com" not in cur and ("/app" in cur or cfg["app_url"] in cur):
+            _ok(f"Payment completed — redirected to app: {cur}", img, steps)
+            time.sleep(3); return True
+        elif "success" in src or "thank" in src:
+            _ok("Payment success indicated on page", img, steps)
+            time.sleep(3); return True
         else:
-            # Last resort: Tab to the first radio and press Space
-            d.find_element(By.TAG_NAME, "body").send_keys(Keys.TAB)
-            time.sleep(0.3)
-            d.switch_to.active_element.send_keys(Keys.SPACE)
-
-        time.sleep(1.5)
-        _ok("Card payment method selected", _shot(d, img_dir, "stripe_01b_card_selected"), steps)
-
-        # Email — pre-populated from Stripe session; only fill if blank
-        try:
-            em = d.find_element(By.CSS_SELECTOR,
-                                'input[type="email"], input[id*="email"], input[name*="email"]')
-            if not em.get_attribute("value"):
-                em.clear(); em.send_keys(email)
-            _slow(cfg)
-        except Exception:
-            pass
-
-        # Card number
-        card_filled = _switch_frame_and_type(
-            ["Secure card number input frame",
-             "Card number",
-             "Credit or debit card number"],
-            card, "card number"
-        )
-        if not card_filled:
-            # Fallback: send to first visible iframe input
-            for fr in d.find_elements(By.TAG_NAME, "iframe"):
-                try:
-                    d.switch_to.frame(fr)
-                    inps = d.find_elements(By.TAG_NAME, "input")
-                    if inps:
-                        inps[0].click(); inps[0].send_keys(card)
-                        d.switch_to.default_content()
-                        card_filled = True
-                        break
-                except Exception:
-                    d.switch_to.default_content()
-
-        if not card_filled:
-            _fail("Could not find card number field on Stripe page",
-                  _shot(d, img_dir, "stripe_err_card"), steps)
+            _fail("Payment did not complete", img, steps, f"URL: {cur}")
             return False
 
-        time.sleep(0.5)
+    try:
+        time.sleep(2)
 
-        # Expiry
-        _switch_frame_and_type(
-            ["Secure expiration date input frame",
-             "Card expiration date",
-             "Expiration date"],
-            expiry, "expiry"
-        )
-        time.sleep(0.4)
+        # ══════════════════════════════════════════════════════════════════
+        # CARD
+        # ══════════════════════════════════════════════════════════════════
+        if method == "card":
+            _select_radio("Card", 0)
+            time.sleep(1.5)
+            _ok("Card selected", _shot(d, img_dir, "stripe_02_card_selected"), steps)
 
-        # CVC
-        _switch_frame_and_type(
-            ["Secure CVC input frame",
-             "CVC",
-             "Card security code"],
-            cvc, "CVC"
-        )
-        time.sleep(0.4)
-
-        # Name on card (outside iframes — "Full name on card" placeholder)
-        for sel in ['input[placeholder*="Full name" i]',
-                    'input[placeholder*="name on card" i]',
-                    'input[name="billingName"]',
-                    'input[autocomplete="cc-name"]',
-                    'input[placeholder*="Name" i]']:
+            # Email (pre-filled from Stripe session)
             try:
-                inp = d.find_element(By.CSS_SELECTOR, sel)
-                if not inp.get_attribute("value"):
-                    inp.clear(); inp.send_keys(cardholder_name)
-                break
+                em = d.find_element(By.CSS_SELECTOR,
+                    'input[type="email"], input[id*="email"], input[name*="email"]')
+                if not em.get_attribute("value"):
+                    em.clear(); em.send_keys(email)
+                _slow(cfg)
             except Exception:
                 pass
 
-        # Postal / postcode (sometimes required for UK cards)
-        for sel in ['input[placeholder*="Postal code" i]',
-                    'input[name="billingAddressPostalCode"]',
-                    'input[autocomplete="postal-code"]',
-                    'input[placeholder*="post" i]',
-                    'input[placeholder*="zip" i]']:
-            try:
-                inp = d.find_element(By.CSS_SELECTOR, sel)
-                if not inp.get_attribute("value"):
-                    inp.clear(); inp.send_keys(postcode)
-                break
-            except Exception:
-                pass
+            # Card number (inside iframe)
+            filled = _fill_frame(
+                ["Secure card number input frame", "Card number",
+                 "Credit or debit card number"], card)
+            if not filled:
+                for fr in d.find_elements(By.TAG_NAME, "iframe"):
+                    try:
+                        d.switch_to.frame(fr)
+                        inps = d.find_elements(By.TAG_NAME, "input")
+                        if inps:
+                            inps[0].click(); inps[0].send_keys(card)
+                            d.switch_to.default_content(); filled = True; break
+                    except Exception:
+                        d.switch_to.default_content()
+            if not filled:
+                _fail("Card number field not found", _shot(d, img_dir, "stripe_err"), steps)
+                return False
 
-        _info("Payment details filled", _shot(d, img_dir, "stripe_02_filled"), steps)
+            time.sleep(0.4)
+            _fill_frame(["Secure expiration date input frame",
+                         "Card expiration date", "Expiration date"], expiry)
+            time.sleep(0.3)
+            _fill_frame(["Secure CVC input frame", "CVC", "Card security code"], cvc)
+            time.sleep(0.3)
 
-        # Submit
-        d.find_element(By.CSS_SELECTOR, 'button[type="submit"]').click()
-        time.sleep(10)  # Stripe processes → webhook fires → redirect
+            for sel in ['input[placeholder*="Full name" i]',
+                        'input[placeholder*="name on card" i]',
+                        'input[name="billingName"]',
+                        'input[autocomplete="cc-name"]']:
+                try:
+                    inp = d.find_element(By.CSS_SELECTOR, sel)
+                    if not inp.get_attribute("value"):
+                        inp.clear(); inp.send_keys(cardholder_name)
+                    break
+                except Exception: pass
 
-        img_done = _shot(d, img_dir, "stripe_03_result")
-        cur  = d.current_url
-        src  = d.page_source.lower()
+            for sel in ['input[placeholder*="Postal code" i]',
+                        'input[name="billingAddressPostalCode"]',
+                        'input[autocomplete="postal-code"]']:
+                try:
+                    inp = d.find_element(By.CSS_SELECTOR, sel)
+                    if not inp.get_attribute("value"):
+                        inp.clear(); inp.send_keys(postcode)
+                    break
+                except Exception: pass
 
-        if "subscription=success" in cur:
-            _ok("Stripe payment confirmed — redirected to billing success page",
-                img_done, steps)
-            time.sleep(3)  # wait for webhook to settle in Supabase
-            return True
-        elif "checkout.stripe.com" not in cur and ("/app" in cur or cfg["app_url"] in cur):
-            _ok(f"Stripe payment completed — redirected to app: {cur}",
-                img_done, steps)
-            time.sleep(3)
-            return True
-        elif "success" in src or "thank" in src:
-            _ok("Stripe payment success indicated on page", img_done, steps)
-            time.sleep(3)
-            return True
+            _info("Card details filled", _shot(d, img_dir, "stripe_03_filled"), steps)
+            d.find_element(By.CSS_SELECTOR, 'button[type="submit"]').click()
+            return _wait_for_success("stripe_04_result")
+
+        # ══════════════════════════════════════════════════════════════════
+        # KLARNA
+        # Stripe test mode: select Klarna → submit → Stripe shows a test
+        # authorisation page with an "Authorize test payment" button.
+        # ══════════════════════════════════════════════════════════════════
+        elif method == "klarna":
+            _select_radio("Klarna", 1)
+            time.sleep(1.5)
+            _ok("Klarna selected", _shot(d, img_dir, "stripe_02_klarna_selected"), steps)
+
+            d.find_element(By.CSS_SELECTOR, 'button[type="submit"]').click()
+            time.sleep(6)  # redirect to Klarna test page
+            _info("Klarna test page", _shot(d, img_dir, "stripe_03_klarna_page"), steps)
+
+            # Klarna test page has "Authorize test payment" or "Pay now" button
+            for btn_text in ["Authorize test payment", "Pay now", "Confirm",
+                             "Approve the purchase", "Authorize"]:
+                try:
+                    btn = d.find_element(
+                        By.XPATH,
+                        f'//button[contains(normalize-space(.), "{btn_text}")]')
+                    ActionChains(d).move_to_element(btn).click().perform()
+                    _ok(f"Klarna test authorized: clicked '{btn_text}'",
+                        _shot(d, img_dir, "stripe_04_klarna_auth"), steps)
+                    break
+                except Exception:
+                    pass
+
+            return _wait_for_success("stripe_05_klarna_result")
+
+        # ══════════════════════════════════════════════════════════════════
+        # REVOLUT PAY
+        # Stripe test mode: select Revolut Pay → submit → Stripe shows a
+        # test page with an "Authorize" or "Pay" button.
+        # ══════════════════════════════════════════════════════════════════
+        elif method == "revolut":
+            _select_radio("Revolut", 2)
+            time.sleep(1.5)
+            _ok("Revolut Pay selected", _shot(d, img_dir, "stripe_02_revolut_selected"), steps)
+
+            d.find_element(By.CSS_SELECTOR, 'button[type="submit"]').click()
+            time.sleep(6)  # redirect to Revolut test page
+            _info("Revolut Pay test page", _shot(d, img_dir, "stripe_03_revolut_page"), steps)
+
+            # Revolut test page has "Authorize" / "Pay" / "Continue" button
+            for btn_text in ["Authorize", "Pay", "Continue", "Confirm",
+                             "Complete payment", "Authorize test payment"]:
+                try:
+                    btn = d.find_element(
+                        By.XPATH,
+                        f'//button[contains(normalize-space(.), "{btn_text}")]')
+                    ActionChains(d).move_to_element(btn).click().perform()
+                    _ok(f"Revolut Pay test authorized: clicked '{btn_text}'",
+                        _shot(d, img_dir, "stripe_04_revolut_auth"), steps)
+                    break
+                except Exception:
+                    pass
+
+            return _wait_for_success("stripe_05_revolut_result")
+
         else:
-            _fail("Payment may not have completed — still on or near Stripe",
-                  img_done, steps, f"URL: {cur}")
+            _fail(f"Unknown payment method: {method}", None, steps)
             return False
 
     except Exception as e:
-        _fail("Stripe payment error", _shot(d, img_dir, "stripe_err"), steps, e)
+        _fail(f"Stripe {method} payment error",
+              _shot(d, img_dir, "stripe_err"), steps, e)
         try: d.switch_to.default_content()
         except Exception: pass
         return False
@@ -730,15 +765,20 @@ def complete_stripe_payment(d, cfg, steps, img_dir, cardholder_name, email):
 # ──────────────────────────────────────────────────────────────────────────────
 # 16.  Register a new charity organisation
 # ──────────────────────────────────────────────────────────────────────────────
-def register_new_charity(d, cfg, steps, img_dir, app_ver, run_date) -> bool:
-    """Register a brand-new charity via the 4-step auth.tsx flow:
-       login page → Tab+Enter → plan selection grid → click Growth card
-       → registration form → fill fields → submit.
+def register_new_charity(d, cfg, steps, img_dir, app_ver, run_date,
+                         suffix="", payment_method="card") -> bool:
+    """Register a brand-new charity via the 4-step auth.tsx flow.
+       suffix / payment_method allow three parallel runs:
+         suffix=""  payment_method="card"    → charity111-...@networklogic.uk
+         suffix="k" payment_method="klarna"  → charity111-...-k@networklogic.uk
+         suffix="r" payment_method="revolut" → charity111-...-r@networklogic.uk
     """
+    method_label    = {"card": "Card", "klarna": "Klarna", "revolut": "Revolut Pay"}.get(payment_method, payment_method)
     version_digits  = re.sub(r"[^0-9]", "", app_ver)
-    charity_email   = f"charity{version_digits}-{run_date}@networklogic.uk"
+    sfx             = f"-{suffix}" if suffix else ""
+    charity_email   = f"charity{version_digits}-{run_date}{sfx}@networklogic.uk"
     charity_pw      = f"Charity{version_digits}!Test"
-    charity_name    = f"Test Charity {run_date}"
+    charity_name    = f"Test Charity {run_date}{' ' + method_label if suffix else ''}"
     charity_admin   = f"Test Admin {run_date}"
     _info(f"Register new charity: {charity_email}", None, steps, f"Org: {charity_name}")
     try:
@@ -848,7 +888,8 @@ def register_new_charity(d, cfg, steps, img_dir, app_ver, run_date) -> bool:
             _ok(f"Charity registered — Stripe checkout opened ({charity_email})",
                 img_result, steps)
             paid = complete_stripe_payment(d, cfg, steps, img_dir,
-                                           charity_admin, charity_email)
+                                           charity_admin, charity_email,
+                                           method=payment_method)
             return paid
         elif "/app" in cur:
             _ok(f"Charity registered & in app: {charity_email}", img_result, steps)
@@ -1132,19 +1173,16 @@ def _print_summary(num, steps):
 # 18.  Admin post-registration verification
 # ──────────────────────────────────────────────────────────────────────────────
 def test_admin_post_registration(d, cfg, steps, img_dir,
-                                 new_email, charity_email, charity_name):
+                                 new_email, charities):
     """
     While logged in as platform admin, verify that:
-      1. The newly registered individual user (new_email) appears in All Users.
-      2. The new user's plan allocation is Starter (free) — no paid plan.
-      3. The charity org (charity_name) appears in All Organisations.
-      4. The Payments / All Subscriptions section is checked for a Growth
-         plan entry matching the charity — SKIP if Stripe payment is still
-         pending (expected when the test stopped at Stripe redirect).
+      1. new_email (J4 Starter user) appears in All Users with Starter plan.
+      2. All 3 charity orgs (Card / Klarna / Revolut) appear in All Organisations.
+      3. All 3 subscriptions show Growth plan in All Subscriptions.
+    charities = list of (charity_name, charity_email) tuples.
     """
     _go(d, cfg, "/app/admin")
     time.sleep(5)  # allow React to load all async sections
-
     src = d.page_source
 
     # ── 1. All Users — new individual user present ───────────────────────
@@ -1160,20 +1198,15 @@ def test_admin_post_registration(d, cfg, steps, img_dir,
         _ok(f"New user present in All Users: {new_email}", img_users, steps)
     else:
         _fail(f"New user NOT found in All Users: {new_email}", img_users, steps,
-              "User may not yet appear if Supabase auth confirmation is pending")
+              "User may not appear if Supabase auth confirmation is still pending")
 
-    # ── 2. Plan allocation for new user — Starter (free) ─────────────────
-    # Page shows plan badge per user row; checking page source for "Starter"
-    # is sufficient at this level of testing.
     if "starter" in src.lower():
         _ok("Starter plan visible in Users section", img_users, steps)
     else:
-        steps.append(Step(
-            "Starter plan badge not detected in page source — check screenshot",
-            "SKIP", img_users,
-            "May load asynchronously; open admin panel manually to confirm"))
+        steps.append(Step("Starter plan badge not detected — check screenshot",
+                          "SKIP", img_users))
 
-    # ── 3. All Organisations — charity org present ────────────────────────
+    # ── 2. All Organisations — all 3 charity orgs present ────────────────
     try:
         hdr = d.find_element(By.XPATH, '//*[contains(text(),"All organisations")]')
         d.execute_script("arguments[0].scrollIntoView({block:'center'});", hdr)
@@ -1182,14 +1215,14 @@ def test_admin_post_registration(d, cfg, steps, img_dir,
         pass
 
     img_orgs = _shot(d, img_dir, "j6_02_all_orgs")
-    if charity_name.lower() in src.lower():
-        _ok(f"Charity org present in All Organisations: {charity_name}", img_orgs, steps)
-    else:
-        _fail(f"Charity org NOT found in All Organisations: {charity_name}",
-              img_orgs, steps,
-              "Org is created before Stripe redirect — should appear even if payment pending")
+    for cname, cemail in charities:
+        if cname.lower() in src.lower():
+            _ok(f"Org present in All Organisations: {cname}", img_orgs, steps)
+        else:
+            _fail(f"Org NOT found in All Organisations: {cname}",
+                  img_orgs, steps, f"Expected org for {cemail}")
 
-    # ── 4. All Subscriptions / Payments — Growth plan check ──────────────
+    # ── 3. All Subscriptions — Growth plan for all 3 charities ───────────
     try:
         hdr = d.find_element(By.XPATH, '//*[contains(text(),"All subscriptions")]')
         d.execute_script("arguments[0].scrollIntoView({block:'center'});", hdr)
@@ -1198,23 +1231,18 @@ def test_admin_post_registration(d, cfg, steps, img_dir,
         pass
 
     img_subs = _shot(d, img_dir, "j6_03_all_subscriptions")
-    # Re-read source after scroll (React may have loaded the section)
-    src2 = d.page_source
-    charity_in_subs  = charity_name.lower() in src2.lower()
-    growth_in_subs   = "growth" in src2.lower()
+    src2 = d.page_source  # re-read after scroll
+    growth_present = "growth" in src2.lower()
 
-    if charity_in_subs and growth_in_subs:
-        _ok(f"Growth plan subscription confirmed for {charity_name}", img_subs, steps)
-    elif charity_in_subs:
-        _fail(
-            f"Charity in subscriptions but Growth plan not visible: {charity_name}",
-            img_subs, steps,
-            "Payment completed but Growth plan badge missing — check Stripe webhook")
-    else:
-        _fail(
-            f"Charity NOT found in All Subscriptions: {charity_name}",
-            img_subs, steps,
-            "Stripe payment was completed — subscription should be active. Check webhook.")
+    for cname, cemail in charities:
+        if cname.lower() in src2.lower() and growth_present:
+            _ok(f"Growth subscription confirmed: {cname}", img_subs, steps)
+        elif cname.lower() in src2.lower():
+            _fail(f"Org in subscriptions but Growth plan not visible: {cname}",
+                  img_subs, steps, "Check Stripe webhook delivery")
+        else:
+            _fail(f"Org NOT in All Subscriptions: {cname}",
+                  img_subs, steps, "Payment completed — subscription should be active")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1320,8 +1348,50 @@ def main():
         except Exception as e:
             steps_j3.append(Step("Journey 3 — error", "FAIL", None, str(e)))
             traceback.print_exc()
-        sections.append(("Journey 3: New Charity Registration & Onboarding", steps_j3))
+        sections.append(("Journey 3: New Charity Registration — Card", steps_j3))
         _print_summary(3, steps_j3)
+
+        # ══════════════════════════════════════════════════════════════════
+        # JOURNEY 7 — New Charity Registration via Klarna
+        #   Same 4-step flow as J3 but selects Klarna on the Stripe page
+        #   and completes the Klarna test authorisation redirect.
+        # ══════════════════════════════════════════════════════════════════
+        _print_journey(7, "New Charity Registration — Klarna")
+        steps_j7 = []
+        d7 = run_dir / "j7_charity_klarna"
+        try:
+            klarna_ok = register_new_charity(d, cfg, steps_j7, d7, app_ver, date_tag,
+                                             suffix="k", payment_method="klarna")
+            if klarna_ok:
+                test_support_submit(d, cfg, steps_j7, d7,
+                                    f"Klarna charity onboarding — cycle {run_ts}")
+                do_logout(d, cfg, steps_j7, d7, "charity_klarna")
+        except Exception as e:
+            steps_j7.append(Step("Journey 7 — error", "FAIL", None, str(e)))
+            traceback.print_exc()
+        sections.append(("Journey 7: New Charity Registration — Klarna", steps_j7))
+        _print_summary(7, steps_j7)
+
+        # ══════════════════════════════════════════════════════════════════
+        # JOURNEY 8 — New Charity Registration via Revolut Pay
+        #   Same 4-step flow but selects Revolut Pay on the Stripe page
+        #   and completes the Revolut Pay test authorisation redirect.
+        # ══════════════════════════════════════════════════════════════════
+        _print_journey(8, "New Charity Registration — Revolut Pay")
+        steps_j8 = []
+        d8 = run_dir / "j8_charity_revolut"
+        try:
+            revolut_ok = register_new_charity(d, cfg, steps_j8, d8, app_ver, date_tag,
+                                              suffix="r", payment_method="revolut")
+            if revolut_ok:
+                test_support_submit(d, cfg, steps_j8, d8,
+                                    f"Revolut charity onboarding — cycle {run_ts}")
+                do_logout(d, cfg, steps_j8, d8, "charity_revolut")
+        except Exception as e:
+            steps_j8.append(Step("Journey 8 — error", "FAIL", None, str(e)))
+            traceback.print_exc()
+        sections.append(("Journey 8: New Charity Registration — Revolut Pay", steps_j8))
+        _print_summary(8, steps_j8)
 
         # ══════════════════════════════════════════════════════════════════
         # JOURNEY 4 — Registration Security Check
@@ -1378,8 +1448,12 @@ def main():
         #     • Growth plan subscription active in All Subscriptions
         #       (payment was completed via Stripe test card in J3)
         # ══════════════════════════════════════════════════════════════════
-        charity_email_j6 = f"charity{safe_ver}-{date_tag}@networklogic.uk"
-        charity_name_j6  = f"Test Charity {date_tag}"
+        # Build the list of all 3 charity registrations for J6 to verify
+        all_charities = [
+            (f"Test Charity {date_tag}",           f"charity{safe_ver}-{date_tag}@networklogic.uk"),
+            (f"Test Charity {date_tag} Klarna",    f"charity{safe_ver}-{date_tag}-k@networklogic.uk"),
+            (f"Test Charity {date_tag} Revolut Pay", f"charity{safe_ver}-{date_tag}-r@networklogic.uk"),
+        ]
         _print_journey(6, "Admin Post-Registration Verification",
                        cfg["admin_email"])
         steps_j6 = []
@@ -1388,9 +1462,7 @@ def main():
             if do_login(d, cfg, cfg["admin_email"], cfg["admin_password"],
                         steps_j6, d6):
                 test_admin_post_registration(d, cfg, steps_j6, d6,
-                                             new_email,
-                                             charity_email_j6,
-                                             charity_name_j6)
+                                             new_email, all_charities)
                 do_logout(d, cfg, steps_j6, d6, "admin_verify")
         except Exception as e:
             steps_j6.append(Step("Journey 6 — error", "FAIL", None, str(e)))
