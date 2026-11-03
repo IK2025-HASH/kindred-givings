@@ -1248,6 +1248,21 @@ def test_admin_post_registration(d, cfg, steps, img_dir,
 # ──────────────────────────────────────────────────────────────────────────────
 # 19.  Main — six user journeys
 # ──────────────────────────────────────────────────────────────────────────────
+def _load_manifest() -> set:
+    """Return set of journey IDs (e.g. {'J1','J3'}) that are enabled in test_manifest.csv.
+    If the file is missing every journey is enabled."""
+    import csv as _csv
+    manifest = HERE / "test_manifest.csv"
+    if not manifest.exists():
+        return {f"J{i}" for i in range(1, 9)}
+    enabled = set()
+    with open(manifest, newline="", encoding="utf-8") as fh:
+        for row in _csv.DictReader(fh):
+            if row.get("Include", "Y").strip().upper() == "Y":
+                enabled.add(row["Journey"].strip())
+    return enabled
+
+
 def main():
     cfg      = load_cfg()
     app_ver, ver_date = read_version()
@@ -1261,9 +1276,15 @@ def main():
     new_email = f"v{safe_ver}-{date_tag}@networklogic.uk"
     new_pw    = "TestPass_Auto123!"
 
+    # Read test_manifest.csv — journeys with Include=N are skipped
+    enabled = _load_manifest()
+
     print(f"\n{'='*60}", flush=True)
     print(f"  GiveWell Test Cycle  |  {app_ver}  |  {run_ts}", flush=True)
     print(f"  Individual test user : {new_email}", flush=True)
+    disabled = {f"J{i}" for i in range(1,9)} - enabled
+    if disabled:
+        print(f"  Skipped (manifest)   : {', '.join(sorted(disabled))}", flush=True)
     print(f"{'='*60}\n", flush=True)
 
     run_dir = HERE / f"TestRun_{tag}"
@@ -1281,24 +1302,26 @@ def main():
     try:
         # ══════════════════════════════════════════════════════════════════
         # JOURNEY 1 — Platform Admin Workflow
-        #   Login as platform admin → visit all admin routes → donor
-        #   management dialog → inbox tabs → support submit → logout.
         # ══════════════════════════════════════════════════════════════════
-        _print_journey(1, "Platform Admin Workflow", cfg["admin_email"])
-        steps_j1 = []
-        d1 = run_dir / "j1_admin"
-        try:
-            if do_login(d, cfg, cfg["admin_email"], cfg["admin_password"], steps_j1, d1):
-                smoke_routes(d, cfg, steps_j1, d1, ADMIN_ROUTES)
-                test_add_donor(d, cfg, steps_j1, d1)
-                test_inbox_tabs(d, cfg, steps_j1, d1)
-                test_support_submit(d, cfg, steps_j1, d1, f"Admin cycle test {run_ts}")
-                do_logout(d, cfg, steps_j1, d1, "admin")
-        except Exception as e:
-            steps_j1.append(Step("Journey 1 — unexpected error", "FAIL", None, str(e)))
-            traceback.print_exc()
-        sections.append((f"Journey 1: Platform Admin Workflow ({cfg['admin_email']})", steps_j1))
-        _print_summary(1, steps_j1)
+        if "J1" not in enabled:
+            sections.append(("Journey 1: Platform Admin Workflow (DISABLED)", [Step("Disabled via test_manifest.csv", "SKIP")]))
+            print("  Journey 1: SKIPPED (disabled in test_manifest.csv)\n", flush=True)
+        else:
+            _print_journey(1, "Platform Admin Workflow", cfg["admin_email"])
+            steps_j1 = []
+            d1 = run_dir / "j1_admin"
+            try:
+                if do_login(d, cfg, cfg["admin_email"], cfg["admin_password"], steps_j1, d1):
+                    smoke_routes(d, cfg, steps_j1, d1, ADMIN_ROUTES)
+                    test_add_donor(d, cfg, steps_j1, d1)
+                    test_inbox_tabs(d, cfg, steps_j1, d1)
+                    test_support_submit(d, cfg, steps_j1, d1, f"Admin cycle test {run_ts}")
+                    do_logout(d, cfg, steps_j1, d1, "admin")
+            except Exception as e:
+                steps_j1.append(Step("Journey 1 — unexpected error", "FAIL", None, str(e)))
+                traceback.print_exc()
+            sections.append((f"Journey 1: Platform Admin Workflow ({cfg['admin_email']})", steps_j1))
+            _print_summary(1, steps_j1)
 
         # ══════════════════════════════════════════════════════════════════
         # JOURNEY 2 — Support Agent Workflow
@@ -1306,138 +1329,149 @@ def main():
         #   → support submit → logout.
         #   Skipped when agent credentials are not configured.
         # ══════════════════════════════════════════════════════════════════
-        ag_email = cfg.get("agent_email", "")
-        ag_pw    = cfg.get("agent_password", "")
-        if ag_email and ag_pw and ag_pw not in ("", "FILL_IN"):
-            _print_journey(2, "Support Agent Workflow", ag_email)
-            steps_j2 = []
-            d2 = run_dir / "j2_agent"
-            try:
-                if do_login(d, cfg, ag_email, ag_pw, steps_j2, d2):
-                    smoke_routes(d, cfg, steps_j2, d2, AGENT_ROUTES)
-                    test_inbox_tabs(d, cfg, steps_j2, d2)
-                    test_support_submit(d, cfg, steps_j2, d2, f"Agent workflow test {run_ts}")
-                    do_logout(d, cfg, steps_j2, d2, "agent")
-            except Exception as e:
-                steps_j2.append(Step("Journey 2 — error", "FAIL", None, str(e)))
-                traceback.print_exc()
-            sections.append((f"Journey 2: Support Agent Workflow ({ag_email})", steps_j2))
-            _print_summary(2, steps_j2)
+        if "J2" not in enabled:
+            sections.append(("Journey 2: Support Agent Workflow (DISABLED)", [Step("Disabled via test_manifest.csv", "SKIP")]))
+            print("  Journey 2: SKIPPED (disabled in test_manifest.csv)\n", flush=True)
         else:
-            sections.append((
-                "Journey 2: Support Agent Workflow (SKIPPED)",
-                [Step("No agent credentials — add agent_email / agent_password to test_config.json",
-                      "SKIP")]))
-            print("  Journey 2: SKIPPED (no agent credentials)\n", flush=True)
+            ag_email = cfg.get("agent_email", "")
+            ag_pw    = cfg.get("agent_password", "")
+            if ag_email and ag_pw and ag_pw not in ("", "FILL_IN"):
+                _print_journey(2, "Support Agent Workflow", ag_email)
+                steps_j2 = []
+                d2 = run_dir / "j2_agent"
+                try:
+                    if do_login(d, cfg, ag_email, ag_pw, steps_j2, d2):
+                        smoke_routes(d, cfg, steps_j2, d2, AGENT_ROUTES)
+                        test_inbox_tabs(d, cfg, steps_j2, d2)
+                        test_support_submit(d, cfg, steps_j2, d2, f"Agent workflow test {run_ts}")
+                        do_logout(d, cfg, steps_j2, d2, "agent")
+                except Exception as e:
+                    steps_j2.append(Step("Journey 2 — error", "FAIL", None, str(e)))
+                    traceback.print_exc()
+                sections.append((f"Journey 2: Support Agent Workflow ({ag_email})", steps_j2))
+                _print_summary(2, steps_j2)
+            else:
+                sections.append((
+                    "Journey 2: Support Agent Workflow (SKIPPED)",
+                    [Step("No agent credentials — add agent_email / agent_password to test_config.json",
+                          "SKIP")]))
+                print("  Journey 2: SKIPPED (no agent credentials)\n", flush=True)
 
         # ══════════════════════════════════════════════════════════════════
-        # JOURNEY 3 — New Charity Registration & Onboarding
-        #   Start from login page → Tab+Enter to register → select Growth
-        #   (£9/mo) plan → fill charity details → submit → Stripe checkout
-        #   or in-app → send support chat → logout.
+        # JOURNEY 3 — New Charity Registration — Card
         # ══════════════════════════════════════════════════════════════════
-        _print_journey(3, "New Charity Registration & Onboarding")
-        steps_j3 = []
-        d3 = run_dir / "j3_charity"
-        try:
-            charity_ok = register_new_charity(d, cfg, steps_j3, d3, app_ver, date_tag)
-            if charity_ok:
-                test_support_submit(d, cfg, steps_j3, d3,
-                                    f"New charity onboarding — cycle {run_ts}")
-                do_logout(d, cfg, steps_j3, d3, "charity")
-        except Exception as e:
-            steps_j3.append(Step("Journey 3 — error", "FAIL", None, str(e)))
-            traceback.print_exc()
-        sections.append(("Journey 3: New Charity Registration — Card", steps_j3))
-        _print_summary(3, steps_j3)
+        if "J3" not in enabled:
+            sections.append(("Journey 3: New Charity Registration — Card (DISABLED)", [Step("Disabled via test_manifest.csv", "SKIP")]))
+            print("  Journey 3: SKIPPED (disabled in test_manifest.csv)\n", flush=True)
+        else:
+            _print_journey(3, "New Charity Registration & Onboarding")
+            steps_j3 = []
+            d3 = run_dir / "j3_charity"
+            try:
+                charity_ok = register_new_charity(d, cfg, steps_j3, d3, app_ver, date_tag)
+                if charity_ok:
+                    test_support_submit(d, cfg, steps_j3, d3,
+                                        f"New charity onboarding — cycle {run_ts}")
+                    do_logout(d, cfg, steps_j3, d3, "charity")
+            except Exception as e:
+                steps_j3.append(Step("Journey 3 — error", "FAIL", None, str(e)))
+                traceback.print_exc()
+            sections.append(("Journey 3: New Charity Registration — Card", steps_j3))
+            _print_summary(3, steps_j3)
 
         # ══════════════════════════════════════════════════════════════════
         # JOURNEY 7 — New Charity Registration via Klarna
-        #   Same 4-step flow as J3 but selects Klarna on the Stripe page
-        #   and completes the Klarna test authorisation redirect.
         # ══════════════════════════════════════════════════════════════════
-        _print_journey(7, "New Charity Registration — Klarna")
-        steps_j7 = []
-        d7 = run_dir / "j7_charity_klarna"
-        try:
-            klarna_ok = register_new_charity(d, cfg, steps_j7, d7, app_ver, date_tag,
-                                             suffix="k", payment_method="klarna")
-            if klarna_ok:
-                test_support_submit(d, cfg, steps_j7, d7,
-                                    f"Klarna charity onboarding — cycle {run_ts}")
-                do_logout(d, cfg, steps_j7, d7, "charity_klarna")
-        except Exception as e:
-            steps_j7.append(Step("Journey 7 — error", "FAIL", None, str(e)))
-            traceback.print_exc()
-        sections.append(("Journey 7: New Charity Registration — Klarna", steps_j7))
-        _print_summary(7, steps_j7)
+        if "J7" not in enabled:
+            sections.append(("Journey 7: New Charity Registration — Klarna (DISABLED)", [Step("Disabled via test_manifest.csv", "SKIP")]))
+            print("  Journey 7: SKIPPED (disabled in test_manifest.csv)\n", flush=True)
+        else:
+            _print_journey(7, "New Charity Registration — Klarna")
+            steps_j7 = []
+            d7 = run_dir / "j7_charity_klarna"
+            try:
+                klarna_ok = register_new_charity(d, cfg, steps_j7, d7, app_ver, date_tag,
+                                                 suffix="k", payment_method="klarna")
+                if klarna_ok:
+                    test_support_submit(d, cfg, steps_j7, d7,
+                                        f"Klarna charity onboarding — cycle {run_ts}")
+                    do_logout(d, cfg, steps_j7, d7, "charity_klarna")
+            except Exception as e:
+                steps_j7.append(Step("Journey 7 — error", "FAIL", None, str(e)))
+                traceback.print_exc()
+            sections.append(("Journey 7: New Charity Registration — Klarna", steps_j7))
+            _print_summary(7, steps_j7)
 
         # ══════════════════════════════════════════════════════════════════
         # JOURNEY 8 — New Charity Registration via Revolut Pay
-        #   Same 4-step flow but selects Revolut Pay on the Stripe page
-        #   and completes the Revolut Pay test authorisation redirect.
         # ══════════════════════════════════════════════════════════════════
-        _print_journey(8, "New Charity Registration — Revolut Pay")
-        steps_j8 = []
-        d8 = run_dir / "j8_charity_revolut"
-        try:
-            revolut_ok = register_new_charity(d, cfg, steps_j8, d8, app_ver, date_tag,
-                                              suffix="r", payment_method="revolut")
-            if revolut_ok:
-                test_support_submit(d, cfg, steps_j8, d8,
-                                    f"Revolut charity onboarding — cycle {run_ts}")
-                do_logout(d, cfg, steps_j8, d8, "charity_revolut")
-        except Exception as e:
-            steps_j8.append(Step("Journey 8 — error", "FAIL", None, str(e)))
-            traceback.print_exc()
-        sections.append(("Journey 8: New Charity Registration — Revolut Pay", steps_j8))
-        _print_summary(8, steps_j8)
+        if "J8" not in enabled:
+            sections.append(("Journey 8: New Charity Registration — Revolut Pay (DISABLED)", [Step("Disabled via test_manifest.csv", "SKIP")]))
+            print("  Journey 8: SKIPPED (disabled in test_manifest.csv)\n", flush=True)
+        else:
+            _print_journey(8, "New Charity Registration — Revolut Pay")
+            steps_j8 = []
+            d8 = run_dir / "j8_charity_revolut"
+            try:
+                revolut_ok = register_new_charity(d, cfg, steps_j8, d8, app_ver, date_tag,
+                                                  suffix="r", payment_method="revolut")
+                if revolut_ok:
+                    test_support_submit(d, cfg, steps_j8, d8,
+                                        f"Revolut charity onboarding — cycle {run_ts}")
+                    do_logout(d, cfg, steps_j8, d8, "charity_revolut")
+            except Exception as e:
+                steps_j8.append(Step("Journey 8 — error", "FAIL", None, str(e)))
+                traceback.print_exc()
+            sections.append(("Journey 8: New Charity Registration — Revolut Pay", steps_j8))
+            _print_summary(8, steps_j8)
 
         # ══════════════════════════════════════════════════════════════════
         # JOURNEY 4 — Registration Security Check
-        #   Register a new individual user (free Starter plan) then
-        #   immediately attempt to log in before email is confirmed.
-        #   Expected outcome: login is blocked → PASS.
         # ══════════════════════════════════════════════════════════════════
-        _print_journey(4, "Registration Security Check", new_email)
-        steps_j4 = []
-        d4 = run_dir / "j4_security"
         user_ok = False
-        try:
-            user_ok = register_user(d, cfg, new_email, new_pw, steps_j4, d4)
-            test_login_before_confirmation(d, cfg, new_email, new_pw, steps_j4, d4)
-        except Exception as e:
-            steps_j4.append(Step("Journey 4 — error", "FAIL", None, str(e)))
-            traceback.print_exc()
-        sections.append((
-            f"Journey 4: Registration Security Check ({new_email})", steps_j4))
-        _print_summary(4, steps_j4)
+        if "J4" not in enabled:
+            sections.append((f"Journey 4: Registration Security Check (DISABLED)", [Step("Disabled via test_manifest.csv", "SKIP")]))
+            print("  Journey 4: SKIPPED (disabled in test_manifest.csv)\n", flush=True)
+        else:
+            _print_journey(4, "Registration Security Check", new_email)
+            steps_j4 = []
+            d4 = run_dir / "j4_security"
+            try:
+                user_ok = register_user(d, cfg, new_email, new_pw, steps_j4, d4)
+                test_login_before_confirmation(d, cfg, new_email, new_pw, steps_j4, d4)
+            except Exception as e:
+                steps_j4.append(Step("Journey 4 — error", "FAIL", None, str(e)))
+                traceback.print_exc()
+            sections.append((
+                f"Journey 4: Registration Security Check ({new_email})", steps_j4))
+            _print_summary(4, steps_j4)
 
         # ══════════════════════════════════════════════════════════════════
         # JOURNEY 5 — New User App Access
-        #   Only runs when the user registered in J4 is auto-confirmed
-        #   (email confirmation disabled in Supabase).  Visits all user-
-        #   role routes and checks inbox tabs, then logs out.
         # ══════════════════════════════════════════════════════════════════
-        _print_journey(5, "New User App Access", new_email)
-        steps_j5 = []
-        d5 = run_dir / "j5_newuser"
-        try:
-            if user_ok:
-                smoke_routes(d, cfg, steps_j5, d5, USER_ROUTES)
-                test_inbox_tabs(d, cfg, steps_j5, d5)
-                do_logout(d, cfg, steps_j5, d5, "new_user")
-            else:
-                steps_j5.append(Step(
-                    "Skipped — new user email not yet confirmed",
-                    "SKIP", None,
-                    f"Confirm {new_email} in Supabase or via the confirmation email, then re-run"))
-        except Exception as e:
-            steps_j5.append(Step("Journey 5 — error", "FAIL", None, str(e)))
-            traceback.print_exc()
-        sections.append((
-            f"Journey 5: New User App Access ({new_email})", steps_j5))
-        _print_summary(5, steps_j5)
+        if "J5" not in enabled:
+            sections.append((f"Journey 5: New User App Access (DISABLED)", [Step("Disabled via test_manifest.csv", "SKIP")]))
+            print("  Journey 5: SKIPPED (disabled in test_manifest.csv)\n", flush=True)
+        else:
+            _print_journey(5, "New User App Access", new_email)
+            steps_j5 = []
+            d5 = run_dir / "j5_newuser"
+            try:
+                if user_ok:
+                    smoke_routes(d, cfg, steps_j5, d5, USER_ROUTES)
+                    test_inbox_tabs(d, cfg, steps_j5, d5)
+                    do_logout(d, cfg, steps_j5, d5, "new_user")
+                else:
+                    steps_j5.append(Step(
+                        "Skipped — new user email not yet confirmed",
+                        "SKIP", None,
+                        f"Confirm {new_email} in Supabase or via the confirmation email, then re-run"))
+            except Exception as e:
+                steps_j5.append(Step("Journey 5 — error", "FAIL", None, str(e)))
+                traceback.print_exc()
+            sections.append((
+                f"Journey 5: New User App Access ({new_email})", steps_j5))
+            _print_summary(5, steps_j5)
 
         # ══════════════════════════════════════════════════════════════════
         # JOURNEY 6 — Admin Post-Registration Verification
@@ -1454,23 +1488,27 @@ def main():
             (f"Test Charity {date_tag} Klarna",    f"charity{safe_ver}-{date_tag}-k@networklogic.uk"),
             (f"Test Charity {date_tag} Revolut Pay", f"charity{safe_ver}-{date_tag}-r@networklogic.uk"),
         ]
-        _print_journey(6, "Admin Post-Registration Verification",
-                       cfg["admin_email"])
-        steps_j6 = []
-        d6 = run_dir / "j6_admin_verify"
-        try:
-            if do_login(d, cfg, cfg["admin_email"], cfg["admin_password"],
-                        steps_j6, d6):
-                test_admin_post_registration(d, cfg, steps_j6, d6,
-                                             new_email, all_charities)
-                do_logout(d, cfg, steps_j6, d6, "admin_verify")
-        except Exception as e:
-            steps_j6.append(Step("Journey 6 — error", "FAIL", None, str(e)))
-            traceback.print_exc()
-        sections.append((
-            f"Journey 6: Admin Post-Registration Verification ({cfg['admin_email']})",
-            steps_j6))
-        _print_summary(6, steps_j6)
+        if "J6" not in enabled:
+            sections.append(("Journey 6: Admin Post-Registration Verification (DISABLED)", [Step("Disabled via test_manifest.csv", "SKIP")]))
+            print("  Journey 6: SKIPPED (disabled in test_manifest.csv)\n", flush=True)
+        else:
+            _print_journey(6, "Admin Post-Registration Verification",
+                           cfg["admin_email"])
+            steps_j6 = []
+            d6 = run_dir / "j6_admin_verify"
+            try:
+                if do_login(d, cfg, cfg["admin_email"], cfg["admin_password"],
+                            steps_j6, d6):
+                    test_admin_post_registration(d, cfg, steps_j6, d6,
+                                                 new_email, all_charities)
+                    do_logout(d, cfg, steps_j6, d6, "admin_verify")
+            except Exception as e:
+                steps_j6.append(Step("Journey 6 — error", "FAIL", None, str(e)))
+                traceback.print_exc()
+            sections.append((
+                f"Journey 6: Admin Post-Registration Verification ({cfg['admin_email']})",
+                steps_j6))
+            _print_summary(6, steps_j6)
 
     finally:
         d.quit()

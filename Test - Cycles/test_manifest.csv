@@ -1,0 +1,9 @@
+Journey,Name,Include,Notes
+J1,Platform Admin Workflow,Y,Login as platform admin - smoke all admin routes - add donor - inbox tabs - support submit - logout
+J2,Support Agent Workflow,Y,Requires agent_email + agent_password in test_config.json; auto-skipped if blank
+J3,New Charity Registration - Card,Y,Registers new charity on Growth plan via Stripe test card 4242 4242 4242 4242
+J4,Registration Security Check,Y,Registers individual user (Starter plan) - verifies login is blocked before email confirmation
+J5,New User App Access,Y,Smoke all user routes + inbox tabs as newly registered user; auto-skipped if J4 user not yet confirmed
+J6,Admin Post-Registration Verification,Y,Logs in as admin and verifies all registered users / charity orgs / Growth subscriptions are visible
+J7,New Charity Registration - Klarna,Y,Registers new charity on Growth plan via Klarna test payment authorisation
+J8,New Charity Registration - Revolut Pay,Y,Registers new charity on Growth plan via Revolut Pay test payment authorisation
