@@ -1,38 +1,36 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo } from "react";
-import { CheckCircle2, Circle } from "lucide-react";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import { PageHeader } from "@/components/app/AppShell";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { useAuth, type Organization } from "@/hooks/useAuth";
-import { useCampaigns, useDonations, useDonors } from "@/hooks/useOrgData";
-import { formatDate, formatMoney } from "@/lib/format";
+import { createFileRoute } from "@tanstack/react-router";
+import { MessageCircle } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/_authenticated/app/")({
   head: () => ({
-    meta: [
-      { title: "Dashboard — Donorbook" },
-      {
-        name: "description",
-        content: "Track money raised, donors, average gift and campaign progress for your charity.",
-      },
-      { property: "og:title", content: "Donorbook charity dashboard" },
-      { property: "og:description", content: "Money raised, donors and campaign progress." },
-    ],
+    meta: [{ title: "Chat POC — Donorbook" }],
   }),
-  component: Dashboard,
+  component: PocHome,
 });
+
+function PocHome() {
+  const { user } = useAuth();
+  return (
+    <div className="flex flex-col items-center gap-6 text-center max-w-md">
+      <div className="flex size-16 items-center justify-center rounded-full bg-primary/10">
+        <MessageCircle className="size-8 text-primary" />
+      </div>
+      <div>
+        <h1 className="font-display text-2xl font-bold tracking-tight">Chat Support — POC</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Signed in as <span className="font-medium text-foreground">{user?.email}</span>.
+          <br />
+          Click the chat button in the bottom-right corner to open the support panel.
+        </p>
+      </div>
+      <p className="text-xs text-muted-foreground border rounded-lg px-4 py-3 bg-background">
+        This is a proof-of-concept build showing only the login and chat module.
+        No other features are active in this branch.
+      </p>
+    </div>
+  );
+}
 
 function SetupChecklist({
   org,
