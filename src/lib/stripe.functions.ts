@@ -754,3 +754,18 @@ export const processAdminRefund = createServerFn({ method: "POST" })
     });
     return { refundId: refund.id, status: refund.status ?? "unknown", amountPence: refund.amount };
   });
+
+// ── 7. Admin: cancel a Stripe subscription immediately ───────────────────────
+export const cancelAdminSubscription = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    z.object({
+      token: z.string(),
+      stripeSubscriptionId: z.string().min(1),
+    }).parse(d)
+  )
+  .handler(async ({ data }): Promise<{ subscriptionId: string; status: string }> => {
+    await requireAdminToken(data.token);
+    const stripe = await getStripe();
+    const sub = await stripe.subscriptions.cancel(data.stripeSubscriptionId);
+    return { subscriptionId: sub.id, status: sub.status };
+  });

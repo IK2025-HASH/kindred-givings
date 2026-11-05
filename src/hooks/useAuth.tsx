@@ -40,6 +40,7 @@ type AuthContextValue = {
   currentOrg: Organization | null;
   currentRole: OrgRole | null;
   isPlatformAdmin: boolean;
+  isAdminResolved: boolean;
   isChatSupportAgent: boolean;
   setCurrentOrgId: (id: string) => void;
   refreshMemberships: () => void;
@@ -152,6 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       currentOrg: current?.organization ?? null,
       currentRole: current?.role ?? null,
       isPlatformAdmin: adminQuery.data ?? false,
+      isAdminResolved: adminQuery.isSuccess,
       isChatSupportAgent: chatSupportQuery.data ?? false,
       setCurrentOrgId,
       refreshMemberships: () => {
@@ -166,6 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       membershipsQuery.isLoading,
       current,
       adminQuery.data,
+      adminQuery.isSuccess,
       chatSupportQuery.data,
       setCurrentOrgId,
       queryClient,

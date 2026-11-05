@@ -64,16 +64,16 @@ type Message = {
 };
 
 function SupportPage() {
-  const { user, isPlatformAdmin, isChatSupportAgent } = useAuth();
+  const { user, isPlatformAdmin, isAdminResolved, isChatSupportAgent } = useAuth();
   const qc = useQueryClient();
   const [selected, setSelected] = useState<Conversation | null>(null);
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // Include admin/agent status in queryKey so query re-runs once auth resolves
+  // Wait for admin status to resolve before firing — prevents empty cache under wrong filter
   const convosQuery = useQuery({
     queryKey: ["support-inbox", user?.id, isPlatformAdmin, isChatSupportAgent],
-    enabled: !!user,
+    enabled: !!user && isAdminResolved,
     queryFn: async (): Promise<Conversation[]> => {
       let q = supabase
         .from("support_conversations")

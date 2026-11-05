@@ -24,7 +24,7 @@ import { usePlatformSettingsQuery } from "@/hooks/usePlatformSettings";
 import { DEFAULTS, type PlatformSettings } from "@/lib/platform-settings.functions";
 import { formatDate, formatMoney } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
-import { syncPlansToStripe, getAdminSubscriptions, processAdminRefund, type AdminSubscription } from "@/lib/stripe.functions";
+import { syncPlansToStripe, getAdminSubscriptions, processAdminRefund, cancelAdminSubscription, type AdminSubscription } from "@/lib/stripe.functions";
 
 export const Route = createFileRoute("/_authenticated/app/admin")({
   beforeLoad: async () => {
@@ -787,6 +787,7 @@ function PaymentsSection() {
   const [refundTarget, setRefundTarget] = useState<AdminSubscription | null>(null);
   const [refundAmountGbp, setRefundAmountGbp] = useState("");
   const [refundReason, setRefundReason] = useState<"duplicate" | "fraudulent" | "requested_by_customer">("requested_by_customer");
+  const [refundCancelSub, setRefundCancelSub] = useState(true);
   const [refundBusy, setRefundBusy] = useState(false);
 
   const subsQuery = useQuery({
@@ -814,7 +815,14 @@ function PaymentsSection() {
           reason: refundReason,
         },
       });
-      toast.success(`Refund of £${(result.amountPence / 100).toFixed(2)} issued — Stripe ID: ${result.refundId} (${result.status})`);
+      let cancelMsg = "";
+      if (refundCancelSub && refundTarget.stripe_subscription_id) {
+        await cancelAdminSubscription({
+          data: { token: session.access_token, stripeSubscriptionId: refundTarget.stripe_subscription_id },
+        });
+        cancelMsg = " · Subscription cancelled.";
+      }
+      toast.success(`Refund of £${(result.amountPence / 100).toFixed(2)} issued — Stripe ID: ${result.refundId} (${result.status})${cancelMsg}`);
       setRefundTarget(null);
       setRefundAmountGbp("");
       void qc.invalidateQueries({ queryKey: ["admin-payments"] });
@@ -942,6 +950,7 @@ function PaymentsSection() {
                           setRefundTarget(s);
                           setRefundAmountGbp(s.stripe_amount ? (s.stripe_amount / 100).toFixed(2) : "");
                           setRefundReason("requested_by_customer");
+                          setRefundCancelSub(true);
                         }}
                       >
                         Refund
@@ -1003,9 +1012,15 @@ function PaymentsSection() {
                     </select>
                   </div>
                 </div>
+                {refundTarget.stripe_subscription_id && (
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Switch checked={refundCancelSub} onCheckedChange={setRefundCancelSub} />
+                    Also cancel subscription (stop future billing)
+                  </label>
+                )}
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="destructive" disabled={refundBusy || !refundAmountGbp} onClick={() => void handleRefund()}>
-                    {refundBusy ? "Processing…" : `Refund £${refundAmountGbp || "0.00"}`}
+                    {refundBusy ? "Processing…" : `Refund £${refundAmountGbp || "0.00"}${refundCancelSub && refundTarget.stripe_subscription_id ? " + Cancel" : ""}`}
                   </Button>
                   <Button size="sm" variant="ghost" disabled={refundBusy} onClick={() => { setRefundTarget(null); setRefundAmountGbp(""); }}>
                     Cancel
