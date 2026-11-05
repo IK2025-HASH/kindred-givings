@@ -1466,29 +1466,25 @@ def _load_manifest():
 
     enabled_j: set = set()
     enabled_tc: set = set()
-    has_type_col = False
 
-    with open(manifest, newline="", encoding="utf-8") as fh:
-        reader = _csv.DictReader(fh)
-        rows = list(reader)
-        if rows:
-            has_type_col = "Type" in rows[0]
-
-    with open(manifest, newline="", encoding="utf-8") as fh:
+    # utf-8-sig strips the BOM that Excel adds when saving CSV files,
+    # which would otherwise corrupt the first column header name.
+    with open(manifest, newline="", encoding="utf-8-sig") as fh:
         for row in _csv.DictReader(fh):
-            inc = row.get("Include", "Y").strip().upper()
-            if has_type_col:
-                rtype = row.get("Type", "Journey").strip()
-                jid   = row.get("Journey", "").strip()
-                tcid  = row.get("TestCase", "").strip()
-                if rtype == "Journey" and inc == "Y":
+            inc   = row.get("Include", "Y").strip().upper()
+            rtype = row.get("Type", "").strip()
+            jid   = row.get("Journey", "").strip()
+            tcid  = row.get("TestCase", "").strip()
+            if rtype == "Journey":
+                if inc == "Y":
                     enabled_j.add(jid)
-                elif rtype == "TestCase" and inc == "Y" and tcid:
+            elif rtype == "TestCase":
+                if inc == "Y" and tcid:
                     enabled_tc.add(tcid)
             else:
-                # Legacy format — only journey-level rows
+                # Legacy format (no Type column) — journey-level rows only
                 if inc == "Y":
-                    enabled_j.add(row["Journey"].strip())
+                    enabled_j.add(jid)
 
     return enabled_j, enabled_tc
 
