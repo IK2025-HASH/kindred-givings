@@ -1451,19 +1451,52 @@ def test_admin_post_registration(d, cfg, steps, img_dir,
 # ──────────────────────────────────────────────────────────────────────────────
 # 19.  Main — six user journeys
 # ──────────────────────────────────────────────────────────────────────────────
-def _load_manifest() -> set:
-    """Return set of journey IDs (e.g. {'J1','J3'}) that are enabled in test_manifest.csv.
-    If the file is missing every journey is enabled."""
+def _load_manifest():
+    """Return (enabled_journeys, enabled_tcs) sets from test_manifest.csv.
+
+    enabled_journeys : set of journey IDs whose Journey row has Include=Y
+    enabled_tcs      : set of test-case IDs (e.g. 'J3-TC4') with Include=Y
+                       — only populated for journeys that are themselves enabled.
+    If the file is missing or uses the old single-row format, all are enabled."""
     import csv as _csv
     manifest = HERE / "test_manifest.csv"
+    all_journeys = {f"J{i}" for i in range(1, 10)}
     if not manifest.exists():
-        return {f"J{i}" for i in range(1, 9)}
-    enabled = set()
+        return all_journeys, set()   # empty tc set = "all TCs run"
+
+    enabled_j: set = set()
+    enabled_tc: set = set()
+    has_type_col = False
+
+    with open(manifest, newline="", encoding="utf-8") as fh:
+        reader = _csv.DictReader(fh)
+        rows = list(reader)
+        if rows:
+            has_type_col = "Type" in rows[0]
+
     with open(manifest, newline="", encoding="utf-8") as fh:
         for row in _csv.DictReader(fh):
-            if row.get("Include", "Y").strip().upper() == "Y":
-                enabled.add(row["Journey"].strip())
-    return enabled
+            inc = row.get("Include", "Y").strip().upper()
+            if has_type_col:
+                rtype = row.get("Type", "Journey").strip()
+                jid   = row.get("Journey", "").strip()
+                tcid  = row.get("TestCase", "").strip()
+                if rtype == "Journey" and inc == "Y":
+                    enabled_j.add(jid)
+                elif rtype == "TestCase" and inc == "Y" and tcid:
+                    enabled_tc.add(tcid)
+            else:
+                # Legacy format — only journey-level rows
+                if inc == "Y":
+                    enabled_j.add(row["Journey"].strip())
+
+    return enabled_j, enabled_tc
+
+
+def _tc_enabled(tc_id: str, enabled_tcs: set) -> bool:
+    """Return True if the test case should run.
+    If enabled_tcs is empty (old CSV or no TCs listed) every TC runs."""
+    return not enabled_tcs or tc_id in enabled_tcs
 
 
 def main():
@@ -1479,15 +1512,19 @@ def main():
     new_email = f"v{safe_ver}-{date_tag}@networklogic.uk"
     new_pw    = "TestPass_Auto123!"
 
-    # Read test_manifest.csv — journeys with Include=N are skipped
-    enabled = _load_manifest()
+    # Read test_manifest.csv — journeys / test cases with Include=N are skipped
+    enabled, enabled_tcs = _load_manifest()
 
     print(f"\n{'='*60}", flush=True)
     print(f"  GiveWell Test Cycle  |  {app_ver}  |  {run_ts}", flush=True)
     print(f"  Individual test user : {new_email}", flush=True)
-    disabled = {f"J{i}" for i in range(1,9)} - enabled
+    disabled = {f"J{i}" for i in range(1,10)} - enabled
     if disabled:
         print(f"  Skipped (manifest)   : {', '.join(sorted(disabled))}", flush=True)
+    if enabled_tcs:
+        disabled_tcs = {tc for tc in enabled_tcs if not _tc_enabled(tc, enabled_tcs)}
+        # print count of active TCs for visibility
+        print(f"  TC-level overrides   : {len(enabled_tcs)} test cases explicitly enabled", flush=True)
     print(f"{'='*60}\n", flush=True)
 
     run_dir = HERE / f"TestRun_{tag}"

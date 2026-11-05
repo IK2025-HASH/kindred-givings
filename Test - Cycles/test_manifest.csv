@@ -1,10 +1,66 @@
-Journey,Name,Include,Notes
-J1,Platform Admin Workflow,Y,Login as platform admin - smoke all admin routes - add donor - inbox tabs - support submit - logout
-J2,Support Agent Workflow,Y,Requires agent_email + agent_password in test_config.json; auto-skipped if blank
-J3,New Charity Registration - Card,Y,Registers new charity on Growth plan via Stripe test card 4242 4242 4242 4242
-J4,Registration Security Check,Y,Registers individual user (Starter plan) - verifies login is blocked before email confirmation
-J5,New User App Access,Y,Smoke all user routes + inbox tabs as newly registered user; auto-skipped if J4 user not yet confirmed
-J6,Admin Post-Registration Verification,Y,Logs in as admin and verifies all registered users / charity orgs / Growth subscriptions are visible
-J7,New Charity Registration - Klarna,Y,Registers new charity on Growth plan via Klarna test payment authorisation
-J8,New Charity Registration - Revolut Pay,Y,Registers new charity on Growth plan via Revolut Pay test payment authorisation
-J9,Charity User Chat,Y,All 3 registered charity users send a chat message to portal admin via the chat FAB icon
+Type,Journey,TestCase,Name,Include,Notes
+Journey,J1,,Platform Admin Workflow,Y,Login as platform admin and smoke all admin-only features
+TestCase,J1,J1-TC1,Login as platform admin,Y,Sign in with ilyas@networklogic.uk
+TestCase,J1,J1-TC2,Smoke all admin routes,Y,Navigate every admin-only route and check no 404 / error
+TestCase,J1,J1-TC3,Add donor record,Y,Create a test donor via the admin donors page
+TestCase,J1,J1-TC4,Inbox tabs — All / Unread / Starred,Y,Click each inbox tab and verify content loads
+TestCase,J1,J1-TC5,Submit support message,Y,Send a test support request via the contact form
+TestCase,J1,J1-TC6,Logout,Y,Sign out and confirm redirect to auth page
+Journey,J2,,Support Agent Workflow,Y,Requires agent_email + agent_password in test_config.json; auto-skipped if blank
+TestCase,J2,J2-TC1,Login as support agent,Y,Sign in with agent credentials from test_config.json
+TestCase,J2,J2-TC2,View support inbox,Y,Navigate to /app/support and verify open conversations load
+TestCase,J2,J2-TC3,Reply to conversation,Y,Select a conversation and send a reply message
+TestCase,J2,J2-TC4,Close conversation,Y,Mark a conversation as closed and verify it disappears from inbox
+TestCase,J2,J2-TC5,Logout,Y,Sign out and confirm redirect to auth page
+Journey,J3,,New Charity Registration - Card,Y,Registers new charity on Growth plan via Stripe test card 4242 4242 4242 4242
+TestCase,J3,J3-TC1,Navigate to registration,Y,Open /auth?mode=register
+TestCase,J3,J3-TC2,Select Growth plan,Y,Choose the Growth (paid) plan on the plan picker step
+TestCase,J3,J3-TC3,Fill registration form,Y,Enter charity name / full name / email / password and submit
+TestCase,J3,J3-TC4,Select Card payment method on Stripe,Y,Click the Card radio button on the Stripe checkout page
+TestCase,J3,J3-TC5,Enter test card details,Y,Type 4242 4242 4242 4242 / 12/29 / 123 / any postcode
+TestCase,J3,J3-TC6,Complete Stripe payment,Y,Click Pay and confirm success redirect back to /app
+TestCase,J3,J3-TC7,Verify app access post-payment,Y,Confirm the charity dashboard loads with no billing gate
+Journey,J4,,Registration Security Check,Y,Registers individual user (Starter plan) - verifies login is blocked before email confirmation
+TestCase,J4,J4-TC1,Navigate to registration,Y,Open /auth?mode=register
+TestCase,J4,J4-TC2,Select Starter plan,Y,Choose the free Starter plan
+TestCase,J4,J4-TC3,Fill registration form,Y,Enter individual user details and submit
+TestCase,J4,J4-TC4,Attempt login before email confirmation,Y,Try signing in immediately — should be blocked or show error
+TestCase,J4,J4-TC5,Verify login is denied,Y,Confirm the app does not grant access before confirmation
+Journey,J5,,New User App Access,Y,Smoke all user routes + inbox tabs as newly registered user; auto-skipped if J4 user not yet confirmed
+TestCase,J5,J5-TC1,Login as newly registered user,Y,Sign in with the J4 test user (after email confirmed manually)
+TestCase,J5,J5-TC2,Smoke all user-facing routes,Y,Navigate every standard user route and check no 404 / error
+TestCase,J5,J5-TC3,Inbox tabs — All / Unread / Starred,Y,Click each inbox tab and verify content loads
+TestCase,J5,J5-TC4,Logout,Y,Sign out and confirm redirect to auth page
+Journey,J6,,Admin Post-Registration Verification,Y,Logs in as admin and verifies all registered users / charity orgs / Growth subscriptions are visible
+TestCase,J6,J6-TC1,Login as platform admin,Y,Sign in with ilyas@networklogic.uk
+TestCase,J6,J6-TC2,Verify all registered users visible,Y,Check All Users list includes the test users from this run
+TestCase,J6,J6-TC3,Verify charity orgs visible,Y,Check All Organisations list includes the new charity orgs
+TestCase,J6,J6-TC4,Verify Growth subscriptions active,Y,Check All Subscriptions shows Growth plan active for each charity org
+TestCase,J6,J6-TC5,Logout,Y,Sign out and confirm redirect to auth page
+Journey,J7,,New Charity Registration - Klarna,Y,Registers new charity on Growth plan via Klarna test payment authorisation
+TestCase,J7,J7-TC1,Navigate to registration,Y,Open /auth?mode=register
+TestCase,J7,J7-TC2,Select Growth plan,Y,Choose the Growth (paid) plan on the plan picker step
+TestCase,J7,J7-TC3,Fill registration form,Y,Enter charity name / full name / email / password and submit
+TestCase,J7,J7-TC4,Select Klarna payment method on Stripe,Y,Click the Klarna option on the Stripe checkout page
+TestCase,J7,J7-TC5,Authorise Klarna test payment,Y,Complete Klarna test flow and confirm payment authorised
+TestCase,J7,J7-TC6,Verify app access post-payment,Y,Confirm the charity dashboard loads with no billing gate
+Journey,J8,,New Charity Registration - Revolut Pay,Y,Registers new charity on Growth plan via Revolut Pay test payment authorisation
+TestCase,J8,J8-TC1,Navigate to registration,Y,Open /auth?mode=register
+TestCase,J8,J8-TC2,Select Growth plan,Y,Choose the Growth (paid) plan on the plan picker step
+TestCase,J8,J8-TC3,Fill registration form,Y,Enter charity name / full name / email / password and submit
+TestCase,J8,J8-TC4,Select Revolut Pay method on Stripe,Y,Click the Revolut Pay option on the Stripe checkout page
+TestCase,J8,J8-TC5,Authorise Revolut Pay test payment,Y,Complete Revolut Pay test flow and confirm payment authorised
+TestCase,J8,J8-TC6,Verify app access post-payment,Y,Confirm the charity dashboard loads with no billing gate
+Journey,J9,,Charity User Chat,Y,All 3 registered charity users send a chat message to portal admin via the chat FAB icon
+TestCase,J9,J9-TC1,Login as Card charity user,Y,Sign in as the charity registered via Card payment (J3)
+TestCase,J9,J9-TC2,Open chat FAB — Card user,Y,Click the Contact support FAB button (bottom-right)
+TestCase,J9,J9-TC3,Send chat message — Card user,Y,Fill subject + message and click Send request
+TestCase,J9,J9-TC4,Logout Card charity user,Y,Sign out
+TestCase,J9,J9-TC5,Login as Klarna charity user,Y,Sign in as the charity registered via Klarna payment (J7)
+TestCase,J9,J9-TC6,Open chat FAB — Klarna user,Y,Click the Contact support FAB button (bottom-right)
+TestCase,J9,J9-TC7,Send chat message — Klarna user,Y,Fill subject + message and click Send request
+TestCase,J9,J9-TC8,Logout Klarna charity user,Y,Sign out
+TestCase,J9,J9-TC9,Login as Revolut Pay charity user,Y,Sign in as the charity registered via Revolut Pay payment (J8)
+TestCase,J9,J9-TC10,Open chat FAB — Revolut Pay user,Y,Click the Contact support FAB button (bottom-right)
+TestCase,J9,J9-TC11,Send chat message — Revolut Pay user,Y,Fill subject + message and click Send request
+TestCase,J9,J9-TC12,Logout Revolut Pay charity user,Y,Sign out
