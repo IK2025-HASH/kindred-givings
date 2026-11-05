@@ -356,6 +356,15 @@ function TeamPage() {
               <div className="flex gap-2">
                 <a
                   href={`mailto:${email}?subject=You've been invited to ${currentOrg?.name ?? "a charity"}&body=Hi%2C%0A%0AYou've been invited to join ${encodeURIComponent(currentOrg?.name ?? "our charity")} on Donorbook.%0A%0AClick this link to accept:%0A${encodeURIComponent(generatedLink)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => {
+                    setTimeout(() => {
+                      const body = `Hi,\n\nYou've been invited to join ${currentOrg?.name ?? "our charity"} on Donorbook.\n\nClick this link to accept:\n${generatedLink}`;
+                      navigator.clipboard.writeText(body).catch(() => null);
+                      toast.info("Email text copied — paste it into your mail app if nothing opened.");
+                    }, 800);
+                  }}
                   className="flex flex-1 items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
                 >
                   <Mail className="size-4" /> Email
