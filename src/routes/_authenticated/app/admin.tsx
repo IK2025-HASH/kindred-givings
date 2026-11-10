@@ -1200,11 +1200,11 @@ function AdminPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("platform_admins")
-        .select("user_id, created_at")
+        .select("user_id, created_at, is_protected, protected_email")
         .order("created_at");
       if (error) throw error;
       const rows = data ?? [];
-      const ids = rows.map((r) => r.user_id as string);
+      const ids = rows.map((r) => r.user_id as string).filter(Boolean);
       const profileMap: Record<string, { email: string | null; full_name: string | null }> = {};
       if (ids.length > 0) {
         const { data: profiles } = await supabase
@@ -1213,7 +1213,7 @@ function AdminPage() {
           .in("id", ids);
         for (const p of profiles ?? []) profileMap[p.id] = { email: p.email ?? null, full_name: p.full_name ?? null };
       }
-      return rows.map((r) => ({ ...r, profiles: profileMap[r.user_id as string] ?? null }));
+      return rows.map((r) => ({ ...r, profiles: r.user_id ? (profileMap[r.user_id as string] ?? null) : null }));
     },
   });
 
@@ -1270,7 +1270,11 @@ function AdminPage() {
     }
   }
 
-  async function removeAdmin(userId: string) {
+  async function removeAdmin(userId: string, isProtected?: boolean) {
+    if (isProtected) {
+      toast.error("This is a protected Network Logic UK super-admin slot and cannot be removed.");
+      return;
+    }
     if (userId === user?.id) {
       toast.error("You cannot remove yourself as an admin");
       return;
@@ -1568,24 +1572,36 @@ function AdminPage() {
               <TableBody>
                 {(adminsQuery.data ?? []).map((a) => {
                   const profile = a.profiles as unknown as { email: string | null; full_name: string | null } | null;
+                  const isProtected = !!(a as any).is_protected;
+                  const displayEmail = profile?.email ?? (a as any).protected_email ?? "—";
                   return (
-                    <TableRow key={a.user_id}>
-                      <TableCell className="font-medium">{profile?.full_name ?? "—"}</TableCell>
+                    <TableRow key={a.user_id ?? (a as any).protected_email}>
+                      <TableCell className="font-medium">
+                        {profile?.full_name ?? "—"}
+                        {isProtected && (
+                          <Badge variant="outline" className="ml-2 text-[10px] border-amber-500 text-amber-600">
+                            Protected
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {profile?.email ?? "—"}
+                        {displayEmail}
                       </TableCell>
                       <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
                         {formatDate(a.created_at)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {a.user_id !== user?.id && (
+                        {!isProtected && a.user_id !== user?.id && (
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => void removeAdmin(String(a.user_id))}
+                            onClick={() => void removeAdmin(String(a.user_id), isProtected)}
                           >
                             Remove
                           </Button>
+                        )}
+                        {isProtected && (
+                          <span className="text-xs text-muted-foreground italic">Network Logic UK</span>
                         )}
                       </TableCell>
                     </TableRow>
