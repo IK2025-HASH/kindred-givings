@@ -135,8 +135,6 @@ function Dashboard() {
     .reduce((s, d) => s + d.amount, 0);
   const recurring = rows.filter((d) => d.is_recurring).reduce((s, d) => s + d.amount, 0);
   const average = rows.length ? yearTotal / Math.max(1, rows.filter((d) => new Date(d.donated_on).getFullYear() === now.getFullYear()).length) : 0;
-  const pending = (donations.data ?? []).filter((d) => d.status === "pending");
-
   const trend = useMemo(() => {
     const buckets = new Map<string, number>();
     for (let i = 11; i >= 0; i--) {
@@ -170,20 +168,6 @@ function Dashboard() {
           </Button>
         }
       />
-
-      {pending.length > 0 && (
-        <Card className="border-primary/40 bg-primary/5">
-          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
-            <span>
-              {pending.length} donation{pending.length > 1 ? "s" : ""} from your giving page
-              {pending.length > 1 ? " are" : " is"} waiting to be confirmed.
-            </span>
-            <Button size="sm" variant="outline" asChild>
-              <Link to="/app/donations">Review</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
 
       <SetupChecklist org={currentOrg} hasDonors={(donors.data?.length ?? 0) > 0} hasCampaigns={(campaigns.data?.length ?? 0) > 0} />
 

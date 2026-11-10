@@ -47,7 +47,7 @@ export const submitPublicDonation = createServerFn({ method: "POST" })
       amount: data.amount,
       currency: org.currency,
       method: "online",
-      status: "pending",
+      status: "confirmed",
       source: "public_page",
       is_recurring: !!data.recurring,
       gift_aid: !!data.giftAid,
@@ -101,7 +101,7 @@ async function sendDonorReceipt({
   const html = `
     <p>Dear ${donorName},</p>
     <p>Thank you for your gift of <strong>${formatted}</strong> to <strong>${orgName}</strong>.</p>
-    <p>Your pledge has been recorded. ${orgName} will be in touch to confirm receipt.</p>
+    <p>Your gift has been confirmed and recorded with ${orgName}. Thank you for your generosity.</p>
     <p style="color:#6b7280;font-size:13px;">
       If you have questions, reply to this email or contact ${orgName} directly.
     </p>

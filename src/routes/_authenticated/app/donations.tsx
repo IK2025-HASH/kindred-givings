@@ -42,10 +42,10 @@ export const Route = createFileRoute("/_authenticated/app/donations")({
       { title: "Donations — Donorbook" },
       {
         name: "description",
-        content: "Record gifts, confirm online donations and export your giving history.",
+        content: "Record offline gifts and view donations from your giving page.",
       },
       { property: "og:title", content: "Donation records in Donorbook" },
-      { property: "og:description", content: "Record, confirm and export donations." },
+      { property: "og:description", content: "Record and export donations." },
     ],
   }),
   component: DonationsPage,
@@ -246,12 +246,7 @@ function DonationsPage() {
                   <TableCell className="text-right">
                     {editable && (
                       <div className="flex justify-end gap-1">
-                        {d.status === "pending" && (
-                          <Button size="sm" onClick={() => void setStatus(d.id, "confirmed")}>
-                            Confirm
-                          </Button>
-                        )}
-                        <Button size="sm" variant="ghost" onClick={() => setDraft(d)}>
+                                        <Button size="sm" variant="ghost" onClick={() => setDraft(d)}>
                           Edit
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => void remove(d.id)}>
