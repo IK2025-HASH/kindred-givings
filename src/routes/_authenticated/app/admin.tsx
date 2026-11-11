@@ -1545,7 +1545,7 @@ function PartnersSection() {
 
 // ── NL Commercial Management types ───────────────────────────────────────────
 type NLCustomer = { id: string; name: string; status: string; primary_contact: { name?: string; email?: string } | null; created_at: string; notes: string | null };
-type NLDeployment = { id: string; customer_id: string; deployment_model: string; geography: string | null; status: string; hosting_provider: string | null; app_version: string | null; go_live_date: string | null; enabled_modules: string[]; created_at: string; customer_name?: string };
+type NLDeployment = { id: string; customer_id: string; deployment_model: string; geography: string | null; geography_instance_ref: string | null; delivery_method: string | null; provisioning_notes: string | null; status: string; hosting_provider: string | null; app_version: string | null; go_live_date: string | null; enabled_modules: string[]; created_at: string; customer_name?: string };
 
 const SAAS_GEOGRAPHIES = ["UK", "EU", "US", "APAC", "MEA"];
 const MODEL_LABELS: Record<string, string> = { saas: "SaaS (NL-hosted)", customer_hosted: "Customer-Hosted (Single-Tenant)" };
@@ -1852,7 +1852,8 @@ function CustomersSection() {
 function DeploymentsSection() {
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ customer_id: "", deployment_model: "saas", geography: "UK", status: "enquiry", hosting_provider: "", app_version: "" });
+  const [form, setForm] = useState({ customer_id: "", deployment_model: "saas", geography: "UK", geography_instance_ref: "", delivery_method: "docker", status: "enquiry", hosting_provider: "", app_version: "", provisioning_notes: "" });
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [savingNew, setSavingNew] = useState(false);
   const [filterModel, setFilterModel] = useState<string>("all");
 
@@ -1870,7 +1871,7 @@ function DeploymentsSection() {
     queryFn: async (): Promise<NLDeployment[]> => {
       const { data, error } = await supabase
         .from("nl_deployments" as never)
-        .select("id, customer_id, deployment_model, geography, status, hosting_provider, app_version, go_live_date, enabled_modules, created_at, nl_customers(name)")
+        .select("id, customer_id, deployment_model, geography, geography_instance_ref, delivery_method, provisioning_notes, status, hosting_provider, app_version, go_live_date, enabled_modules, created_at, nl_customers(name)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []).map((r: never) => ({ ...(r as NLDeployment), customer_name: (r as never as { nl_customers: { name: string } | null }).nl_customers?.name }));
@@ -1885,9 +1886,12 @@ function DeploymentsSection() {
         customer_id: form.customer_id,
         deployment_model: form.deployment_model,
         geography: form.deployment_model === "saas" ? form.geography : null,
+        geography_instance_ref: form.deployment_model === "saas" ? (form.geography_instance_ref || null) : null,
+        delivery_method: form.deployment_model === "customer_hosted" ? form.delivery_method : null,
         status: form.status,
-        hosting_provider: form.hosting_provider || null,
+        hosting_provider: form.deployment_model === "customer_hosted" ? (form.hosting_provider || null) : null,
         app_version: form.app_version || null,
+        provisioning_notes: form.provisioning_notes || null,
       };
       const { error } = await supabase.from("nl_deployments" as never).insert(payload as never);
       if (error) throw error;
@@ -1982,7 +1986,7 @@ function DeploymentsSection() {
                   </select>
                 </div>
 
-                {isSaaS ? (
+                {isSaaS ? (<>
                   <div className="space-y-1.5">
                     <Label>Geography instance</Label>
                     <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
@@ -1991,13 +1995,28 @@ function DeploymentsSection() {
                     </select>
                     <p className="text-xs text-muted-foreground">Each geography is a separate NL-hosted instance.</p>
                   </div>
-                ) : (
+                  <div className="space-y-1.5">
+                    <Label>Instance reference <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    <Input value={form.geography_instance_ref} onChange={(e) => setForm((p) => ({ ...p, geography_instance_ref: e.target.value }))} placeholder="e.g. Supabase project ID, AWS region, hosting partner" />
+                    <p className="text-xs text-muted-foreground">Record the DB project / hosting partner for this geography.</p>
+                  </div>
+                </>) : (<>
                   <div className="space-y-1.5">
                     <Label>Hosting provider / location</Label>
-                    <Input value={form.hosting_provider} onChange={(e) => setForm((p) => ({ ...p, hosting_provider: e.target.value }))} placeholder="e.g. AWS eu-west-2, on-site London" />
+                    <Input value={form.hosting_provider} onChange={(e) => setForm((p) => ({ ...p, hosting_provider: e.target.value }))} placeholder="e.g. AWS eu-west-2, on-site London DC" />
                     <p className="text-xs text-orange-600 font-medium">Single-tenant — isolated instance for this customer only.</p>
                   </div>
-                )}
+                  <div className="space-y-1.5">
+                    <Label>Delivery method</Label>
+                    <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      value={form.delivery_method} onChange={(e) => setForm((p) => ({ ...p, delivery_method: e.target.value }))}>
+                      <option value="docker">Docker container</option>
+                      <option value="manual">Manual install guide</option>
+                      <option value="both">Both (customer chooses)</option>
+                    </select>
+                    <p className="text-xs text-muted-foreground">How NL will ship the deployment package to the customer.</p>
+                  </div>
+                </>)}
 
                 <div className="space-y-1.5">
                   <Label>Initial status</Label>
@@ -2010,6 +2029,13 @@ function DeploymentsSection() {
                 <div className="space-y-1.5">
                   <Label>App version</Label>
                   <Input value={form.app_version} onChange={(e) => setForm((p) => ({ ...p, app_version: e.target.value }))} placeholder="e.g. 1.1.1" />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Provisioning notes <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <textarea className="min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
+                    value={form.provisioning_notes} onChange={(e) => setForm((p) => ({ ...p, provisioning_notes: e.target.value }))}
+                    placeholder="Stage checklist, handover notes, infrastructure readiness…" />
                 </div>
               </div>
               <div className="flex justify-end gap-2">
@@ -2040,9 +2066,21 @@ function DeploymentsSection() {
                     </span>
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                    {d.deployment_model === "saas"
-                      ? (d.geography ? <span className="font-medium text-blue-700 dark:text-blue-300">{d.geography}</span> : "—")
-                      : (d.hosting_provider ?? <span className="italic">on-premise</span>)}
+                    {d.deployment_model === "saas" ? (
+                      <div>
+                        {d.geography ? <span className="font-medium text-blue-700 dark:text-blue-300">{d.geography}</span> : "—"}
+                        {d.geography_instance_ref && <p className="text-xs text-muted-foreground truncate max-w-[160px]">{d.geography_instance_ref}</p>}
+                      </div>
+                    ) : (
+                      <div>
+                        <span>{d.hosting_provider ?? <span className="italic">on-premise</span>}</span>
+                        {d.delivery_method && (
+                          <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                            {d.delivery_method === "docker" ? "Docker" : d.delivery_method === "manual" ? "Manual install" : "Docker + Manual"}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell><StatusChip status={d.status} /></TableCell>
                   <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
