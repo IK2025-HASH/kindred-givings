@@ -2072,9 +2072,23 @@ function DeploymentsSection() {
                     <p className="text-xs text-muted-foreground">Each geography is a separate NL-hosted instance.</p>
                   </div>
                   <div className="space-y-1.5">
+                    <Label>Hosting provider</Label>
+                    <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      value={form.hosting_provider} onChange={(e) => setForm((p) => ({ ...p, hosting_provider: e.target.value }))}>
+                      <option value="">Select provider…</option>
+                      <option value="Hostinger VPS">Hostinger VPS</option>
+                      <option value="AWS">AWS</option>
+                      <option value="DigitalOcean">DigitalOcean</option>
+                      <option value="Azure">Azure</option>
+                      <option value="GCP">GCP</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    <p className="text-xs text-muted-foreground">Infrastructure NL uses to host this geography instance.</p>
+                  </div>
+                  <div className="space-y-1.5">
                     <Label>Instance reference <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                    <Input value={form.geography_instance_ref} onChange={(e) => setForm((p) => ({ ...p, geography_instance_ref: e.target.value }))} placeholder="e.g. Supabase project ID, AWS region, hosting partner" />
-                    <p className="text-xs text-muted-foreground">Record the DB project / hosting partner for this geography.</p>
+                    <Input value={form.geography_instance_ref} onChange={(e) => setForm((p) => ({ ...p, geography_instance_ref: e.target.value }))} placeholder="e.g. VPS IP, Supabase project ID, region" />
+                    <p className="text-xs text-muted-foreground">VPS IP address, DB project ID, or hosting ref.</p>
                   </div>
                 </>) : (<>
                   <div className="space-y-1.5">
@@ -2282,6 +2296,50 @@ function DeploymentsSection() {
                                 <div className="rounded-md border bg-muted/30 p-3 text-sm">
                                   <p className="text-xs font-medium text-muted-foreground mb-1">Provisioning notes</p>
                                   <p className="whitespace-pre-wrap">{d.provisioning_notes}</p>
+                                </div>
+                              )}
+                              {/* VPS provisioning guide — shown when hosting provider is Hostinger VPS */}
+                              {d.deployment_model === "saas" && d.hosting_provider === "Hostinger VPS" && (
+                                <div className="rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 p-3 space-y-2 text-sm">
+                                  <p className="font-semibold text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
+                                    <Server className="size-3.5" /> Hostinger VPS — Deployment Guide
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    VPS IP: <span className="font-mono font-medium">{d.geography_instance_ref || "⚠ set Instance Ref to VPS IP"}</span>
+                                  </p>
+                                  <div className="space-y-1.5 text-xs">
+                                    <p className="font-medium text-muted-foreground uppercase tracking-wide">First-time VPS setup (run once)</p>
+                                    {[
+                                      `ssh root@${d.geography_instance_ref || "YOUR_VPS_IP"}`,
+                                      "apt update && apt install -y nginx certbot python3-certbot-nginx",
+                                      "mkdir -p /var/www/kindred-givings",
+                                      `# Upload nginx config: scp deploy/nginx.conf root@${d.geography_instance_ref || "YOUR_VPS_IP"}:/etc/nginx/sites-available/kindred-givings`,
+                                      "ln -s /etc/nginx/sites-available/kindred-givings /etc/nginx/sites-enabled/ && nginx -t && systemctl reload nginx",
+                                      "certbot --nginx -d app.YOURDOMAIN.com",
+                                    ].map((cmd, i) => (
+                                      <div key={i} className="flex items-start gap-2 font-mono bg-background rounded px-2 py-1 border">
+                                        <span className="text-muted-foreground select-none shrink-0">{i + 1}.</span>
+                                        <span className="break-all">{cmd}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="space-y-1.5 text-xs mt-2">
+                                    <p className="font-medium text-muted-foreground uppercase tracking-wide">Every deploy (from repo root on your machine)</p>
+                                    {[
+                                      "npm run build",
+                                      `rsync -avz --delete dist/ root@${d.geography_instance_ref || "YOUR_VPS_IP"}:/var/www/kindred-givings/`,
+                                      `ssh root@${d.geography_instance_ref || "YOUR_VPS_IP"} "nginx -t && systemctl reload nginx"`,
+                                    ].map((cmd, i) => (
+                                      <div key={i} className="flex items-start gap-2 font-mono bg-background rounded px-2 py-1 border">
+                                        <span className="text-muted-foreground select-none shrink-0">{i + 1}.</span>
+                                        <span className="break-all">{cmd}</span>
+                                      </div>
+                                    ))}
+                                    <p className="text-muted-foreground">Or run <span className="font-mono">./deploy/deploy.sh root@{d.geography_instance_ref || "YOUR_VPS_IP"}</span> as a single command.</p>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground border-t pt-2 mt-1">
+                                    Supabase DB stays cloud-hosted — only the static frontend lives on this VPS. See <span className="font-mono">deploy/VPS_SETUP.md</span> for full guide.
+                                  </p>
                                 </div>
                               )}
                               {/* Licence link */}
