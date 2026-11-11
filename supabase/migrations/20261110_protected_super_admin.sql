@@ -29,11 +29,10 @@ ON CONFLICT (user_id) DO UPDATE
   SET is_protected    = true,
       protected_email = 'ilyas@networklogic.uk';
 
--- If the user does not exist yet (e.g. fresh on-premise install before first login),
--- insert a placeholder row with no user_id so the trigger below can fill it in.
-INSERT INTO public.platform_admins (user_id, is_protected, protected_email)
-VALUES (NULL, true, 'ilyas@networklogic.uk')
-ON CONFLICT DO NOTHING;
+-- Note: a NULL user_id placeholder is not inserted here because platform_admins.user_id
+-- is NOT NULL. For fresh on-premise installs where the user has not yet registered,
+-- run the trigger manually after first sign-in, or re-run this migration post-signup.
+-- The trigger below (trg_link_protected_admin) handles auto-linking on signup.
 
 -- 4. Trigger: when ilyas@networklogic.uk registers (or already exists),
 --    automatically link the user_id and ensure is_protected = true.
