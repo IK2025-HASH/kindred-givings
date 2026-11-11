@@ -1549,7 +1549,7 @@ type NLDeployment = { id: string; customer_id: string; deployment_model: string;
 
 const SAAS_GEOGRAPHIES = ["UK", "EU", "US", "APAC", "MEA"];
 const MODEL_LABELS: Record<string, string> = { saas: "SaaS (NL-hosted)", customer_hosted: "Customer-Hosted (Single-Tenant)" };
-type NLLicence = { id: string; customer_id: string; licence_key: string | null; start_date: string; expiry_date: string; status: string; maintenance_status: string; enabled_modules: string[]; customer_name?: string };
+type NLLicence = { id: string; customer_id: string; deployment_id: string | null; licence_key: string | null; start_date: string; expiry_date: string; status: string; maintenance_status: string; enabled_modules: string[]; customer_name?: string };
 type NLChangeRequest = { id: string; customer_id: string | null; cr_ref: string | null; title: string; status: string; priority: string; estimated_days: number | null; agreed_price: number | null; customer_name?: string; created_at: string };
 
 const DEPLOYMENT_STATUSES = ["enquiry","assessment","quoted","contracted","authorised","provisioning","deployed","uat","live","suspended","retired"];
@@ -1888,6 +1888,17 @@ function DeploymentsSection() {
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []).map((r: never) => ({ ...(r as NLDeployment), customer_name: (r as never as { nl_customers: { name: string } | null }).nl_customers?.name }));
+    },
+  });
+
+  const licencesQ = useQuery({
+    queryKey: ["nl-licences-all"],
+    queryFn: async (): Promise<NLLicence[]> => {
+      const { data, error } = await supabase
+        .from("nl_licences" as never)
+        .select("id, customer_id, deployment_id, licence_key, start_date, expiry_date, status, maintenance_status, enabled_modules");
+      if (error) throw error;
+      return (data ?? []) as NLLicence[];
     },
   });
 
@@ -2273,6 +2284,31 @@ function DeploymentsSection() {
                                   <p className="whitespace-pre-wrap">{d.provisioning_notes}</p>
                                 </div>
                               )}
+                              {/* Licence link */}
+                              {(() => {
+                                const linked = (licencesQ.data ?? []).filter((l) => l.deployment_id === d.id);
+                                const unlinked = (licencesQ.data ?? []).filter((l) => l.customer_id === d.customer_id && !l.deployment_id);
+                                return (
+                                  <div className="rounded-md border p-3 space-y-1.5">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Linked licences</p>
+                                    {linked.length === 0 && unlinked.length === 0 && (
+                                      <p className="text-sm text-muted-foreground">No licence issued yet. <span className="text-xs">↓ Issue one in the Licences module below.</span></p>
+                                    )}
+                                    {linked.map((l) => (
+                                      <div key={l.id} className="flex items-center justify-between text-sm">
+                                        <span className="font-medium font-mono">{l.licence_key ?? l.id.slice(0, 8)}</span>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-muted-foreground text-xs">Expires {new Date(l.expiry_date).toLocaleDateString("en-GB")}</span>
+                                          <StatusChip status={l.status} />
+                                        </div>
+                                      </div>
+                                    ))}
+                                    {unlinked.length > 0 && (
+                                      <p className="text-xs text-amber-600 dark:text-amber-400">⚠ {unlinked.length} customer licence(s) not yet linked to a deployment — set deployment_id in Licences module.</p>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                               <div className="flex items-center justify-between">
                                 <p className="text-xs text-muted-foreground">Created {new Date(d.created_at).toLocaleDateString("en-GB")}</p>
                                 <Button size="sm" variant="outline" onClick={() => startEdit(d)}>Edit details</Button>
@@ -2302,8 +2338,10 @@ function DeploymentsSection() {
 function LicencesSection() {
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ customer_id: "", licence_key: "", start_date: "", expiry_date: "", status: "active" });
+  const [form, setForm] = useState({ customer_id: "", deployment_id: "", licence_key: "", start_date: "", expiry_date: "", status: "active" });
   const [savingNew, setSavingNew] = useState(false);
+  const [linkingId, setLinkingId] = useState<string | null>(null);
+  const [linkDeploymentId, setLinkDeploymentId] = useState("");
 
   const customersQ = useQuery({
     queryKey: ["nl-customers"],
@@ -2314,12 +2352,24 @@ function LicencesSection() {
     },
   });
 
+  const deploymentsQ = useQuery({
+    queryKey: ["nl-deployments"],
+    queryFn: async (): Promise<NLDeployment[]> => {
+      const { data, error } = await supabase
+        .from("nl_deployments" as never)
+        .select("id, customer_id, deployment_model, geography, status, nl_customers(name)")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map((r: never) => ({ ...(r as NLDeployment), customer_name: (r as never as { nl_customers: { name: string } | null }).nl_customers?.name }));
+    },
+  });
+
   const query = useQuery({
     queryKey: ["nl-licences"],
     queryFn: async (): Promise<NLLicence[]> => {
       const { data, error } = await supabase
         .from("nl_licences" as never)
-        .select("id, customer_id, licence_key, start_date, expiry_date, status, maintenance_status, enabled_modules, nl_customers(name)")
+        .select("id, customer_id, deployment_id, licence_key, start_date, expiry_date, status, maintenance_status, enabled_modules, nl_customers(name)")
         .order("expiry_date");
       if (error) throw error;
       return (data ?? []).map((r: never) => ({ ...(r as NLLicence), customer_name: (r as never as { nl_customers: { name: string } | null }).nl_customers?.name }));
@@ -2328,15 +2378,18 @@ function LicencesSection() {
 
   async function createLicence() {
     if (!form.customer_id || !form.start_date || !form.expiry_date) { toast.error("Customer, start and expiry dates are required"); return; }
+    if (!form.deployment_id) { toast.error("Select the deployment this licence covers — a licence must always be linked to a deployment."); return; }
     setSavingNew(true);
     try {
       const grace = new Date(form.expiry_date);
       grace.setDate(grace.getDate() + 30);
-      const { error } = await supabase.from("nl_licences" as never).insert({ ...form, grace_until: grace.toISOString().slice(0, 10) } as never);
+      const payload = { ...form, deployment_id: form.deployment_id || null, grace_until: grace.toISOString().slice(0, 10) };
+      const { error } = await supabase.from("nl_licences" as never).insert(payload as never);
       if (error) throw error;
-      toast.success("Licence created");
+      toast.success("Licence issued and linked to deployment");
       setAdding(false);
       void qc.invalidateQueries({ queryKey: ["nl-licences"] });
+      void qc.invalidateQueries({ queryKey: ["nl-licences-all"] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not create");
     } finally {
@@ -2344,26 +2397,70 @@ function LicencesSection() {
     }
   }
 
+  async function linkToDeployment(licenceId: string) {
+    if (!linkDeploymentId) { toast.error("Select a deployment"); return; }
+    const { error } = await supabase.from("nl_licences" as never).update({ deployment_id: linkDeploymentId } as never).eq("id", licenceId);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Licence linked to deployment");
+    setLinkingId(null);
+    void qc.invalidateQueries({ queryKey: ["nl-licences"] });
+    void qc.invalidateQueries({ queryKey: ["nl-licences-all"] });
+  }
+
+  async function revokeStatus(id: string, status: string) {
+    const { error } = await supabase.from("nl_licences" as never).update({ status } as never).eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Licence ${status}`);
+    void qc.invalidateQueries({ queryKey: ["nl-licences"] });
+    void qc.invalidateQueries({ queryKey: ["nl-licences-all"] });
+  }
+
   const today = new Date().toISOString().slice(0, 10);
   const customers = customersQ.data ?? [];
+  const deployments = deploymentsQ.data ?? [];
+  // Filter deployments to match selected customer
+  const customerDeployments = deployments.filter((d) => d.customer_id === form.customer_id);
+  const unlinkedCount = (query.data ?? []).filter((l) => !l.deployment_id).length;
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2"><Shield className="size-4" /> Licences</CardTitle>
+        <div>
+          <CardTitle className="flex items-center gap-2"><Shield className="size-4" /> Licences</CardTitle>
+          {unlinkedCount > 0 && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">⚠ {unlinkedCount} licence(s) not linked to a deployment</p>
+          )}
+        </div>
         <Button size="sm" onClick={() => setAdding(true)}><Plus className="mr-1.5 size-4" /> Issue licence</Button>
       </CardHeader>
       <CardContent className="space-y-3">
         {adding && (
           <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Every licence must be linked to a deployment</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Customer</Label>
                 <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={form.customer_id} onChange={(e) => setForm((p) => ({ ...p, customer_id: e.target.value }))}>
+                  value={form.customer_id} onChange={(e) => setForm((p) => ({ ...p, customer_id: e.target.value, deployment_id: "" }))}>
                   <option value="">Select customer…</option>
                   {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Deployment <span className="text-red-500">*</span></Label>
+                <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={form.deployment_id} onChange={(e) => setForm((p) => ({ ...p, deployment_id: e.target.value }))}
+                  disabled={!form.customer_id}>
+                  <option value="">Select deployment…</option>
+                  {customerDeployments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.deployment_model === "saas" ? `SaaS – ${d.geography}` : "Customer-Hosted"} · {d.status}
+                    </option>
+                  ))}
+                </select>
+                {form.customer_id && customerDeployments.length === 0 && (
+                  <p className="text-xs text-red-500">No deployments for this customer — create one first.</p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label>Licence key / ref</Label>
@@ -2376,11 +2473,12 @@ function LicencesSection() {
               <div className="space-y-1.5">
                 <Label>Expiry date</Label>
                 <Input type="date" value={form.expiry_date} onChange={(e) => setForm((p) => ({ ...p, expiry_date: e.target.value }))} />
+                <p className="text-xs text-muted-foreground">Grace period of 30 days is applied automatically.</p>
               </div>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button>
-              <Button disabled={savingNew} onClick={() => void createLicence()}>Issue</Button>
+              <Button disabled={savingNew} onClick={() => void createLicence()}>Issue licence</Button>
             </div>
           </div>
         )}
@@ -2389,30 +2487,78 @@ function LicencesSection() {
             <TableRow>
               <TableHead>Customer</TableHead>
               <TableHead className="hidden md:table-cell">Key</TableHead>
+              <TableHead className="hidden md:table-cell">Deployment</TableHead>
               <TableHead>Expiry</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="hidden lg:table-cell">Maintenance</TableHead>
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {(query.data ?? []).map((l) => {
               const expiring = l.expiry_date <= today && l.status === "active";
+              const linkedDeployment = deployments.find((d) => d.id === l.deployment_id);
               return (
-                <TableRow key={l.id} className={expiring ? "bg-orange-50/50 dark:bg-orange-900/10" : ""}>
-                  <TableCell className="font-medium">{l.customer_name ?? l.customer_id.slice(0, 8)}</TableCell>
-                  <TableCell className="hidden font-mono text-xs text-muted-foreground md:table-cell">{l.licence_key ?? "—"}</TableCell>
-                  <TableCell className="text-sm">
-                    {new Date(l.expiry_date).toLocaleDateString("en-GB")}
-                    {expiring && <AlertTriangle className="ml-1 inline size-3.5 text-orange-500" />}
-                  </TableCell>
-                  <TableCell><StatusChip status={l.status} /></TableCell>
-                  <TableCell className="hidden lg:table-cell"><StatusChip status={l.maintenance_status} /></TableCell>
-                </TableRow>
+                <>
+                  <TableRow key={l.id} className={expiring ? "bg-orange-50/50 dark:bg-orange-900/10" : ""}>
+                    <TableCell className="font-medium">{l.customer_name ?? l.customer_id.slice(0, 8)}</TableCell>
+                    <TableCell className="hidden font-mono text-xs text-muted-foreground md:table-cell">{l.licence_key ?? "—"}</TableCell>
+                    <TableCell className="hidden md:table-cell text-sm">
+                      {linkedDeployment ? (
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${linkedDeployment.deployment_model === "saas" ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" : "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300"}`}>
+                          {linkedDeployment.deployment_model === "saas" ? `SaaS · ${linkedDeployment.geography}` : "Customer-Hosted"}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">⚠ Not linked</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {new Date(l.expiry_date).toLocaleDateString("en-GB")}
+                      {expiring && <AlertTriangle className="ml-1 inline size-3.5 text-orange-500" />}
+                    </TableCell>
+                    <TableCell><StatusChip status={l.status} /></TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {!l.deployment_id && (
+                          <Button size="sm" variant="outline" className="h-7 text-xs px-2"
+                            onClick={() => { setLinkingId(linkingId === l.id ? null : l.id); setLinkDeploymentId(""); }}>
+                            Link deployment
+                          </Button>
+                        )}
+                        {l.status === "active" && (
+                          <Button size="sm" variant="ghost" className="h-7 text-xs px-2 text-red-600 hover:text-red-700"
+                            onClick={() => { if (confirm("Revoke this licence?")) void revokeStatus(l.id, "revoked"); }}>
+                            Revoke
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  {/* Inline link-to-deployment panel */}
+                  {linkingId === l.id && (
+                    <TableRow key={`${l.id}-link`}>
+                      <TableCell colSpan={6} className="bg-amber-50/50 dark:bg-amber-900/10 p-3">
+                        <div className="flex items-center gap-2">
+                          <select className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm"
+                            value={linkDeploymentId} onChange={(e) => setLinkDeploymentId(e.target.value)}>
+                            <option value="">Select deployment to link…</option>
+                            {deployments.filter((d) => d.customer_id === l.customer_id).map((d) => (
+                              <option key={d.id} value={d.id}>
+                                {d.deployment_model === "saas" ? `SaaS – ${d.geography}` : "Customer-Hosted"} · {d.status}
+                              </option>
+                            ))}
+                          </select>
+                          <Button size="sm" onClick={() => void linkToDeployment(l.id)}>Link</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setLinkingId(null)}>Cancel</Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
               );
             })}
             {(query.data ?? []).length === 0 && !query.isLoading && (
               <TableRow>
-                <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">No licences yet.</TableCell>
+                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">No licences yet.</TableCell>
               </TableRow>
             )}
           </TableBody>
