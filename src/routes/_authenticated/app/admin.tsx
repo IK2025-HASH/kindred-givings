@@ -2,7 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, Building2, ChevronDown, ChevronUp, CreditCard, ExternalLink, FileText, Inbox, MessageCircle, Plus, RefreshCw, Server, Shield, Trash2, X } from "lucide-react";
+import { Activity, AlertTriangle, Building2, ChevronDown, ChevronUp, CreditCard, Database, ExternalLink, FileText, Inbox, MessageCircle, Plus, RefreshCw, Server, Shield, Trash2, Users, X } from "lucide-react";
 import { PageHeader } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1031,6 +1031,514 @@ function PaymentsSection() {
           </CardContent>
         </Card>
       )}
+    </>
+  );
+}
+
+// ── Feature List / User Stories Section ──────────────────────────────────────
+type AdminFeature = { id: string; title: string; description: string | null; type: string; status: string; priority: string; sort_order: number; created_at: string };
+
+const FEATURE_TYPES = ["feature", "user_story", "bug", "epic"];
+const FEATURE_STATUSES = ["backlog", "in_progress", "done", "deferred"];
+
+function FeaturesSection() {
+  const qc = useQueryClient();
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ title: "", description: "", type: "feature", status: "backlog", priority: "normal" });
+  const [savingNew, setSavingNew] = useState(false);
+  const [filterStatus, setFilterStatus] = useState("all");
+
+  const query = useQuery({
+    queryKey: ["admin-features"],
+    queryFn: async (): Promise<AdminFeature[]> => {
+      const { data, error } = await supabase
+        .from("admin_features" as never)
+        .select("id, title, description, type, status, priority, sort_order, created_at")
+        .order("sort_order")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as AdminFeature[];
+    },
+  });
+
+  async function create() {
+    if (!form.title) { toast.error("Title required"); return; }
+    setSavingNew(true);
+    try {
+      const { error } = await supabase.from("admin_features" as never).insert(form as never);
+      if (error) throw error;
+      toast.success("Feature added");
+      setAdding(false);
+      void qc.invalidateQueries({ queryKey: ["admin-features"] });
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Could not create"); }
+    finally { setSavingNew(false); }
+  }
+
+  async function updateStatus(id: string, status: string) {
+    const { error } = await supabase.from("admin_features" as never).update({ status } as never).eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    void qc.invalidateQueries({ queryKey: ["admin-features"] });
+  }
+
+  async function deleteFeature(id: string) {
+    const { error } = await supabase.from("admin_features" as never).delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Deleted");
+    void qc.invalidateQueries({ queryKey: ["admin-features"] });
+  }
+
+  const rows = (query.data ?? []).filter((r) => filterStatus === "all" || r.status === filterStatus);
+  const counts = FEATURE_STATUSES.reduce<Record<string, number>>((acc, s) => { acc[s] = (query.data ?? []).filter((r) => r.status === s).length; return acc; }, {});
+  const PRIORITY_COLOR: Record<string, string> = { low: "text-muted-foreground", normal: "text-foreground", high: "text-orange-600", critical: "text-red-600 font-semibold" };
+  const TYPE_COLOR: Record<string, string> = { feature: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300", user_story: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300", bug: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300", epic: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <CardTitle className="flex items-center gap-2"><FileText className="size-4" /> Feature List &amp; User Stories</CardTitle>
+          <div className="flex items-center gap-2">
+            <select className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+              value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+              <option value="all">All ({(query.data ?? []).length})</option>
+              {FEATURE_STATUSES.map((s) => <option key={s} value={s}>{s} ({counts[s] ?? 0})</option>)}
+            </select>
+            <Button size="sm" onClick={() => setAdding(true)}><Plus className="mr-1.5 size-4" /> Add</Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {adding && (
+          <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2 space-y-1.5">
+                <Label>Title</Label>
+                <Input value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} placeholder="As a donor, I want to…" />
+              </div>
+              <div className="sm:col-span-2 space-y-1.5">
+                <Label>Description (optional)</Label>
+                <Textarea rows={2} value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Type</Label>
+                <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}>
+                  {FEATURE_TYPES.map((t) => <option key={t} value={t}>{t.replace("_", " ")}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Priority</Label>
+                <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.priority} onChange={(e) => setForm((p) => ({ ...p, priority: e.target.value }))}>
+                  {["low","normal","high","critical"].map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button>
+              <Button disabled={savingNew} onClick={() => void create()}>Add</Button>
+            </div>
+          </div>
+        )}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Title</TableHead>
+              <TableHead className="hidden md:table-cell">Type</TableHead>
+              <TableHead className="hidden md:table-cell">Priority</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((f) => (
+              <TableRow key={f.id}>
+                <TableCell>
+                  <div className="font-medium text-sm">{f.title}</div>
+                  {f.description && <div className="text-xs text-muted-foreground line-clamp-1">{f.description}</div>}
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                  <span className={`inline-flex rounded px-1.5 py-0.5 text-xs font-medium ${TYPE_COLOR[f.type] ?? "bg-muted text-muted-foreground"}`}>{f.type.replace("_"," ")}</span>
+                </TableCell>
+                <TableCell className={`hidden text-xs md:table-cell ${PRIORITY_COLOR[f.priority] ?? ""}`}>{f.priority}</TableCell>
+                <TableCell>
+                  <select className="h-7 rounded-md border border-input bg-background px-2 text-xs" value={f.status} onChange={(e) => void updateStatus(f.id, e.target.value)}>
+                    {FEATURE_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button size="sm" variant="ghost" onClick={() => void deleteFeature(f.id)}><Trash2 className="size-3.5 text-destructive" /></Button>
+                </TableCell>
+              </TableRow>
+            ))}
+            {rows.length === 0 && !query.isLoading && (
+              <TableRow><TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">No items. Add a feature or user story.</TableCell></TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Application Monitoring Section ────────────────────────────────────────────
+function MonitoringSection() {
+  const query = useQuery({
+    queryKey: ["admin-monitoring"],
+    refetchInterval: 30000,
+    queryFn: async () => {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      const weekAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
+
+      const [orgsRes, usersRes, donationsRes, subsRes, donationsTodayRes, signupsTodayRes, enquiriesRes] = await Promise.all([
+        supabase.from("organizations").select("id", { count: "exact", head: true }),
+        supabase.from("profiles").select("id", { count: "exact", head: true }),
+        supabase.from("donations").select("amount").eq("status", "confirmed"),
+        supabase.from("subscriptions").select("id", { count: "exact", head: true }).in("status", ["active", "trialing"]),
+        supabase.from("donations").select("amount").eq("status", "confirmed").gte("created_at", today),
+        supabase.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", today),
+        supabase.from("onboarding_enquiries").select("id", { count: "exact", head: true }).gte("created_at", weekAgo),
+      ]);
+
+      const totalDonations = (donationsRes.data ?? []).reduce((s, d) => s + Number(d.amount), 0);
+      const todayDonations = (donationsTodayRes.data ?? []).reduce((s, d) => s + Number(d.amount), 0);
+
+      return {
+        orgs: orgsRes.count ?? 0,
+        users: usersRes.count ?? 0,
+        activeSubs: subsRes.count ?? 0,
+        totalDonations,
+        todayDonations,
+        signupsToday: signupsTodayRes.count ?? 0,
+        enquiriesThisWeek: enquiriesRes.count ?? 0,
+      };
+    },
+  });
+
+  const d = query.data;
+
+  const tiles = [
+    { label: "Organisations", value: d?.orgs ?? "—", sub: "total" },
+    { label: "Users", value: d?.users ?? "—", sub: "total" },
+    { label: "Active subscriptions", value: d?.activeSubs ?? "—", sub: "SaaS" },
+    { label: "Total donated", value: d ? `£${d.totalDonations.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—", sub: "confirmed" },
+    { label: "Donated today", value: d ? `£${d.todayDonations.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—", sub: "last 24h" },
+    { label: "Signups today", value: d?.signupsToday ?? "—", sub: "new users" },
+    { label: "Enquiries (7d)", value: d?.enquiriesThisWeek ?? "—", sub: "marketing site" },
+  ];
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-2"><Activity className="size-4" /> Application Monitoring</CardTitle>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Auto-refreshes every 30s</span>
+          <Button size="sm" variant="outline" onClick={() => void query.refetch()} disabled={query.isFetching}>
+            <RefreshCw className={`mr-1.5 size-4 ${query.isFetching ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {tiles.map((t) => (
+            <div key={t.label} className="rounded-lg border bg-muted/20 p-4">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t.label}</p>
+              <p className="mt-1.5 text-2xl font-bold font-display">{String(t.value)}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{t.sub}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-4 text-xs text-muted-foreground">
+          Last updated: {query.dataUpdatedAt ? new Date(query.dataUpdatedAt).toLocaleTimeString("en-GB") : "—"} ·{" "}
+          <a href="https://supabase.com/dashboard/project/zaexufclxmrpiuxogsjo" target="_blank" rel="noreferrer" className="underline underline-offset-2">
+            Supabase dashboard <ExternalLink className="inline size-3" />
+          </a>
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── SQL / Database Management Section ────────────────────────────────────────
+function SQLSection() {
+  const [sql, setSql] = useState("SELECT table_name, pg_size_pretty(pg_total_relation_size(quote_ident(table_name))) AS size\nFROM information_schema.tables\nWHERE table_schema = 'public'\nORDER BY pg_total_relation_size(quote_ident(table_name)) DESC\nLIMIT 20;");
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<{ columns: string[]; rows: Record<string, unknown>[] } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function runQuery() {
+    if (!sql.trim()) return;
+    setRunning(true);
+    setError(null);
+    setResult(null);
+    try {
+      const { data, error: rpcError } = await supabase.rpc("admin_run_select" as never, { query: sql } as never);
+      if (rpcError) throw rpcError;
+      const rows = (data as Record<string, unknown>[] | null) ?? [];
+      const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+      setResult({ columns, rows });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  const QUICK = [
+    { label: "Table sizes", sql: "SELECT table_name, pg_size_pretty(pg_total_relation_size(quote_ident(table_name))) AS size\nFROM information_schema.tables\nWHERE table_schema = 'public'\nORDER BY pg_total_relation_size(quote_ident(table_name)) DESC\nLIMIT 20;" },
+    { label: "Row counts", sql: "SELECT relname AS table_name, n_live_tup AS row_count\nFROM pg_stat_user_tables\nORDER BY n_live_tup DESC;" },
+    { label: "Recent migrations", sql: "SELECT version, statements[1] AS first_statement\nFROM supabase_migrations.schema_migrations\nORDER BY version DESC LIMIT 20;" },
+    { label: "Active RLS policies", sql: "SELECT tablename, policyname, cmd, roles\nFROM pg_policies\nWHERE schemaname = 'public'\nORDER BY tablename;" },
+  ];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Database className="size-4" /> SQL / Database Management</CardTitle>
+        <p className="text-xs text-muted-foreground">Read-only SELECT queries only. Use the Supabase dashboard for writes.</p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {QUICK.map((q) => (
+            <Button key={q.label} size="sm" variant="outline" onClick={() => setSql(q.sql)}>
+              {q.label}
+            </Button>
+          ))}
+        </div>
+        <Textarea
+          className="font-mono text-xs"
+          rows={5}
+          value={sql}
+          onChange={(e) => setSql(e.target.value)}
+          spellCheck={false}
+        />
+        <div className="flex justify-between items-center">
+          <Button onClick={() => void runQuery()} disabled={running || !sql.trim()}>
+            {running ? <><RefreshCw className="mr-1.5 size-4 animate-spin" /> Running…</> : "Run query"}
+          </Button>
+          <a href="https://supabase.com/dashboard/project/zaexufclxmrpiuxogsjo/editor" target="_blank" rel="noreferrer" className="text-xs text-muted-foreground underline underline-offset-2 flex items-center gap-1">
+            Full Supabase editor <ExternalLink className="size-3" />
+          </a>
+        </div>
+        {error && (
+          <div className="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive font-mono">{error}</div>
+        )}
+        {result && (
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/60">
+                <tr>
+                  {result.columns.map((c) => (
+                    <th key={c} className="px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap">{c}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {result.rows.map((row, i) => (
+                  <tr key={i} className={i % 2 === 1 ? "bg-muted/20" : ""}>
+                    {result.columns.map((c) => (
+                      <td key={c} className="px-3 py-1.5 font-mono whitespace-nowrap">{String(row[c] ?? "")}</td>
+                    ))}
+                  </tr>
+                ))}
+                {result.rows.length === 0 && (
+                  <tr><td colSpan={result.columns.length} className="px-3 py-4 text-center text-muted-foreground">No rows returned</td></tr>
+                )}
+              </tbody>
+            </table>
+            <p className="px-3 py-1.5 text-xs text-muted-foreground border-t">{result.rows.length} row{result.rows.length !== 1 ? "s" : ""}</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Partner Management Section ────────────────────────────────────────────────
+type Partner = { id: string; name: string; email: string; company: string | null; status: string; partner_code: string; reward_type: string; reward_rate: number; total_referrals: number; total_earned: number; created_at: string };
+
+function PartnersSection() {
+  const qc = useQueryClient();
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", company: "", reward_type: "credits", reward_rate: "0.10", reward_levels: "1" });
+  const [savingNew, setSavingNew] = useState(false);
+
+  const query = useQuery({
+    queryKey: ["admin-partners"],
+    queryFn: async (): Promise<Partner[]> => {
+      const { data, error } = await supabase
+        .from("partners" as never)
+        .select("id, name, email, company, status, partner_code, reward_type, reward_rate, total_referrals, total_earned, created_at")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Partner[];
+    },
+  });
+
+  const referralsQuery = useQuery({
+    queryKey: ["admin-referrals-summary"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("partner_referrals" as never)
+        .select("partner_id, status, reward_amount")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      const rows = (data ?? []) as { partner_id: string; status: string; reward_amount: number }[];
+      const byPartner: Record<string, { total: number; converted: number; pending: number }> = {};
+      for (const r of rows) {
+        if (!byPartner[r.partner_id]) byPartner[r.partner_id] = { total: 0, converted: 0, pending: 0 };
+        byPartner[r.partner_id].total++;
+        if (r.status === "converted") byPartner[r.partner_id].converted++;
+        if (r.status === "pending") byPartner[r.partner_id].pending++;
+      }
+      return byPartner;
+    },
+  });
+
+  async function createPartner() {
+    if (!form.name || !form.email) { toast.error("Name and email are required"); return; }
+    setSavingNew(true);
+    try {
+      const { error } = await supabase.from("partners" as never).insert({
+        name: form.name, email: form.email,
+        company: form.company || null,
+        reward_type: form.reward_type,
+        reward_rate: parseFloat(form.reward_rate),
+        reward_levels: parseInt(form.reward_levels),
+      } as never);
+      if (error) throw error;
+      toast.success("Partner created");
+      setAdding(false);
+      void qc.invalidateQueries({ queryKey: ["admin-partners"] });
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Could not create"); }
+    finally { setSavingNew(false); }
+  }
+
+  async function toggleStatus(id: string, current: string) {
+    const next = current === "active" ? "suspended" : "active";
+    const { error } = await supabase.from("partners" as never).update({ status: next } as never).eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Partner ${next}`);
+    void qc.invalidateQueries({ queryKey: ["admin-partners"] });
+  }
+
+  const partners = query.data ?? [];
+  const refMap = referralsQuery.data ?? {};
+  const totalPartners = partners.length;
+  const activePartners = partners.filter((p) => p.status === "active").length;
+  const totalEarned = partners.reduce((s, p) => s + Number(p.total_earned), 0);
+
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-3">
+        {[
+          { label: "Partners", value: totalPartners, sub: `${activePartners} active` },
+          { label: "Total referrals", value: partners.reduce((s, p) => s + p.total_referrals, 0), sub: "all time" },
+          { label: "Total earned", value: `£${totalEarned.toFixed(2)}`, sub: "credits + monetary" },
+        ].map((t) => (
+          <Card key={t.label}>
+            <CardContent className="p-5">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t.label}</p>
+              <p className="mt-2 font-display text-2xl font-bold">{String(t.value)}</p>
+              <p className="text-xs text-muted-foreground">{t.sub}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2"><Users className="size-4" /> Partners</CardTitle>
+          <Button size="sm" onClick={() => setAdding(true)}><Plus className="mr-1.5 size-4" /> Add partner</Button>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {adding && (
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Name</Label>
+                  <Input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="Jane Smith" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Email</Label>
+                  <Input type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} placeholder="jane@partner.org" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Company (optional)</Label>
+                  <Input value={form.company} onChange={(e) => setForm((p) => ({ ...p, company: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Reward type</Label>
+                  <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={form.reward_type} onChange={(e) => setForm((p) => ({ ...p, reward_type: e.target.value }))}>
+                    <option value="credits">Service credits (default)</option>
+                    <option value="monetary">Monetary (requires explicit config)</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Reward rate (e.g. 0.10 = 10%)</Label>
+                  <Input type="number" step="0.01" min="0" max="1" value={form.reward_rate} onChange={(e) => setForm((p) => ({ ...p, reward_rate: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Multi-level depth (1–3)</Label>
+                  <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={form.reward_levels} onChange={(e) => setForm((p) => ({ ...p, reward_levels: e.target.value }))}>
+                    <option value="1">1 level</option>
+                    <option value="2">2 levels</option>
+                    <option value="3">3 levels</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button>
+                <Button disabled={savingNew} onClick={() => void createPartner()}>Create</Button>
+              </div>
+            </div>
+          )}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Partner</TableHead>
+                <TableHead className="hidden md:table-cell">Code</TableHead>
+                <TableHead className="hidden md:table-cell">Reward</TableHead>
+                <TableHead>Referrals</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {partners.map((p) => {
+                const stats = refMap[p.id];
+                return (
+                  <TableRow key={p.id}>
+                    <TableCell>
+                      <div className="font-medium text-sm">{p.name}</div>
+                      <div className="text-xs text-muted-foreground">{p.email}</div>
+                    </TableCell>
+                    <TableCell className="hidden font-mono text-xs text-muted-foreground md:table-cell">{p.partner_code}</TableCell>
+                    <TableCell className="hidden text-xs md:table-cell">
+                      <div className="capitalize">{p.reward_type}</div>
+                      <div className="text-muted-foreground">{(p.reward_rate * 100).toFixed(0)}%</div>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <div>{stats?.total ?? p.total_referrals} total</div>
+                      {stats && <div className="text-xs text-muted-foreground">{stats.converted} converted</div>}
+                    </TableCell>
+                    <TableCell><StatusChip status={p.status} /></TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="ghost" onClick={() => void toggleStatus(p.id, p.status)}>
+                        {p.status === "active" ? "Suspend" : "Activate"}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {partners.length === 0 && !query.isLoading && (
+                <TableRow><TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">No partners yet.</TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </>
   );
 }
@@ -2342,7 +2850,16 @@ function AdminPage() {
         </Card>
       </div>
 
-      {/* ── MODULE 2: BRANDING ─────────────────────────────────────── */}
+      {/* ── MODULE 2: MONITORING ──────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="border-b pb-2">
+          <h2 className="text-base font-semibold">Application monitoring</h2>
+          <p className="text-sm text-muted-foreground">Live platform health, usage stats and key metrics.</p>
+        </div>
+        <MonitoringSection />
+      </div>
+
+      {/* ── MODULE 3: BRANDING ─────────────────────────────────────── */}
       <div className="space-y-4">
         <div className="border-b pb-2">
           <h2 className="text-base font-semibold">Branding</h2>
@@ -2351,7 +2868,7 @@ function AdminPage() {
         <PlatformSettingsSection />
       </div>
 
-      {/* ── MODULE 3: PRICING & PLANS ──────────────────────────────── */}
+      {/* ── MODULE 4: PRICING & PLANS ──────────────────────────────── */}
       <div className="space-y-4">
         <div className="border-b pb-2">
           <h2 className="text-base font-semibold">Pricing &amp; plans</h2>
@@ -2360,7 +2877,7 @@ function AdminPage() {
         <PlansSection />
       </div>
 
-      {/* ── MODULE 4: PAYMENTS ─────────────────────────────────────── */}
+      {/* ── MODULE 5: PAYMENTS ─────────────────────────────────────── */}
       <div className="space-y-4">
         <div className="border-b pb-2">
           <h2 className="text-base font-semibold">Payments</h2>
@@ -2378,7 +2895,34 @@ function AdminPage() {
         <ChatSupportSection />
       </div>
 
-      {/* ── MODULE 6: ONBOARDING PIPELINE ─────────────────────────── */}
+      {/* ── MODULE 6: FEATURE LIST / USER STORIES ─────────────────── */}
+      <div className="space-y-4">
+        <div className="border-b pb-2">
+          <h2 className="text-base font-semibold">Feature list &amp; user stories</h2>
+          <p className="text-sm text-muted-foreground">Track product features, epics, user stories and bugs across the backlog.</p>
+        </div>
+        <FeaturesSection />
+      </div>
+
+      {/* ── MODULE 7: SQL / DATABASE MANAGEMENT ───────────────────── */}
+      <div className="space-y-4">
+        <div className="border-b pb-2">
+          <h2 className="text-base font-semibold">SQL / database management</h2>
+          <p className="text-sm text-muted-foreground">Run read-only SELECT queries against the live database for diagnostics and reporting.</p>
+        </div>
+        <SQLSection />
+      </div>
+
+      {/* ── MODULE 8: PARTNER MANAGEMENT ──────────────────────────── */}
+      <div className="space-y-4">
+        <div className="border-b pb-2">
+          <h2 className="text-base font-semibold">Partner management</h2>
+          <p className="text-sm text-muted-foreground">Affiliate partners, referral tracking, multi-level rewards (default: service credits).</p>
+        </div>
+        <PartnersSection />
+      </div>
+
+      {/* ── MODULE 9: ONBOARDING PIPELINE ─────────────────────────── */}
       <div className="space-y-4">
         <div className="border-b pb-2">
           <h2 className="text-base font-semibold">Onboarding enquiries</h2>
@@ -2387,7 +2931,7 @@ function AdminPage() {
         <EnquiriesSection />
       </div>
 
-      {/* ── MODULE 7: CUSTOMERS ───────────────────────────────────── */}
+      {/* ── MODULE 11: CUSTOMERS ───────────────────────────────────── */}
       <div className="space-y-4">
         <div className="border-b pb-2">
           <h2 className="text-base font-semibold">Customers</h2>
@@ -2396,7 +2940,7 @@ function AdminPage() {
         <CustomersSection />
       </div>
 
-      {/* ── MODULE 8: DEPLOYMENTS ─────────────────────────────────── */}
+      {/* ── MODULE 12: DEPLOYMENTS ─────────────────────────────────── */}
       <div className="space-y-4">
         <div className="border-b pb-2">
           <h2 className="text-base font-semibold">Deployments</h2>
@@ -2405,7 +2949,7 @@ function AdminPage() {
         <DeploymentsSection />
       </div>
 
-      {/* ── MODULE 9: LICENCES ────────────────────────────────────── */}
+      {/* ── MODULE 13: LICENCES ────────────────────────────────────── */}
       <div className="space-y-4">
         <div className="border-b pb-2">
           <h2 className="text-base font-semibold">Licences</h2>
@@ -2414,7 +2958,7 @@ function AdminPage() {
         <LicencesSection />
       </div>
 
-      {/* ── MODULE 10: CHANGE REQUESTS ────────────────────────────── */}
+      {/* ── MODULE 14: CHANGE REQUESTS ────────────────────────────── */}
       <div className="space-y-4">
         <div className="border-b pb-2">
           <h2 className="text-base font-semibold">Change requests</h2>
