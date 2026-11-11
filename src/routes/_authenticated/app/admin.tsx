@@ -2,7 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, ChevronDown, ChevronUp, CreditCard, ExternalLink, MessageCircle, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { AlertTriangle, Building2, ChevronDown, ChevronUp, CreditCard, ExternalLink, FileText, Inbox, MessageCircle, Plus, RefreshCw, Server, Shield, Trash2, X } from "lucide-react";
 import { PageHeader } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1035,6 +1035,717 @@ function PaymentsSection() {
   );
 }
 
+// ── NL Commercial Management types ───────────────────────────────────────────
+type NLCustomer = { id: string; name: string; status: string; primary_contact: { name?: string; email?: string } | null; created_at: string; notes: string | null };
+type NLDeployment = { id: string; customer_id: string; deployment_model: string; status: string; hosting_provider: string | null; app_version: string | null; go_live_date: string | null; enabled_modules: string[]; created_at: string; customer_name?: string };
+type NLLicence = { id: string; customer_id: string; licence_key: string | null; start_date: string; expiry_date: string; status: string; maintenance_status: string; enabled_modules: string[]; customer_name?: string };
+type NLChangeRequest = { id: string; customer_id: string | null; cr_ref: string | null; title: string; status: string; priority: string; estimated_days: number | null; agreed_price: number | null; customer_name?: string; created_at: string };
+
+const DEPLOYMENT_STATUSES = ["enquiry","assessment","quoted","contracted","authorised","provisioning","deployed","uat","live","suspended","retired"];
+const CR_STATUSES = ["requested","under_review","quoted","approved","in_development","delivered","rejected","withdrawn"];
+const LICENCE_STATUSES = ["active","grace","expired","revoked"];
+
+function statusColor(status: string) {
+  const map: Record<string, string> = {
+    live: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+    active: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+    approved: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+    contracted: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+    quoted: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
+    enquiry: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+    grace: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
+    expired: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+    suspended: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+    retired: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500",
+    rejected: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+    delivered: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
+  };
+  return map[status] ?? "bg-muted text-muted-foreground";
+}
+
+function StatusChip({ status }: { status: string }) {
+  return (
+    <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium capitalize ${statusColor(status)}`}>
+      {status.replace(/_/g, " ")}
+    </span>
+  );
+}
+
+// ── Enquiries Pipeline Section ────────────────────────────────────────────────
+function EnquiriesSection() {
+  const qc = useQueryClient();
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [editNotes, setEditNotes] = useState("");
+  const [editStatus, setEditStatus] = useState("");
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const query = useQuery({
+    queryKey: ["nl-enquiries"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("onboarding_enquiries")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  async function saveEnquiry(id: string) {
+    setSavingId(id);
+    try {
+      const { error } = await supabase
+        .from("onboarding_enquiries")
+        .update({ status: editStatus, notes: editNotes })
+        .eq("id", id);
+      if (error) throw error;
+      toast.success("Enquiry updated");
+      setExpanded(null);
+      void qc.invalidateQueries({ queryKey: ["nl-enquiries"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  const rows = query.data ?? [];
+  const byStatus = {
+    new: rows.filter((r) => r.status === "new").length,
+    contacted: rows.filter((r) => r.status === "contacted").length,
+    qualified: rows.filter((r) => r.status === "qualified").length,
+    closed: rows.filter((r) => r.status === "closed").length,
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2"><Inbox className="size-4" /> Onboarding Enquiries</CardTitle>
+          <Button size="sm" variant="outline" onClick={() => void qc.invalidateQueries({ queryKey: ["nl-enquiries"] })}>
+            <RefreshCw className="mr-1.5 size-4" /> Refresh
+          </Button>
+        </div>
+        <div className="flex gap-3 pt-1">
+          {Object.entries(byStatus).map(([s, n]) => (
+            <span key={s} className="text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground">{n}</span> {s}
+            </span>
+          ))}
+        </div>
+      </CardHeader>
+      <CardContent className="overflow-x-auto p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Organisation</TableHead>
+              <TableHead>Name / Email</TableHead>
+              <TableHead className="hidden md:table-cell">Donors</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="hidden lg:table-cell">Date</TableHead>
+              <TableHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((r) => (
+              <>
+                <TableRow key={r.id}>
+                  <TableCell className="font-medium">{r.organisation}</TableCell>
+                  <TableCell className="text-sm">
+                    <div>{r.name}</div>
+                    <div className="text-muted-foreground text-xs">{r.email}</div>
+                  </TableCell>
+                  <TableCell className="hidden text-sm text-muted-foreground md:table-cell capitalize">
+                    {(r.donor_count ?? "—").replace(/_/g, " ")}
+                  </TableCell>
+                  <TableCell><StatusChip status={r.status} /></TableCell>
+                  <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">
+                    {new Date(r.created_at).toLocaleDateString("en-GB")}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button size="sm" variant="ghost" onClick={() => {
+                      if (expanded === r.id) { setExpanded(null); return; }
+                      setExpanded(r.id);
+                      setEditStatus(r.status);
+                      setEditNotes(r.notes ?? "");
+                    }}>
+                      {expanded === r.id ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+                {expanded === r.id && (
+                  <TableRow key={`${r.id}-expand`}>
+                    <TableCell colSpan={6} className="bg-muted/30 px-4 py-3">
+                      {r.message && <p className="mb-3 text-sm text-muted-foreground italic">"{r.message}"</p>}
+                      <div className="flex flex-wrap gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Status</Label>
+                          <select
+                            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                            value={editStatus}
+                            onChange={(e) => setEditStatus(e.target.value)}
+                          >
+                            {["new","contacted","qualified","closed"].map((s) => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex-1 min-w-[200px] space-y-1">
+                          <Label className="text-xs">Notes</Label>
+                          <Input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Internal notes…" className="text-xs h-8" />
+                        </div>
+                        <div className="flex items-end gap-2">
+                          <Button size="sm" disabled={savingId === r.id} onClick={() => void saveEnquiry(r.id)}>Save</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setExpanded(null)}>Cancel</Button>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </>
+            ))}
+            {rows.length === 0 && !query.isLoading && (
+              <TableRow>
+                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                  No enquiries yet. They appear here when visitors submit the marketing site form.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Customers Section ─────────────────────────────────────────────────────────
+function CustomersSection() {
+  const qc = useQueryClient();
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [savingNew, setSavingNew] = useState(false);
+
+  const query = useQuery({
+    queryKey: ["nl-customers"],
+    queryFn: async (): Promise<NLCustomer[]> => {
+      const { data, error } = await supabase
+        .from("nl_customers" as never)
+        .select("id, name, status, primary_contact, created_at, notes")
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as NLCustomer[];
+    },
+  });
+
+  async function createCustomer() {
+    if (!newName) { toast.error("Name is required"); return; }
+    setSavingNew(true);
+    try {
+      const { error } = await supabase.from("nl_customers" as never).insert({
+        name: newName,
+        primary_contact: newEmail ? { email: newEmail } : null,
+      } as never);
+      if (error) throw error;
+      toast.success("Customer created");
+      setAdding(false); setNewName(""); setNewEmail("");
+      void qc.invalidateQueries({ queryKey: ["nl-customers"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not create");
+    } finally {
+      setSavingNew(false);
+    }
+  }
+
+  async function updateStatus(id: string, status: string) {
+    const { error } = await supabase.from("nl_customers" as never).update({ status } as never).eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Status updated");
+    void qc.invalidateQueries({ queryKey: ["nl-customers"] });
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-2"><Building2 className="size-4" /> Customers</CardTitle>
+        <Button size="sm" onClick={() => setAdding(true)}><Plus className="mr-1.5 size-4" /> Add customer</Button>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {adding && (
+          <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Organisation name</Label>
+                <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="St. Mary's Church" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Primary contact email</Label>
+                <Input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="contact@example.org" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button>
+              <Button disabled={savingNew} onClick={() => void createCustomer()}>Create</Button>
+            </div>
+          </div>
+        )}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead className="hidden md:table-cell">Primary contact</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="hidden lg:table-cell">Added</TableHead>
+              <TableHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {(query.data ?? []).map((c) => (
+              <TableRow key={c.id}>
+                <TableCell className="font-medium">{c.name}</TableCell>
+                <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                  {c.primary_contact?.email ?? c.primary_contact?.name ?? "—"}
+                </TableCell>
+                <TableCell><StatusChip status={c.status} /></TableCell>
+                <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">
+                  {new Date(c.created_at).toLocaleDateString("en-GB")}
+                </TableCell>
+                <TableCell className="text-right">
+                  <select
+                    className="h-7 rounded-md border border-input bg-background px-2 text-xs"
+                    value={c.status}
+                    onChange={(e) => void updateStatus(c.id, e.target.value)}
+                  >
+                    {["prospect","active","suspended","churned"].map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </TableCell>
+              </TableRow>
+            ))}
+            {(query.data ?? []).length === 0 && !query.isLoading && (
+              <TableRow>
+                <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
+                  No customers yet. Add one or convert an enquiry.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Deployments Section ───────────────────────────────────────────────────────
+function DeploymentsSection() {
+  const qc = useQueryClient();
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ customer_id: "", deployment_model: "customer_hosted", status: "enquiry", hosting_provider: "", app_version: "" });
+  const [savingNew, setSavingNew] = useState(false);
+
+  const customersQ = useQuery({
+    queryKey: ["nl-customers"],
+    queryFn: async (): Promise<NLCustomer[]> => {
+      const { data, error } = await supabase.from("nl_customers" as never).select("id, name, status, primary_contact, created_at, notes").order("name");
+      if (error) throw error;
+      return (data ?? []) as NLCustomer[];
+    },
+  });
+
+  const query = useQuery({
+    queryKey: ["nl-deployments"],
+    queryFn: async (): Promise<NLDeployment[]> => {
+      const { data, error } = await supabase
+        .from("nl_deployments" as never)
+        .select("id, customer_id, deployment_model, status, hosting_provider, app_version, go_live_date, enabled_modules, created_at, nl_customers(name)")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map((r: never) => ({ ...(r as NLDeployment), customer_name: (r as never as { nl_customers: { name: string } | null }).nl_customers?.name }));
+    },
+  });
+
+  async function createDeployment() {
+    if (!form.customer_id) { toast.error("Select a customer"); return; }
+    setSavingNew(true);
+    try {
+      const { error } = await supabase.from("nl_deployments" as never).insert(form as never);
+      if (error) throw error;
+      toast.success("Deployment created");
+      setAdding(false);
+      void qc.invalidateQueries({ queryKey: ["nl-deployments"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not create");
+    } finally {
+      setSavingNew(false);
+    }
+  }
+
+  async function updateStatus(id: string, status: string) {
+    const { error } = await supabase.from("nl_deployments" as never).update({ status } as never).eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Status updated");
+    void qc.invalidateQueries({ queryKey: ["nl-deployments"] });
+  }
+
+  const customers = customersQ.data ?? [];
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-2"><Server className="size-4" /> Deployments</CardTitle>
+        <Button size="sm" onClick={() => setAdding(true)}><Plus className="mr-1.5 size-4" /> New deployment</Button>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {adding && (
+          <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Customer</Label>
+                <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={form.customer_id} onChange={(e) => setForm((p) => ({ ...p, customer_id: e.target.value }))}>
+                  <option value="">Select customer…</option>
+                  {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Model</Label>
+                <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={form.deployment_model} onChange={(e) => setForm((p) => ({ ...p, deployment_model: e.target.value }))}>
+                  <option value="saas">SaaS</option>
+                  <option value="customer_hosted">Customer-hosted</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Status</Label>
+                <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}>
+                  {DEPLOYMENT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Hosting provider</Label>
+                <Input value={form.hosting_provider} onChange={(e) => setForm((p) => ({ ...p, hosting_provider: e.target.value }))} placeholder="e.g. AWS, on-site" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button>
+              <Button disabled={savingNew} onClick={() => void createDeployment()}>Create</Button>
+            </div>
+          </div>
+        )}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Customer</TableHead>
+              <TableHead className="hidden md:table-cell">Model</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="hidden lg:table-cell">Hosting</TableHead>
+              <TableHead className="hidden lg:table-cell">Go-live</TableHead>
+              <TableHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {(query.data ?? []).map((d) => (
+              <TableRow key={d.id}>
+                <TableCell className="font-medium">{d.customer_name ?? d.customer_id.slice(0, 8)}</TableCell>
+                <TableCell className="hidden text-sm text-muted-foreground md:table-cell capitalize">
+                  {d.deployment_model.replace("_", " ")}
+                </TableCell>
+                <TableCell><StatusChip status={d.status} /></TableCell>
+                <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">{d.hosting_provider ?? "—"}</TableCell>
+                <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">
+                  {d.go_live_date ? new Date(d.go_live_date).toLocaleDateString("en-GB") : "—"}
+                </TableCell>
+                <TableCell className="text-right">
+                  <select className="h-7 rounded-md border border-input bg-background px-2 text-xs"
+                    value={d.status} onChange={(e) => void updateStatus(d.id, e.target.value)}>
+                    {DEPLOYMENT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </TableCell>
+              </TableRow>
+            ))}
+            {(query.data ?? []).length === 0 && !query.isLoading && (
+              <TableRow>
+                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">No deployments yet.</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Licences Section ──────────────────────────────────────────────────────────
+function LicencesSection() {
+  const qc = useQueryClient();
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ customer_id: "", licence_key: "", start_date: "", expiry_date: "", status: "active" });
+  const [savingNew, setSavingNew] = useState(false);
+
+  const customersQ = useQuery({
+    queryKey: ["nl-customers"],
+    queryFn: async (): Promise<NLCustomer[]> => {
+      const { data, error } = await supabase.from("nl_customers" as never).select("id, name, status, primary_contact, created_at, notes").order("name");
+      if (error) throw error;
+      return (data ?? []) as NLCustomer[];
+    },
+  });
+
+  const query = useQuery({
+    queryKey: ["nl-licences"],
+    queryFn: async (): Promise<NLLicence[]> => {
+      const { data, error } = await supabase
+        .from("nl_licences" as never)
+        .select("id, customer_id, licence_key, start_date, expiry_date, status, maintenance_status, enabled_modules, nl_customers(name)")
+        .order("expiry_date");
+      if (error) throw error;
+      return (data ?? []).map((r: never) => ({ ...(r as NLLicence), customer_name: (r as never as { nl_customers: { name: string } | null }).nl_customers?.name }));
+    },
+  });
+
+  async function createLicence() {
+    if (!form.customer_id || !form.start_date || !form.expiry_date) { toast.error("Customer, start and expiry dates are required"); return; }
+    setSavingNew(true);
+    try {
+      const grace = new Date(form.expiry_date);
+      grace.setDate(grace.getDate() + 30);
+      const { error } = await supabase.from("nl_licences" as never).insert({ ...form, grace_until: grace.toISOString().slice(0, 10) } as never);
+      if (error) throw error;
+      toast.success("Licence created");
+      setAdding(false);
+      void qc.invalidateQueries({ queryKey: ["nl-licences"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not create");
+    } finally {
+      setSavingNew(false);
+    }
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const customers = customersQ.data ?? [];
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-2"><Shield className="size-4" /> Licences</CardTitle>
+        <Button size="sm" onClick={() => setAdding(true)}><Plus className="mr-1.5 size-4" /> Issue licence</Button>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {adding && (
+          <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Customer</Label>
+                <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={form.customer_id} onChange={(e) => setForm((p) => ({ ...p, customer_id: e.target.value }))}>
+                  <option value="">Select customer…</option>
+                  {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Licence key / ref</Label>
+                <Input value={form.licence_key} onChange={(e) => setForm((p) => ({ ...p, licence_key: e.target.value }))} placeholder="KG-2025-001" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Start date</Label>
+                <Input type="date" value={form.start_date} onChange={(e) => setForm((p) => ({ ...p, start_date: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Expiry date</Label>
+                <Input type="date" value={form.expiry_date} onChange={(e) => setForm((p) => ({ ...p, expiry_date: e.target.value }))} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button>
+              <Button disabled={savingNew} onClick={() => void createLicence()}>Issue</Button>
+            </div>
+          </div>
+        )}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Customer</TableHead>
+              <TableHead className="hidden md:table-cell">Key</TableHead>
+              <TableHead>Expiry</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="hidden lg:table-cell">Maintenance</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {(query.data ?? []).map((l) => {
+              const expiring = l.expiry_date <= today && l.status === "active";
+              return (
+                <TableRow key={l.id} className={expiring ? "bg-orange-50/50 dark:bg-orange-900/10" : ""}>
+                  <TableCell className="font-medium">{l.customer_name ?? l.customer_id.slice(0, 8)}</TableCell>
+                  <TableCell className="hidden font-mono text-xs text-muted-foreground md:table-cell">{l.licence_key ?? "—"}</TableCell>
+                  <TableCell className="text-sm">
+                    {new Date(l.expiry_date).toLocaleDateString("en-GB")}
+                    {expiring && <AlertTriangle className="ml-1 inline size-3.5 text-orange-500" />}
+                  </TableCell>
+                  <TableCell><StatusChip status={l.status} /></TableCell>
+                  <TableCell className="hidden lg:table-cell"><StatusChip status={l.maintenance_status} /></TableCell>
+                </TableRow>
+              );
+            })}
+            {(query.data ?? []).length === 0 && !query.isLoading && (
+              <TableRow>
+                <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">No licences yet.</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Change Requests Section ───────────────────────────────────────────────────
+function ChangeRequestsSection() {
+  const qc = useQueryClient();
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ customer_id: "", cr_ref: "", title: "", status: "requested", priority: "normal", description: "" });
+  const [savingNew, setSavingNew] = useState(false);
+
+  const customersQ = useQuery({
+    queryKey: ["nl-customers"],
+    queryFn: async (): Promise<NLCustomer[]> => {
+      const { data, error } = await supabase.from("nl_customers" as never).select("id, name, status, primary_contact, created_at, notes").order("name");
+      if (error) throw error;
+      return (data ?? []) as NLCustomer[];
+    },
+  });
+
+  const query = useQuery({
+    queryKey: ["nl-crs"],
+    queryFn: async (): Promise<NLChangeRequest[]> => {
+      const { data, error } = await supabase
+        .from("nl_change_requests" as never)
+        .select("id, customer_id, cr_ref, title, status, priority, estimated_days, agreed_price, created_at, nl_customers(name)")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map((r: never) => ({ ...(r as NLChangeRequest), customer_name: (r as never as { nl_customers: { name: string } | null }).nl_customers?.name }));
+    },
+  });
+
+  async function createCR() {
+    if (!form.title) { toast.error("Title is required"); return; }
+    setSavingNew(true);
+    try {
+      const { error } = await supabase.from("nl_change_requests" as never).insert(form as never);
+      if (error) throw error;
+      toast.success("Change request created");
+      setAdding(false);
+      void qc.invalidateQueries({ queryKey: ["nl-crs"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not create");
+    } finally {
+      setSavingNew(false);
+    }
+  }
+
+  async function updateStatus(id: string, status: string) {
+    const { error } = await supabase.from("nl_change_requests" as never).update({ status } as never).eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Status updated");
+    void qc.invalidateQueries({ queryKey: ["nl-crs"] });
+  }
+
+  const customers = customersQ.data ?? [];
+  const PRIORITY_COLOR: Record<string, string> = { low: "text-muted-foreground", normal: "text-foreground", high: "text-orange-600", critical: "text-red-600 font-semibold" };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-2"><FileText className="size-4" /> Change Requests</CardTitle>
+        <Button size="sm" onClick={() => setAdding(true)}><Plus className="mr-1.5 size-4" /> New CR</Button>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {adding && (
+          <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Customer (optional)</Label>
+                <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={form.customer_id} onChange={(e) => setForm((p) => ({ ...p, customer_id: e.target.value }))}>
+                  <option value="">Platform-wide</option>
+                  {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>CR Ref</Label>
+                <Input value={form.cr_ref} onChange={(e) => setForm((p) => ({ ...p, cr_ref: e.target.value }))} placeholder="CR-2025-001" />
+              </div>
+              <div className="sm:col-span-2 space-y-1.5">
+                <Label>Title</Label>
+                <Input value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} placeholder="Add Gift Aid reporting module" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Priority</Label>
+                <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={form.priority} onChange={(e) => setForm((p) => ({ ...p, priority: e.target.value }))}>
+                  {["low","normal","high","critical"].map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Status</Label>
+                <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}>
+                  {CR_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button>
+              <Button disabled={savingNew} onClick={() => void createCR()}>Create</Button>
+            </div>
+          </div>
+        )}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Ref / Title</TableHead>
+              <TableHead className="hidden md:table-cell">Customer</TableHead>
+              <TableHead>Priority</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="hidden lg:table-cell">Date</TableHead>
+              <TableHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {(query.data ?? []).map((cr) => (
+              <TableRow key={cr.id}>
+                <TableCell>
+                  <div className="font-medium text-sm">{cr.title}</div>
+                  {cr.cr_ref && <div className="font-mono text-xs text-muted-foreground">{cr.cr_ref}</div>}
+                </TableCell>
+                <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{cr.customer_name ?? "Platform-wide"}</TableCell>
+                <TableCell className={`text-xs font-medium capitalize ${PRIORITY_COLOR[cr.priority] ?? ""}`}>{cr.priority}</TableCell>
+                <TableCell><StatusChip status={cr.status} /></TableCell>
+                <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">
+                  {new Date(cr.created_at).toLocaleDateString("en-GB")}
+                </TableCell>
+                <TableCell className="text-right">
+                  <select className="h-7 rounded-md border border-input bg-background px-2 text-xs"
+                    value={cr.status} onChange={(e) => void updateStatus(cr.id, e.target.value)}>
+                    {CR_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
+                  </select>
+                </TableCell>
+              </TableRow>
+            ))}
+            {(query.data ?? []).length === 0 && !query.isLoading && (
+              <TableRow>
+                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">No change requests yet.</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
 function AdminPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -1665,6 +2376,51 @@ function AdminPage() {
           <p className="text-sm text-muted-foreground">Manage support agents and assign incoming conversations.</p>
         </div>
         <ChatSupportSection />
+      </div>
+
+      {/* ── MODULE 6: ONBOARDING PIPELINE ─────────────────────────── */}
+      <div className="space-y-4">
+        <div className="border-b pb-2">
+          <h2 className="text-base font-semibold">Onboarding enquiries</h2>
+          <p className="text-sm text-muted-foreground">Leads from the marketing site — qualify, contact and convert to customers.</p>
+        </div>
+        <EnquiriesSection />
+      </div>
+
+      {/* ── MODULE 7: CUSTOMERS ───────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="border-b pb-2">
+          <h2 className="text-base font-semibold">Customers</h2>
+          <p className="text-sm text-muted-foreground">Customer organisations — both SaaS tenants and customer-hosted deployments.</p>
+        </div>
+        <CustomersSection />
+      </div>
+
+      {/* ── MODULE 8: DEPLOYMENTS ─────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="border-b pb-2">
+          <h2 className="text-base font-semibold">Deployments</h2>
+          <p className="text-sm text-muted-foreground">Track every live and in-flight deployment through its full lifecycle.</p>
+        </div>
+        <DeploymentsSection />
+      </div>
+
+      {/* ── MODULE 9: LICENCES ────────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="border-b pb-2">
+          <h2 className="text-base font-semibold">Licences</h2>
+          <p className="text-sm text-muted-foreground">Issue and track annual licences for customer-hosted deployments.</p>
+        </div>
+        <LicencesSection />
+      </div>
+
+      {/* ── MODULE 10: CHANGE REQUESTS ────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="border-b pb-2">
+          <h2 className="text-base font-semibold">Change requests</h2>
+          <p className="text-sm text-muted-foreground">Customer-funded and platform enhancements — from request to delivery.</p>
+        </div>
+        <ChangeRequestsSection />
       </div>
     </div>
   );
