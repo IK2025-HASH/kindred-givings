@@ -1545,7 +1545,10 @@ function PartnersSection() {
 
 // ── NL Commercial Management types ───────────────────────────────────────────
 type NLCustomer = { id: string; name: string; status: string; primary_contact: { name?: string; email?: string } | null; created_at: string; notes: string | null };
-type NLDeployment = { id: string; customer_id: string; deployment_model: string; status: string; hosting_provider: string | null; app_version: string | null; go_live_date: string | null; enabled_modules: string[]; created_at: string; customer_name?: string };
+type NLDeployment = { id: string; customer_id: string; deployment_model: string; geography: string | null; status: string; hosting_provider: string | null; app_version: string | null; go_live_date: string | null; enabled_modules: string[]; created_at: string; customer_name?: string };
+
+const SAAS_GEOGRAPHIES = ["UK", "EU", "US", "APAC", "MEA"];
+const MODEL_LABELS: Record<string, string> = { saas: "SaaS (NL-hosted)", customer_hosted: "Customer-Hosted (Single-Tenant)" };
 type NLLicence = { id: string; customer_id: string; licence_key: string | null; start_date: string; expiry_date: string; status: string; maintenance_status: string; enabled_modules: string[]; customer_name?: string };
 type NLChangeRequest = { id: string; customer_id: string | null; cr_ref: string | null; title: string; status: string; priority: string; estimated_days: number | null; agreed_price: number | null; customer_name?: string; created_at: string };
 
@@ -1849,8 +1852,9 @@ function CustomersSection() {
 function DeploymentsSection() {
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ customer_id: "", deployment_model: "customer_hosted", status: "enquiry", hosting_provider: "", app_version: "" });
+  const [form, setForm] = useState({ customer_id: "", deployment_model: "saas", geography: "UK", status: "enquiry", hosting_provider: "", app_version: "" });
   const [savingNew, setSavingNew] = useState(false);
+  const [filterModel, setFilterModel] = useState<string>("all");
 
   const customersQ = useQuery({
     queryKey: ["nl-customers"],
@@ -1866,7 +1870,7 @@ function DeploymentsSection() {
     queryFn: async (): Promise<NLDeployment[]> => {
       const { data, error } = await supabase
         .from("nl_deployments" as never)
-        .select("id, customer_id, deployment_model, status, hosting_provider, app_version, go_live_date, enabled_modules, created_at, nl_customers(name)")
+        .select("id, customer_id, deployment_model, geography, status, hosting_provider, app_version, go_live_date, enabled_modules, created_at, nl_customers(name)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []).map((r: never) => ({ ...(r as NLDeployment), customer_name: (r as never as { nl_customers: { name: string } | null }).nl_customers?.name }));
@@ -1877,7 +1881,15 @@ function DeploymentsSection() {
     if (!form.customer_id) { toast.error("Select a customer"); return; }
     setSavingNew(true);
     try {
-      const { error } = await supabase.from("nl_deployments" as never).insert(form as never);
+      const payload = {
+        customer_id: form.customer_id,
+        deployment_model: form.deployment_model,
+        geography: form.deployment_model === "saas" ? form.geography : null,
+        status: form.status,
+        hosting_provider: form.hosting_provider || null,
+        app_version: form.app_version || null,
+      };
+      const { error } = await supabase.from("nl_deployments" as never).insert(payload as never);
       if (error) throw error;
       toast.success("Deployment created");
       setAdding(false);
@@ -1897,91 +1909,163 @@ function DeploymentsSection() {
   }
 
   const customers = customersQ.data ?? [];
+  const isSaaS = form.deployment_model === "saas";
+
+  const allDeployments = query.data ?? [];
+  const saasDeployments = allDeployments.filter((d) => d.deployment_model === "saas");
+  const hostedDeployments = allDeployments.filter((d) => d.deployment_model === "customer_hosted");
+  const filtered = filterModel === "all" ? allDeployments : filterModel === "saas" ? saasDeployments : hostedDeployments;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2"><Server className="size-4" /> Deployments</CardTitle>
-        <Button size="sm" onClick={() => setAdding(true)}><Plus className="mr-1.5 size-4" /> New deployment</Button>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {adding && (
-          <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label>Customer</Label>
-                <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={form.customer_id} onChange={(e) => setForm((p) => ({ ...p, customer_id: e.target.value }))}>
-                  <option value="">Select customer…</option>
-                  {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Model</Label>
-                <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={form.deployment_model} onChange={(e) => setForm((p) => ({ ...p, deployment_model: e.target.value }))}>
-                  <option value="saas">SaaS</option>
-                  <option value="customer_hosted">Customer-hosted</option>
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Status</Label>
-                <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}>
-                  {DEPLOYMENT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Hosting provider</Label>
-                <Input value={form.hosting_provider} onChange={(e) => setForm((p) => ({ ...p, hosting_provider: e.target.value }))} placeholder="e.g. AWS, on-site" />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button>
-              <Button disabled={savingNew} onClick={() => void createDeployment()}>Create</Button>
-            </div>
+    <div className="space-y-4">
+      {/* Summary cards */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-lg border bg-blue-50 dark:bg-blue-950/30 p-3">
+          <p className="text-xs font-medium text-blue-700 dark:text-blue-300 uppercase tracking-wide">SaaS instances</p>
+          <p className="mt-1 text-2xl font-bold text-blue-900 dark:text-blue-100">{saasDeployments.length}</p>
+          <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">NL-hosted · multi-tenant per geography</p>
+        </div>
+        <div className="rounded-lg border bg-orange-50 dark:bg-orange-950/30 p-3">
+          <p className="text-xs font-medium text-orange-700 dark:text-orange-300 uppercase tracking-wide">Customer-hosted</p>
+          <p className="mt-1 text-2xl font-bold text-orange-900 dark:text-orange-100">{hostedDeployments.length}</p>
+          <p className="text-xs text-orange-600 dark:text-orange-400 mt-0.5">On-premise · strictly single-tenant</p>
+        </div>
+        <div className="rounded-lg border bg-muted/40 p-3">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Live</p>
+          <p className="mt-1 text-2xl font-bold">{allDeployments.filter((d) => d.status === "live").length}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">across all models</p>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div className="flex items-center gap-3">
+            <CardTitle className="flex items-center gap-2"><Server className="size-4" /> Deployments</CardTitle>
+            <select className="h-7 rounded-md border border-input bg-background px-2 text-xs"
+              value={filterModel} onChange={(e) => setFilterModel(e.target.value)}>
+              <option value="all">All models</option>
+              <option value="saas">SaaS only</option>
+              <option value="customer_hosted">Customer-hosted only</option>
+            </select>
           </div>
-        )}
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Customer</TableHead>
-              <TableHead className="hidden md:table-cell">Model</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="hidden lg:table-cell">Hosting</TableHead>
-              <TableHead className="hidden lg:table-cell">Go-live</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {(query.data ?? []).map((d) => (
-              <TableRow key={d.id}>
-                <TableCell className="font-medium">{d.customer_name ?? d.customer_id.slice(0, 8)}</TableCell>
-                <TableCell className="hidden text-sm text-muted-foreground md:table-cell capitalize">
-                  {d.deployment_model.replace("_", " ")}
-                </TableCell>
-                <TableCell><StatusChip status={d.status} /></TableCell>
-                <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">{d.hosting_provider ?? "—"}</TableCell>
-                <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">
-                  {d.go_live_date ? new Date(d.go_live_date).toLocaleDateString("en-GB") : "—"}
-                </TableCell>
-                <TableCell className="text-right">
-                  <select className="h-7 rounded-md border border-input bg-background px-2 text-xs"
-                    value={d.status} onChange={(e) => void updateStatus(d.id, e.target.value)}>
+          <Button size="sm" onClick={() => setAdding(true)}><Plus className="mr-1.5 size-4" /> New deployment</Button>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {adding && (
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+              {/* Model selector first — drives what else appears */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Deployment model</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button"
+                      onClick={() => setForm((p) => ({ ...p, deployment_model: "saas", geography: "UK" }))}
+                      className={`rounded-lg border-2 p-3 text-left transition-colors ${isSaaS ? "border-primary bg-primary/5" : "border-input hover:border-muted-foreground/50"}`}>
+                      <p className="font-semibold text-sm">SaaS (NL-hosted)</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">NL operates the infrastructure. Select a geography instance.</p>
+                    </button>
+                    <button type="button"
+                      onClick={() => setForm((p) => ({ ...p, deployment_model: "customer_hosted", geography: "" }))}
+                      className={`rounded-lg border-2 p-3 text-left transition-colors ${!isSaaS ? "border-primary bg-primary/5" : "border-input hover:border-muted-foreground/50"}`}>
+                      <p className="font-semibold text-sm">Customer-Hosted</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Customer owns infra. <span className="font-semibold text-orange-600">Strictly single-tenant.</span></p>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Customer</Label>
+                  <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={form.customer_id} onChange={(e) => setForm((p) => ({ ...p, customer_id: e.target.value }))}>
+                    <option value="">Select customer…</option>
+                    {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+
+                {isSaaS ? (
+                  <div className="space-y-1.5">
+                    <Label>Geography instance</Label>
+                    <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      value={form.geography} onChange={(e) => setForm((p) => ({ ...p, geography: e.target.value }))}>
+                      {SAAS_GEOGRAPHIES.map((g) => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                    <p className="text-xs text-muted-foreground">Each geography is a separate NL-hosted instance.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <Label>Hosting provider / location</Label>
+                    <Input value={form.hosting_provider} onChange={(e) => setForm((p) => ({ ...p, hosting_provider: e.target.value }))} placeholder="e.g. AWS eu-west-2, on-site London" />
+                    <p className="text-xs text-orange-600 font-medium">Single-tenant — isolated instance for this customer only.</p>
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <Label>Initial status</Label>
+                  <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}>
                     {DEPLOYMENT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
-                </TableCell>
-              </TableRow>
-            ))}
-            {(query.data ?? []).length === 0 && !query.isLoading && (
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>App version</Label>
+                  <Input value={form.app_version} onChange={(e) => setForm((p) => ({ ...p, app_version: e.target.value }))} placeholder="e.g. 1.1.1" />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button>
+                <Button disabled={savingNew} onClick={() => void createDeployment()}>Create deployment</Button>
+              </div>
+            </div>
+          )}
+
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">No deployments yet.</TableCell>
+                <TableHead>Customer</TableHead>
+                <TableHead className="hidden md:table-cell">Model</TableHead>
+                <TableHead className="hidden md:table-cell">Geography / Host</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="hidden lg:table-cell">Go-live</TableHead>
+                <TableHead />
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((d) => (
+                <TableRow key={d.id}>
+                  <TableCell className="font-medium">{d.customer_name ?? d.customer_id.slice(0, 8)}</TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${d.deployment_model === "saas" ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" : "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300"}`}>
+                      {d.deployment_model === "saas" ? "SaaS" : "Customer-Hosted"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                    {d.deployment_model === "saas"
+                      ? (d.geography ? <span className="font-medium text-blue-700 dark:text-blue-300">{d.geography}</span> : "—")
+                      : (d.hosting_provider ?? <span className="italic">on-premise</span>)}
+                  </TableCell>
+                  <TableCell><StatusChip status={d.status} /></TableCell>
+                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                    {d.go_live_date ? new Date(d.go_live_date).toLocaleDateString("en-GB") : "—"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <select className="h-7 rounded-md border border-input bg-background px-2 text-xs"
+                      value={d.status} onChange={(e) => void updateStatus(d.id, e.target.value)}>
+                      {DEPLOYMENT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filtered.length === 0 && !query.isLoading && (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">No deployments yet.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
