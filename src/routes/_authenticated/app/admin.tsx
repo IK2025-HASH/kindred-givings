@@ -1848,14 +1848,27 @@ function CustomersSection() {
   );
 }
 
+// ── Deployment stage gates — which transitions require confirmation ────────────
+const STAGE_GATE_TRANSITIONS: Record<string, string> = {
+  authorised: "This will authorise the deployment for provisioning. Confirm all commercials are signed.",
+  provisioning: "This will begin active provisioning. Confirm infrastructure is ready.",
+  live: "This will mark the deployment as LIVE. Confirm all UAT sign-offs are complete.",
+  suspended: "This will suspend the deployment. The customer will lose access.",
+  retired: "This will permanently retire this deployment. This cannot be undone.",
+};
+
 // ── Deployments Section ───────────────────────────────────────────────────────
 function DeploymentsSection() {
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ customer_id: "", deployment_model: "saas", geography: "UK", geography_instance_ref: "", delivery_method: "docker", status: "enquiry", hosting_provider: "", app_version: "", provisioning_notes: "" });
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Partial<NLDeployment & { go_live_date_input: string }>>({});
   const [savingNew, setSavingNew] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [filterModel, setFilterModel] = useState<string>("all");
+  const [pendingStatus, setPendingStatus] = useState<{ id: string; status: string } | null>(null);
 
   const customersQ = useQuery({
     queryKey: ["nl-customers"],
@@ -1880,6 +1893,16 @@ function DeploymentsSection() {
 
   async function createDeployment() {
     if (!form.customer_id) { toast.error("Select a customer"); return; }
+    // Duplicate guard
+    const existing = (query.data ?? []).find((d) =>
+      d.customer_id === form.customer_id &&
+      d.deployment_model === form.deployment_model &&
+      (form.deployment_model === "customer_hosted" || d.geography === form.geography)
+    );
+    if (existing) {
+      toast.error(`This customer already has a ${form.deployment_model === "saas" ? form.geography + " SaaS" : "customer-hosted"} deployment (${existing.status}).`);
+      return;
+    }
     setSavingNew(true);
     try {
       const payload = {
@@ -1905,11 +1928,53 @@ function DeploymentsSection() {
     }
   }
 
-  async function updateStatus(id: string, status: string) {
-    const { error } = await supabase.from("nl_deployments" as never).update({ status } as never).eq("id", id);
+  function requestStatusChange(id: string, status: string) {
+    if (STAGE_GATE_TRANSITIONS[status]) {
+      setPendingStatus({ id, status });
+    } else {
+      void confirmStatusChange(id, status);
+    }
+  }
+
+  async function confirmStatusChange(id: string, status: string) {
+    const update: Record<string, unknown> = { status };
+    if (status === "live") update.go_live_date = new Date().toISOString().split("T")[0];
+    const { error } = await supabase.from("nl_deployments" as never).update(update as never).eq("id", id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Status updated");
+    toast.success(`Status → ${status}`);
+    setPendingStatus(null);
     void qc.invalidateQueries({ queryKey: ["nl-deployments"] });
+  }
+
+  function startEdit(d: NLDeployment) {
+    setEditingId(d.id);
+    setEditForm({ ...d, go_live_date_input: d.go_live_date ?? "" });
+    setExpandedId(d.id);
+  }
+
+  async function saveEdit() {
+    if (!editingId) return;
+    setSavingEdit(true);
+    try {
+      const patch = {
+        app_version: editForm.app_version || null,
+        hosting_provider: editForm.hosting_provider || null,
+        geography_instance_ref: editForm.geography_instance_ref || null,
+        delivery_method: editForm.delivery_method || null,
+        provisioning_notes: editForm.provisioning_notes || null,
+        infra_signed_off: editForm.infra_signed_off ?? false,
+        go_live_date: editForm.go_live_date_input || null,
+      };
+      const { error } = await supabase.from("nl_deployments" as never).update(patch as never).eq("id", editingId);
+      if (error) throw error;
+      toast.success("Deployment updated");
+      setEditingId(null);
+      void qc.invalidateQueries({ queryKey: ["nl-deployments"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save");
+    } finally {
+      setSavingEdit(false);
+    }
   }
 
   const customers = customersQ.data ?? [];
@@ -2045,6 +2110,29 @@ function DeploymentsSection() {
             </div>
           )}
 
+          {/* Stage gate confirmation dialog */}
+          {pendingStatus && (() => {
+            const d = (query.data ?? []).find((x) => x.id === pendingStatus.id);
+            return (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                <div className="w-full max-w-md rounded-xl border bg-background p-6 shadow-xl mx-4 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="size-5 text-amber-500 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-semibold">Confirm status change → <span className="uppercase text-xs tracking-wide">{pendingStatus.status}</span></p>
+                      <p className="text-sm text-muted-foreground mt-1">{STAGE_GATE_TRANSITIONS[pendingStatus.status]}</p>
+                      {d && <p className="text-xs text-muted-foreground mt-2">Customer: <span className="font-medium">{d.customer_name}</span></p>}
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setPendingStatus(null)}>Cancel</Button>
+                    <Button size="sm" onClick={() => void confirmStatusChange(pendingStatus.id, pendingStatus.status)}>Confirm</Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           <Table>
             <TableHeader>
               <TableRow>
@@ -2058,41 +2146,144 @@ function DeploymentsSection() {
             </TableHeader>
             <TableBody>
               {filtered.map((d) => (
-                <TableRow key={d.id}>
-                  <TableCell className="font-medium">{d.customer_name ?? d.customer_id.slice(0, 8)}</TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${d.deployment_model === "saas" ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" : "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300"}`}>
-                      {d.deployment_model === "saas" ? "SaaS" : "Customer-Hosted"}
-                    </span>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                    {d.deployment_model === "saas" ? (
-                      <div>
-                        {d.geography ? <span className="font-medium text-blue-700 dark:text-blue-300">{d.geography}</span> : "—"}
-                        {d.geography_instance_ref && <p className="text-xs text-muted-foreground truncate max-w-[160px]">{d.geography_instance_ref}</p>}
-                      </div>
-                    ) : (
-                      <div>
-                        <span>{d.hosting_provider ?? <span className="italic">on-premise</span>}</span>
-                        {d.delivery_method && (
-                          <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">
-                            {d.delivery_method === "docker" ? "Docker" : d.delivery_method === "manual" ? "Manual install" : "Docker + Manual"}
-                          </p>
+                <>
+                  <TableRow key={d.id} className="cursor-pointer hover:bg-muted/30"
+                    onClick={() => setExpandedId(expandedId === d.id ? null : d.id)}>
+                    <TableCell className="font-medium">{d.customer_name ?? d.customer_id.slice(0, 8)}</TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${d.deployment_model === "saas" ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" : "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300"}`}>
+                        {d.deployment_model === "saas" ? "SaaS" : "Customer-Hosted"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                      {d.deployment_model === "saas" ? (
+                        <div>
+                          {d.geography ? <span className="font-medium text-blue-700 dark:text-blue-300">{d.geography}</span> : "—"}
+                          {d.geography_instance_ref && <p className="text-xs truncate max-w-[160px]">{d.geography_instance_ref}</p>}
+                        </div>
+                      ) : (
+                        <div>
+                          <span>{d.hosting_provider ?? <span className="italic">on-premise</span>}</span>
+                          {d.delivery_method && (
+                            <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                              {d.delivery_method === "docker" ? "Docker" : d.delivery_method === "manual" ? "Manual install" : "Docker + Manual"}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2">
+                        <StatusChip status={d.status} />
+                        {d.deployment_model === "customer_hosted" && !d.infra_signed_off && ["authorised","provisioning","deployed","uat","live"].includes(d.status) && (
+                          <span title="Infrastructure not signed off" className="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                            ⚠ infra
+                          </span>
                         )}
                       </div>
-                    )}
-                  </TableCell>
-                  <TableCell><StatusChip status={d.status} /></TableCell>
-                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                    {d.go_live_date ? new Date(d.go_live_date).toLocaleDateString("en-GB") : "—"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <select className="h-7 rounded-md border border-input bg-background px-2 text-xs"
-                      value={d.status} onChange={(e) => void updateStatus(d.id, e.target.value)}>
-                      {DEPLOYMENT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </TableCell>
-                </TableRow>
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                      {d.go_live_date ? new Date(d.go_live_date).toLocaleDateString("en-GB") : "—"}
+                    </TableCell>
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <select className="h-7 rounded-md border border-input bg-background px-2 text-xs"
+                        value={d.status} onChange={(e) => requestStatusChange(d.id, e.target.value)}>
+                        {DEPLOYMENT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </TableCell>
+                  </TableRow>
+
+                  {/* Expanded detail row */}
+                  {expandedId === d.id && (
+                    <TableRow key={`${d.id}-detail`}>
+                      <TableCell colSpan={6} className="bg-muted/20 p-0">
+                        <div className="p-4 space-y-4">
+                          {editingId === d.id ? (
+                            /* ── Edit mode ── */
+                            <div className="space-y-3">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Edit deployment details</p>
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="space-y-1.5">
+                                  <Label>App version</Label>
+                                  <Input value={editForm.app_version ?? ""} onChange={(e) => setEditForm((p) => ({ ...p, app_version: e.target.value }))} placeholder="e.g. 1.2.0" />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <Label>Go-live date</Label>
+                                  <Input type="date" value={editForm.go_live_date_input ?? ""} onChange={(e) => setEditForm((p) => ({ ...p, go_live_date_input: e.target.value }))} />
+                                </div>
+                                {d.deployment_model === "saas" ? (
+                                  <div className="space-y-1.5">
+                                    <Label>Instance reference</Label>
+                                    <Input value={editForm.geography_instance_ref ?? ""} onChange={(e) => setEditForm((p) => ({ ...p, geography_instance_ref: e.target.value }))} placeholder="Supabase project, AWS region…" />
+                                  </div>
+                                ) : (<>
+                                  <div className="space-y-1.5">
+                                    <Label>Hosting provider</Label>
+                                    <Input value={editForm.hosting_provider ?? ""} onChange={(e) => setEditForm((p) => ({ ...p, hosting_provider: e.target.value }))} />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <Label>Delivery method</Label>
+                                    <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                      value={editForm.delivery_method ?? "docker"} onChange={(e) => setEditForm((p) => ({ ...p, delivery_method: e.target.value }))}>
+                                      <option value="docker">Docker container</option>
+                                      <option value="manual">Manual install guide</option>
+                                      <option value="both">Both (customer chooses)</option>
+                                    </select>
+                                  </div>
+                                  <div className="flex items-center gap-2 sm:col-span-2">
+                                    <input type="checkbox" id={`infra-${d.id}`} checked={editForm.infra_signed_off ?? false}
+                                      onChange={(e) => setEditForm((p) => ({ ...p, infra_signed_off: e.target.checked }))}
+                                      className="size-4 rounded border-input" />
+                                    <label htmlFor={`infra-${d.id}`} className="text-sm font-medium">Infrastructure readiness signed off (NL-PAOMS §6.2)</label>
+                                  </div>
+                                </>)}
+                                <div className="space-y-1.5 sm:col-span-2">
+                                  <Label>Provisioning notes</Label>
+                                  <textarea className="min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
+                                    value={editForm.provisioning_notes ?? ""} onChange={(e) => setEditForm((p) => ({ ...p, provisioning_notes: e.target.value }))}
+                                    placeholder="Stage checklist, handover notes, infrastructure readiness…" />
+                                </div>
+                              </div>
+                              <div className="flex justify-end gap-2">
+                                <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
+                                <Button size="sm" disabled={savingEdit} onClick={() => void saveEdit()}>Save changes</Button>
+                              </div>
+                            </div>
+                          ) : (
+                            /* ── Read mode ── */
+                            <div className="space-y-3">
+                              <div className="grid gap-x-6 gap-y-2 sm:grid-cols-3 text-sm">
+                                <div><span className="text-muted-foreground">App version</span><p className="font-medium mt-0.5">{d.app_version ?? "—"}</p></div>
+                                <div><span className="text-muted-foreground">Go-live date</span><p className="font-medium mt-0.5">{d.go_live_date ? new Date(d.go_live_date).toLocaleDateString("en-GB") : "—"}</p></div>
+                                {d.deployment_model === "saas" ? (
+                                  <div><span className="text-muted-foreground">Instance ref</span><p className="font-medium mt-0.5 break-all">{d.geography_instance_ref ?? "—"}</p></div>
+                                ) : (<>
+                                  <div><span className="text-muted-foreground">Delivery</span><p className="font-medium mt-0.5 capitalize">{d.delivery_method?.replace("_", " ") ?? "—"}</p></div>
+                                  <div className="sm:col-span-2 flex items-center gap-2">
+                                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${d.infra_signed_off ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300" : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"}`}>
+                                      {d.infra_signed_off ? "✓ Infra signed off" : "⚠ Infra not yet signed off"}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">(NL-PAOMS §6.2)</span>
+                                  </div>
+                                </>)}
+                              </div>
+                              {d.provisioning_notes && (
+                                <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Provisioning notes</p>
+                                  <p className="whitespace-pre-wrap">{d.provisioning_notes}</p>
+                                </div>
+                              )}
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs text-muted-foreground">Created {new Date(d.created_at).toLocaleDateString("en-GB")}</p>
+                                <Button size="sm" variant="outline" onClick={() => startEdit(d)}>Edit details</Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
               ))}
               {filtered.length === 0 && !query.isLoading && (
                 <TableRow>
