@@ -31,6 +31,7 @@ JOURNEY_MODULES = {
     "J13": "journeys.j01_admin_platform",
     "J14": "journeys.j01_admin_platform",
     "J15": "journeys.j01_admin_platform",
+    "J16": "journeys.j16_deployment_engine",
 }
 
 STATUSES = ("PASS", "FAIL", "SKIP", "ERROR")
