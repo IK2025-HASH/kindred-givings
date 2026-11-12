@@ -2443,7 +2443,6 @@ function LicencesSection() {
 
   async function createLicence() {
     if (!form.customer_id || !form.start_date || !form.expiry_date) { toast.error("Customer, start and expiry dates are required"); return; }
-    if (!form.deployment_id) { toast.error("Select the deployment this licence covers — a licence must always be linked to a deployment."); return; }
     setSavingNew(true);
     try {
       const grace = new Date(form.expiry_date);
@@ -2501,7 +2500,7 @@ function LicencesSection() {
       <CardContent className="space-y-3">
         {adding && (
           <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Every licence must be linked to a deployment</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Issue licence — link to a deployment now or later</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Customer</Label>
@@ -2512,7 +2511,7 @@ function LicencesSection() {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label>Deployment <span className="text-red-500">*</span></Label>
+                <Label>Deployment <span className="text-muted-foreground text-xs">(optional — can link later)</span></Label>
                 <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={form.deployment_id} onChange={(e) => setForm((p) => ({ ...p, deployment_id: e.target.value }))}
                   disabled={!form.customer_id}>
@@ -3319,6 +3318,7 @@ function DeploymentEngineSection() {
   const [currentStep, setCurrentStep] = useState(-1);
   const [totalSteps, setTotalSteps] = useState(0);
   const [done, setDone] = useState(false);
+  const [confirmedAuth, setConfirmedAuth] = useState(false);
   const [smokeResults, setSmokeResults] = useState<SmokeResult[]>([]);
   const logEndRef = useRef<HTMLDivElement>(null);
 
@@ -3537,6 +3537,7 @@ function DeploymentEngineSection() {
     setStep(0);
     setDeploying(false);
     setDone(false);
+    setConfirmedAuth(false);
     setDeploymentId(null);
     setLogs([]);
     setSmokeResults([]);
@@ -3750,8 +3751,13 @@ function DeploymentEngineSection() {
                 </select>
               </div>
             )}
+            {form.customer_id && !licenceValid() && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 p-3 text-sm text-amber-800 dark:text-amber-300">
+                ⚠ No active licence found for this customer. You can still proceed — a licence can be issued and linked after deployment.
+              </div>
+            )}
             <div className="flex justify-end">
-              <Button disabled={!form.customer_id || !licenceValid()} onClick={() => setStep(1)}>
+              <Button disabled={!form.customer_id} onClick={() => setStep(1)}>
                 Next: Delivery model →
               </Button>
             </div>
@@ -3902,16 +3908,13 @@ function DeploymentEngineSection() {
             </div>
             <div className="rounded-lg border bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 px-4 py-3">
               <label className="flex items-start gap-3 cursor-pointer text-sm text-amber-800 dark:text-amber-300">
-                <input type="checkbox" id="confirm-auth" className="mt-0.5 rounded" onChange={(e) => {
-                  const btn = document.getElementById("start-deploy-btn") as HTMLButtonElement | null;
-                  if (btn) btn.disabled = !e.target.checked;
-                }} />
+                <input type="checkbox" id="confirm-auth" className="mt-0.5 rounded" onChange={(e) => setConfirmedAuth(e.target.checked)} />
                 <span>I confirm this deployment has been authorised by the customer and an active licence is in place.</span>
               </label>
             </div>
             <div className="flex justify-between">
               <Button variant="ghost" onClick={() => setStep(3)}>← Back</Button>
-              <Button id="start-deploy-btn" disabled onClick={() => void startDeployment()}>
+              <Button disabled={!confirmedAuth} onClick={() => void startDeployment()}>
                 <Zap className="mr-1.5 size-4" /> Start deployment
               </Button>
             </div>
