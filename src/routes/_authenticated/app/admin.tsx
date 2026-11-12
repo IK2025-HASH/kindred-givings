@@ -1550,11 +1550,18 @@ type NLDeployment = { id: string; customer_id: string; deployment_model: string;
 const SAAS_GEOGRAPHIES = ["UK", "EU", "US", "APAC", "MEA"];
 const MODEL_LABELS: Record<string, string> = { saas: "SaaS (NL-hosted)", customer_hosted: "Customer-Hosted (Single-Tenant)" };
 type NLLicence = { id: string; customer_id: string; deployment_id: string | null; licence_key: string | null; start_date: string; expiry_date: string; status: string; maintenance_status: string; enabled_modules: string[]; customer_name?: string };
-type NLChangeRequest = { id: string; customer_id: string | null; cr_ref: string | null; title: string; status: string; priority: string; estimated_days: number | null; agreed_price: number | null; customer_name?: string; created_at: string };
+type NLChangeRequest = { id: string; customer_id: string | null; deployment_id: string | null; cr_ref: string | null; title: string; description: string | null; status: string; priority: string; estimated_days: number | null; agreed_price: number | null; currency: string; assigned_to: string | null; incorporate_in_product: boolean; funded_by_customer: boolean; customer_name?: string; deployment_ref?: string; created_at: string };
+type NLSupportContract = { id: string; customer_id: string; deployment_id: string | null; contract_ref: string | null; sla_tier: string; start_date: string; end_date: string; status: string; response_times: Record<string, number> | null; notes: string | null; created_at: string; customer_name?: string; deployment_ref?: string };
 
 const DEPLOYMENT_STATUSES = ["enquiry","assessment","quoted","contracted","authorised","provisioning","deployed","uat","live","suspended","retired"];
 const CR_STATUSES = ["requested","under_review","quoted","approved","in_development","delivered","rejected","withdrawn"];
 const LICENCE_STATUSES = ["active","grace","expired","revoked"];
+const SLA_TIERS = ["standard","enhanced","premium"];
+const SLA_RESPONSE_TIMES: Record<string, { p1: number; p2: number; p3: number }> = {
+  standard:  { p1: 8,  p2: 24, p3: 72 },
+  enhanced:  { p1: 4,  p2: 8,  p3: 24 },
+  premium:   { p1: 1,  p2: 4,  p3: 8  },
+};
 
 function statusColor(status: string) {
   const map: Record<string, string> = {
@@ -2630,8 +2637,12 @@ function LicencesSection() {
 function ChangeRequestsSection() {
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ customer_id: "", cr_ref: "", title: "", status: "requested", priority: "normal", description: "" });
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Partial<NLChangeRequest>>({});
+  const [form, setForm] = useState({ customer_id: "", deployment_id: "", cr_ref: "", title: "", description: "", status: "requested", priority: "normal", estimated_days: "", agreed_price: "", currency: "GBP", assigned_to: "", incorporate_in_product: false, funded_by_customer: true });
   const [savingNew, setSavingNew] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const customersQ = useQuery({
     queryKey: ["nl-customers"],
@@ -2642,15 +2653,28 @@ function ChangeRequestsSection() {
     },
   });
 
+  const deploymentsQ = useQuery({
+    queryKey: ["nl-deployments-all"],
+    queryFn: async (): Promise<NLDeployment[]> => {
+      const { data, error } = await supabase.from("nl_deployments" as never).select("id, customer_id, deployment_model, geography, geography_instance_ref, delivery_method, provisioning_notes, status, hosting_provider, app_version, go_live_date, enabled_modules, created_at, nl_customers(name)").order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map((r: never) => ({ ...(r as NLDeployment), customer_name: (r as never as { nl_customers: { name: string } | null }).nl_customers?.name }));
+    },
+  });
+
   const query = useQuery({
     queryKey: ["nl-crs"],
     queryFn: async (): Promise<NLChangeRequest[]> => {
       const { data, error } = await supabase
         .from("nl_change_requests" as never)
-        .select("id, customer_id, cr_ref, title, status, priority, estimated_days, agreed_price, created_at, nl_customers(name)")
+        .select("id, customer_id, deployment_id, cr_ref, title, description, status, priority, estimated_days, agreed_price, currency, assigned_to, incorporate_in_product, funded_by_customer, created_at, nl_customers(name), nl_deployments(geography_instance_ref)")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []).map((r: never) => ({ ...(r as NLChangeRequest), customer_name: (r as never as { nl_customers: { name: string } | null }).nl_customers?.name }));
+      return (data ?? []).map((r: never) => ({
+        ...(r as NLChangeRequest),
+        customer_name: (r as never as { nl_customers: { name: string } | null }).nl_customers?.name,
+        deployment_ref: (r as never as { nl_deployments: { geography_instance_ref: string } | null }).nl_deployments?.geography_instance_ref,
+      }));
     },
   });
 
@@ -2658,7 +2682,22 @@ function ChangeRequestsSection() {
     if (!form.title) { toast.error("Title is required"); return; }
     setSavingNew(true);
     try {
-      const { error } = await supabase.from("nl_change_requests" as never).insert(form as never);
+      const payload = {
+        customer_id: form.customer_id || null,
+        deployment_id: form.deployment_id || null,
+        cr_ref: form.cr_ref || null,
+        title: form.title,
+        description: form.description || null,
+        status: form.status,
+        priority: form.priority,
+        estimated_days: form.estimated_days ? Number(form.estimated_days) : null,
+        agreed_price: form.agreed_price ? Number(form.agreed_price) : null,
+        currency: form.currency,
+        assigned_to: form.assigned_to || null,
+        incorporate_in_product: form.incorporate_in_product,
+        funded_by_customer: form.funded_by_customer,
+      };
+      const { error } = await supabase.from("nl_change_requests" as never).insert(payload as never);
       if (error) throw error;
       toast.success("Change request created");
       setAdding(false);
@@ -2670,15 +2709,40 @@ function ChangeRequestsSection() {
     }
   }
 
-  async function updateStatus(id: string, status: string) {
-    const { error } = await supabase.from("nl_change_requests" as never).update({ status } as never).eq("id", id);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Status updated");
-    void qc.invalidateQueries({ queryKey: ["nl-crs"] });
+  async function saveEdit(id: string) {
+    setSavingEdit(true);
+    try {
+      const payload = {
+        status: editForm.status,
+        priority: editForm.priority,
+        assigned_to: editForm.assigned_to || null,
+        estimated_days: editForm.estimated_days ?? null,
+        agreed_price: editForm.agreed_price ?? null,
+        incorporate_in_product: editForm.incorporate_in_product,
+        funded_by_customer: editForm.funded_by_customer,
+        deployment_id: editForm.deployment_id || null,
+      };
+      const { error } = await supabase.from("nl_change_requests" as never).update(payload as never).eq("id", id);
+      if (error) throw error;
+      toast.success("CR updated");
+      setEditingId(null);
+      void qc.invalidateQueries({ queryKey: ["nl-crs"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save");
+    } finally {
+      setSavingEdit(false);
+    }
   }
 
   const customers = customersQ.data ?? [];
+  const deployments = deploymentsQ.data ?? [];
   const PRIORITY_COLOR: Record<string, string> = { low: "text-muted-foreground", normal: "text-foreground", high: "text-orange-600", critical: "text-red-600 font-semibold" };
+
+  const crsByStatus = CR_STATUSES.reduce<Record<string, NLChangeRequest[]>>((acc, s) => {
+    acc[s] = (query.data ?? []).filter((cr) => cr.status === s);
+    return acc;
+  }, {});
+  const activeStatuses = CR_STATUSES.filter((s) => crsByStatus[s]?.length);
 
   return (
     <Card>
@@ -2686,25 +2750,45 @@ function ChangeRequestsSection() {
         <CardTitle className="flex items-center gap-2"><FileText className="size-4" /> Change Requests</CardTitle>
         <Button size="sm" onClick={() => setAdding(true)}><Plus className="mr-1.5 size-4" /> New CR</Button>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-4">
         {adding && (
           <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+            <p className="text-sm font-medium">New change request</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Customer (optional)</Label>
                 <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={form.customer_id} onChange={(e) => setForm((p) => ({ ...p, customer_id: e.target.value }))}>
+                  value={form.customer_id} onChange={(e) => setForm((p) => ({ ...p, customer_id: e.target.value, deployment_id: "" }))}>
                   <option value="">Platform-wide</option>
                   {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Linked deployment</Label>
+                <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={form.deployment_id} onChange={(e) => setForm((p) => ({ ...p, deployment_id: e.target.value }))}>
+                  <option value="">None</option>
+                  {deployments.filter((d) => !form.customer_id || d.customer_id === form.customer_id).map((d) => (
+                    <option key={d.id} value={d.id}>{d.geography_instance_ref ?? d.geography ?? d.deployment_model} — {d.status}</option>
+                  ))}
                 </select>
               </div>
               <div className="space-y-1.5">
                 <Label>CR Ref</Label>
                 <Input value={form.cr_ref} onChange={(e) => setForm((p) => ({ ...p, cr_ref: e.target.value }))} placeholder="CR-2025-001" />
               </div>
+              <div className="space-y-1.5">
+                <Label>Assigned to</Label>
+                <Input value={form.assigned_to} onChange={(e) => setForm((p) => ({ ...p, assigned_to: e.target.value }))} placeholder="Dev name or initials" />
+              </div>
               <div className="sm:col-span-2 space-y-1.5">
                 <Label>Title</Label>
                 <Input value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} placeholder="Add Gift Aid reporting module" />
+              </div>
+              <div className="sm:col-span-2 space-y-1.5">
+                <Label>Description</Label>
+                <textarea className="min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-y"
+                  value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} placeholder="What needs to be built and why…" />
               </div>
               <div className="space-y-1.5">
                 <Label>Priority</Label>
@@ -2720,6 +2804,24 @@ function ChangeRequestsSection() {
                   {CR_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
                 </select>
               </div>
+              <div className="space-y-1.5">
+                <Label>Estimated days</Label>
+                <Input type="number" value={form.estimated_days} onChange={(e) => setForm((p) => ({ ...p, estimated_days: e.target.value }))} placeholder="5" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Agreed price ({form.currency})</Label>
+                <Input type="number" value={form.agreed_price} onChange={(e) => setForm((p) => ({ ...p, agreed_price: e.target.value }))} placeholder="2500" />
+              </div>
+              <div className="sm:col-span-2 flex flex-wrap gap-6">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" checked={form.funded_by_customer} onChange={(e) => setForm((p) => ({ ...p, funded_by_customer: e.target.checked }))} className="rounded" />
+                  Customer-funded
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" checked={form.incorporate_in_product} onChange={(e) => setForm((p) => ({ ...p, incorporate_in_product: e.target.checked }))} className="rounded" />
+                  Incorporate in product (ship to all tenants)
+                </label>
+              </div>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button>
@@ -2727,45 +2829,513 @@ function ChangeRequestsSection() {
             </div>
           </div>
         )}
+
+        {/* Kanban-grouped list */}
+        {activeStatuses.length === 0 && !query.isLoading && (
+          <p className="py-10 text-center text-sm text-muted-foreground">No change requests yet.</p>
+        )}
+        {activeStatuses.map((status) => (
+          <div key={status} className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1 flex items-center gap-2">
+              <StatusChip status={status} /> <span>{crsByStatus[status]?.length} CR{(crsByStatus[status]?.length ?? 0) !== 1 ? "s" : ""}</span>
+            </p>
+            {crsByStatus[status]?.map((cr) => (
+              <div key={cr.id} className="rounded-lg border bg-card">
+                <div className="flex items-start gap-3 p-3 cursor-pointer" onClick={() => setExpanded(expanded === cr.id ? null : cr.id)}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-sm">{cr.title}</span>
+                      {cr.cr_ref && <span className="font-mono text-xs text-muted-foreground">{cr.cr_ref}</span>}
+                      <span className={`text-xs font-medium capitalize ${PRIORITY_COLOR[cr.priority] ?? ""}`}>{cr.priority}</span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                      {cr.customer_name && <span>{cr.customer_name}</span>}
+                      {cr.deployment_ref && <span>· {cr.deployment_ref}</span>}
+                      {cr.assigned_to && <span>· Assigned: {cr.assigned_to}</span>}
+                      {cr.agreed_price && <span>· {cr.currency} {Number(cr.agreed_price).toLocaleString()}</span>}
+                      {cr.estimated_days && <span>· {cr.estimated_days}d</span>}
+                    </div>
+                  </div>
+                  <ChevronDown className={`size-4 mt-0.5 shrink-0 text-muted-foreground transition-transform ${expanded === cr.id ? "rotate-180" : ""}`} />
+                </div>
+                {expanded === cr.id && (
+                  <div className="border-t bg-muted/20 p-4 space-y-4">
+                    {editingId === cr.id ? (
+                      <div className="space-y-3">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1.5">
+                            <Label>Status</Label>
+                            <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                              value={editForm.status ?? cr.status} onChange={(e) => setEditForm((p) => ({ ...p, status: e.target.value }))}>
+                              {CR_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
+                            </select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Priority</Label>
+                            <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                              value={editForm.priority ?? cr.priority} onChange={(e) => setEditForm((p) => ({ ...p, priority: e.target.value }))}>
+                              {["low","normal","high","critical"].map((s) => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Assigned to</Label>
+                            <Input value={editForm.assigned_to ?? (cr.assigned_to ?? "")} onChange={(e) => setEditForm((p) => ({ ...p, assigned_to: e.target.value }))} />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Linked deployment</Label>
+                            <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                              value={editForm.deployment_id ?? (cr.deployment_id ?? "")} onChange={(e) => setEditForm((p) => ({ ...p, deployment_id: e.target.value }))}>
+                              <option value="">None</option>
+                              {deployments.filter((d) => !cr.customer_id || d.customer_id === cr.customer_id).map((d) => (
+                                <option key={d.id} value={d.id}>{d.geography_instance_ref ?? d.geography ?? d.deployment_model}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Estimated days</Label>
+                            <Input type="number" value={editForm.estimated_days ?? (cr.estimated_days ?? "")} onChange={(e) => setEditForm((p) => ({ ...p, estimated_days: e.target.value ? Number(e.target.value) : null }))} />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Agreed price</Label>
+                            <Input type="number" value={editForm.agreed_price ?? (cr.agreed_price ?? "")} onChange={(e) => setEditForm((p) => ({ ...p, agreed_price: e.target.value ? Number(e.target.value) : null }))} />
+                          </div>
+                          <div className="sm:col-span-2 flex flex-wrap gap-6">
+                            <label className="flex items-center gap-2 text-sm cursor-pointer">
+                              <input type="checkbox" checked={editForm.funded_by_customer ?? cr.funded_by_customer} onChange={(e) => setEditForm((p) => ({ ...p, funded_by_customer: e.target.checked }))} className="rounded" />
+                              Customer-funded
+                            </label>
+                            <label className="flex items-center gap-2 text-sm cursor-pointer">
+                              <input type="checkbox" checked={editForm.incorporate_in_product ?? cr.incorporate_in_product} onChange={(e) => setEditForm((p) => ({ ...p, incorporate_in_product: e.target.checked }))} className="rounded" />
+                              Incorporate in product
+                            </label>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" disabled={savingEdit} onClick={() => void saveEdit(cr.id)}>Save</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {cr.description && <p className="text-sm text-muted-foreground">{cr.description}</p>}
+                        <div className="grid gap-2 sm:grid-cols-3 text-xs">
+                          <div><span className="font-medium">Assigned:</span> {cr.assigned_to ?? "—"}</div>
+                          <div><span className="font-medium">Days est:</span> {cr.estimated_days ?? "—"}</div>
+                          <div><span className="font-medium">Price:</span> {cr.agreed_price ? `${cr.currency} ${Number(cr.agreed_price).toLocaleString()}` : "—"}</div>
+                          <div><span className="font-medium">Customer-funded:</span> {cr.funded_by_customer ? "Yes" : "No"}</div>
+                          <div><span className="font-medium">In product:</span> {cr.incorporate_in_product ? "Yes" : "No"}</div>
+                          <div><span className="font-medium">Created:</span> {new Date(cr.created_at).toLocaleDateString("en-GB")}</div>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => { setEditingId(cr.id); setEditForm({}); }}>Edit</Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Support Contracts Section ─────────────────────────────────────────────────
+function SupportContractsSection() {
+  const qc = useQueryClient();
+  const [adding, setAdding] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [form, setForm] = useState({ customer_id: "", deployment_id: "", contract_ref: "", sla_tier: "standard", start_date: "", end_date: "", status: "active", notes: "" });
+  const [savingNew, setSavingNew] = useState(false);
+
+  const customersQ = useQuery({
+    queryKey: ["nl-customers"],
+    queryFn: async (): Promise<NLCustomer[]> => {
+      const { data, error } = await supabase.from("nl_customers" as never).select("id, name, status, primary_contact, created_at, notes").order("name");
+      if (error) throw error;
+      return (data ?? []) as NLCustomer[];
+    },
+  });
+
+  const deploymentsQ = useQuery({
+    queryKey: ["nl-deployments-all"],
+    queryFn: async (): Promise<NLDeployment[]> => {
+      const { data, error } = await supabase.from("nl_deployments" as never).select("id, customer_id, deployment_model, geography, geography_instance_ref, delivery_method, provisioning_notes, status, hosting_provider, app_version, go_live_date, enabled_modules, created_at").order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as NLDeployment[];
+    },
+  });
+
+  const query = useQuery({
+    queryKey: ["nl-support-contracts"],
+    queryFn: async (): Promise<NLSupportContract[]> => {
+      const { data, error } = await supabase
+        .from("nl_support_contracts" as never)
+        .select("id, customer_id, deployment_id, contract_ref, sla_tier, start_date, end_date, status, response_times, notes, created_at, nl_customers(name), nl_deployments(geography_instance_ref)")
+        .order("end_date", { ascending: true });
+      if (error) throw error;
+      return (data ?? []).map((r: never) => ({
+        ...(r as NLSupportContract),
+        customer_name: (r as never as { nl_customers: { name: string } | null }).nl_customers?.name,
+        deployment_ref: (r as never as { nl_deployments: { geography_instance_ref: string } | null }).nl_deployments?.geography_instance_ref,
+      }));
+    },
+  });
+
+  async function createContract() {
+    if (!form.customer_id) { toast.error("Customer is required"); return; }
+    if (!form.start_date || !form.end_date) { toast.error("Start and end dates are required"); return; }
+    const defaults = SLA_RESPONSE_TIMES[form.sla_tier];
+    setSavingNew(true);
+    try {
+      const payload = {
+        customer_id: form.customer_id,
+        deployment_id: form.deployment_id || null,
+        contract_ref: form.contract_ref || null,
+        sla_tier: form.sla_tier,
+        start_date: form.start_date,
+        end_date: form.end_date,
+        status: form.status,
+        response_times: defaults ?? null,
+        notes: form.notes || null,
+      };
+      const { error } = await supabase.from("nl_support_contracts" as never).insert(payload as never);
+      if (error) throw error;
+      toast.success("Support contract created");
+      setAdding(false);
+      void qc.invalidateQueries({ queryKey: ["nl-support-contracts"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not create");
+    } finally {
+      setSavingNew(false);
+    }
+  }
+
+  async function updateContractStatus(id: string, status: string) {
+    const { error } = await supabase.from("nl_support_contracts" as never).update({ status } as never).eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Status updated");
+    void qc.invalidateQueries({ queryKey: ["nl-support-contracts"] });
+  }
+
+  const customers = customersQ.data ?? [];
+  const deployments = deploymentsQ.data ?? [];
+  const contracts = query.data ?? [];
+  const today = new Date();
+  const thirtyDays = new Date(today.getTime() + 30 * 86400000);
+  const expiringCount = contracts.filter((c) => c.status === "active" && new Date(c.end_date) <= thirtyDays).length;
+
+  const SLA_BADGE: Record<string, string> = {
+    standard: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+    enhanced: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+    premium: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle className="flex items-center gap-2"><Shield className="size-4" /> Support Contracts</CardTitle>
+          {expiringCount > 0 && (
+            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400 font-medium">⚠ {expiringCount} contract{expiringCount !== 1 ? "s" : ""} expiring within 30 days</p>
+          )}
+        </div>
+        <Button size="sm" onClick={() => setAdding(true)}><Plus className="mr-1.5 size-4" /> New contract</Button>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {adding && (
+          <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+            <p className="text-sm font-medium">New support contract</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Customer <span className="text-red-500">*</span></Label>
+                <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={form.customer_id} onChange={(e) => setForm((p) => ({ ...p, customer_id: e.target.value, deployment_id: "" }))}>
+                  <option value="">Select customer…</option>
+                  {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Linked deployment</Label>
+                <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={form.deployment_id} onChange={(e) => setForm((p) => ({ ...p, deployment_id: e.target.value }))}>
+                  <option value="">None</option>
+                  {deployments.filter((d) => !form.customer_id || d.customer_id === form.customer_id).map((d) => (
+                    <option key={d.id} value={d.id}>{d.geography_instance_ref ?? d.geography ?? d.deployment_model} — {d.status}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Contract ref</Label>
+                <Input value={form.contract_ref} onChange={(e) => setForm((p) => ({ ...p, contract_ref: e.target.value }))} placeholder="SC-2025-001" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>SLA tier</Label>
+                <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={form.sla_tier} onChange={(e) => setForm((p) => ({ ...p, sla_tier: e.target.value }))}>
+                  {SLA_TIERS.map((t) => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Start date <span className="text-red-500">*</span></Label>
+                <Input type="date" value={form.start_date} onChange={(e) => setForm((p) => ({ ...p, start_date: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>End date <span className="text-red-500">*</span></Label>
+                <Input type="date" value={form.end_date} onChange={(e) => setForm((p) => ({ ...p, end_date: e.target.value }))} />
+              </div>
+              <div className="sm:col-span-2 space-y-1.5">
+                <Label>Notes</Label>
+                <textarea className="min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-y"
+                  value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Escalation contacts, special terms…" />
+              </div>
+            </div>
+            {form.sla_tier && SLA_RESPONSE_TIMES[form.sla_tier] && (
+              <div className="text-xs text-muted-foreground bg-muted/40 rounded p-2.5">
+                <span className="font-medium">Default response times:</span> P1 = {SLA_RESPONSE_TIMES[form.sla_tier]!.p1}h · P2 = {SLA_RESPONSE_TIMES[form.sla_tier]!.p2}h · P3 = {SLA_RESPONSE_TIMES[form.sla_tier]!.p3}h
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button>
+              <Button disabled={savingNew} onClick={() => void createContract()}>Create</Button>
+            </div>
+          </div>
+        )}
+
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Ref / Title</TableHead>
-              <TableHead className="hidden md:table-cell">Customer</TableHead>
-              <TableHead>Priority</TableHead>
+              <TableHead>Customer</TableHead>
+              <TableHead>SLA tier</TableHead>
+              <TableHead className="hidden md:table-cell">Deployment</TableHead>
+              <TableHead>End date</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="hidden lg:table-cell">Date</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(query.data ?? []).map((cr) => (
-              <TableRow key={cr.id}>
-                <TableCell>
-                  <div className="font-medium text-sm">{cr.title}</div>
-                  {cr.cr_ref && <div className="font-mono text-xs text-muted-foreground">{cr.cr_ref}</div>}
-                </TableCell>
-                <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{cr.customer_name ?? "Platform-wide"}</TableCell>
-                <TableCell className={`text-xs font-medium capitalize ${PRIORITY_COLOR[cr.priority] ?? ""}`}>{cr.priority}</TableCell>
-                <TableCell><StatusChip status={cr.status} /></TableCell>
-                <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">
-                  {new Date(cr.created_at).toLocaleDateString("en-GB")}
-                </TableCell>
-                <TableCell className="text-right">
-                  <select className="h-7 rounded-md border border-input bg-background px-2 text-xs"
-                    value={cr.status} onChange={(e) => void updateStatus(cr.id, e.target.value)}>
-                    {CR_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
-                  </select>
-                </TableCell>
-              </TableRow>
-            ))}
-            {(query.data ?? []).length === 0 && !query.isLoading && (
+            {contracts.map((c) => {
+              const endDate = new Date(c.end_date);
+              const daysLeft = Math.ceil((endDate.getTime() - today.getTime()) / 86400000);
+              const isExpiring = c.status === "active" && daysLeft <= 30;
+              const rt = c.response_times as Record<string, number> | null;
+              return (
+                <>
+                  <TableRow key={c.id} className={isExpiring ? "bg-amber-50/40 dark:bg-amber-950/20" : ""}>
+                    <TableCell>
+                      <div className="font-medium text-sm">{c.customer_name ?? "—"}</div>
+                      {c.contract_ref && <div className="font-mono text-xs text-muted-foreground">{c.contract_ref}</div>}
+                    </TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium capitalize ${SLA_BADGE[c.sla_tier] ?? "bg-muted text-muted-foreground"}`}>{c.sla_tier}</span>
+                    </TableCell>
+                    <TableCell className="hidden text-xs text-muted-foreground md:table-cell">{c.deployment_ref ?? "—"}</TableCell>
+                    <TableCell>
+                      <div className="text-sm">{new Date(c.end_date).toLocaleDateString("en-GB")}</div>
+                      {isExpiring && <div className="text-xs font-medium text-amber-600 dark:text-amber-400">{daysLeft <= 0 ? "Expired" : `${daysLeft}d left`}</div>}
+                    </TableCell>
+                    <TableCell><StatusChip status={c.status} /></TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" onClick={() => setExpanded(expanded === c.id ? null : c.id)}>
+                        <ChevronDown className={`size-4 transition-transform ${expanded === c.id ? "rotate-180" : ""}`} />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                  {expanded === c.id && (
+                    <TableRow key={`${c.id}-detail`}>
+                      <TableCell colSpan={6} className="bg-muted/20 p-4">
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Response times</p>
+                            {rt ? (
+                              <div className="text-sm space-y-1">
+                                {Object.entries(rt).map(([k, v]) => (
+                                  <div key={k} className="flex justify-between"><span className="font-medium">{k.toUpperCase()}:</span> <span>{v}h</span></div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">Default for {c.sla_tier} tier</p>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Details</p>
+                            <div className="text-sm space-y-1">
+                              <div><span className="font-medium">Start:</span> {new Date(c.start_date).toLocaleDateString("en-GB")}</div>
+                              <div><span className="font-medium">End:</span> {new Date(c.end_date).toLocaleDateString("en-GB")}</div>
+                              {c.notes && <div className="text-muted-foreground mt-2">{c.notes}</div>}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex gap-2">
+                          <select className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                            value={c.status} onChange={(e) => void updateContractStatus(c.id, e.target.value)}>
+                            {["active","expired","cancelled"].map((s) => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
+              );
+            })}
+            {contracts.length === 0 && !query.isLoading && (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">No change requests yet.</TableCell>
+                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">No support contracts yet.</TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Platform Status Section ───────────────────────────────────────────────────
+function PlatformStatusSection() {
+  const qc = useQueryClient();
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [healthNotes, setHealthNotes] = useState<Record<string, string>>({});
+
+  const deploymentsQ = useQuery({
+    queryKey: ["nl-deployments-all"],
+    queryFn: async (): Promise<NLDeployment[]> => {
+      const { data, error } = await supabase.from("nl_deployments" as never).select("id, customer_id, deployment_model, geography, geography_instance_ref, delivery_method, provisioning_notes, status, hosting_provider, app_version, go_live_date, enabled_modules, created_at, nl_customers(name)").order("status");
+      if (error) throw error;
+      return (data ?? []).map((r: never) => ({ ...(r as NLDeployment), customer_name: (r as never as { nl_customers: { name: string } | null }).nl_customers?.name }));
+    },
+    refetchInterval: 60000,
+  });
+
+  async function setHealthStatus(id: string, healthStatus: string) {
+    setSavingId(id);
+    try {
+      const note = healthNotes[id] ?? "";
+      const patchNotes = note
+        ? `[${new Date().toLocaleString("en-GB")}] ${healthStatus.toUpperCase()}: ${note}`
+        : `[${new Date().toLocaleString("en-GB")}] Health check: ${healthStatus}`;
+      const existing = deploymentsQ.data?.find((d) => d.id === id)?.provisioning_notes ?? "";
+      const combined = existing ? `${existing}\n${patchNotes}` : patchNotes;
+      const { error } = await supabase.from("nl_deployments" as never).update({ provisioning_notes: combined } as never).eq("id", id);
+      if (error) throw error;
+      toast.success("Health status logged");
+      setHealthNotes((p) => ({ ...p, [id]: "" }));
+      void qc.invalidateQueries({ queryKey: ["nl-deployments-all"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not update");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  const deployments = deploymentsQ.data ?? [];
+  const live = deployments.filter((d) => d.status === "live");
+  const inProgress = deployments.filter((d) => !["live","retired","suspended"].includes(d.status));
+  const suspended = deployments.filter((d) => d.status === "suspended");
+
+  function healthBadge(d: NLDeployment) {
+    if (d.status === "live") return <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400"><span className="size-2 rounded-full bg-green-500 inline-block animate-pulse" />Live</span>;
+    if (d.status === "suspended") return <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 dark:text-red-400"><span className="size-2 rounded-full bg-red-500 inline-block" />Suspended</span>;
+    return <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400"><span className="size-2 rounded-full bg-amber-400 inline-block" />{d.status.replace(/_/g, " ")}</span>;
+  }
+
+  function DeploymentHealthRow({ d }: { d: NLDeployment }) {
+    const [open, setOpen] = useState(false);
+    const lastLog = d.provisioning_notes?.split("\n").filter(Boolean).at(-1);
+    return (
+      <div className="rounded-lg border bg-card">
+        <div className="flex items-center gap-3 p-3 cursor-pointer" onClick={() => setOpen(!open)}>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium text-sm">{d.geography_instance_ref ?? d.geography ?? "—"}</span>
+              <span className="text-xs text-muted-foreground capitalize">{MODEL_LABELS[d.deployment_model] ?? d.deployment_model}</span>
+              {d.customer_name && <span className="text-xs text-muted-foreground">· {d.customer_name}</span>}
+            </div>
+            <div className="flex items-center gap-3 mt-1">
+              {healthBadge(d)}
+              {d.app_version && <span className="text-xs text-muted-foreground">v{d.app_version}</span>}
+              {d.hosting_provider && <span className="text-xs text-muted-foreground">· {d.hosting_provider}</span>}
+            </div>
+          </div>
+          <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+        </div>
+        {open && (
+          <div className="border-t bg-muted/20 p-4 space-y-3">
+            {lastLog && (
+              <div className="text-xs text-muted-foreground font-mono bg-muted rounded p-2">{lastLog}</div>
+            )}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Log a health check</p>
+              <div className="flex gap-2">
+                <Input className="h-8 text-sm flex-1" placeholder="Optional note (e.g. all services responding)" value={healthNotes[d.id] ?? ""} onChange={(e) => setHealthNotes((p) => ({ ...p, [d.id]: e.target.value }))} />
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {["healthy","degraded","down","maintenance"].map((s) => (
+                  <Button key={s} size="sm" variant="outline" disabled={savingId === d.id} className={s === "healthy" ? "border-green-400 text-green-700" : s === "down" ? "border-red-400 text-red-700" : s === "degraded" ? "border-amber-400 text-amber-700" : ""} onClick={() => void setHealthStatus(d.id, s)}>
+                    {s.charAt(0).toUpperCase() + s.slice(1)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              <span className="font-medium">Go-live:</span> {d.go_live_date ? new Date(d.go_live_date).toLocaleDateString("en-GB") : "—"} ·{" "}
+              <span className="font-medium">Geography:</span> {d.geography ?? "—"} ·{" "}
+              <span className="font-medium">Delivery:</span> {d.delivery_method ?? "—"}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-2"><Activity className="size-4" /> Platform Status</CardTitle>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Refreshes every 60s</span>
+          <Button size="sm" variant="outline" onClick={() => void deploymentsQ.refetch()} disabled={deploymentsQ.isFetching}>
+            <RefreshCw className={`mr-1.5 size-4 ${deploymentsQ.isFetching ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {/* Summary badges */}
+        <div className="flex flex-wrap gap-3">
+          <div className="rounded-lg border bg-green-50/50 dark:bg-green-950/20 px-4 py-2.5 text-center min-w-[80px]">
+            <p className="text-xl font-bold text-green-700 dark:text-green-400">{live.length}</p>
+            <p className="text-xs text-muted-foreground">Live</p>
+          </div>
+          <div className="rounded-lg border bg-amber-50/50 dark:bg-amber-950/20 px-4 py-2.5 text-center min-w-[80px]">
+            <p className="text-xl font-bold text-amber-700 dark:text-amber-400">{inProgress.length}</p>
+            <p className="text-xs text-muted-foreground">In progress</p>
+          </div>
+          <div className="rounded-lg border bg-red-50/50 dark:bg-red-950/20 px-4 py-2.5 text-center min-w-[80px]">
+            <p className="text-xl font-bold text-red-700 dark:text-red-400">{suspended.length}</p>
+            <p className="text-xs text-muted-foreground">Suspended</p>
+          </div>
+        </div>
+
+        {live.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Live deployments</p>
+            {live.map((d) => <DeploymentHealthRow key={d.id} d={d} />)}
+          </div>
+        )}
+        {inProgress.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">In progress</p>
+            {inProgress.map((d) => <DeploymentHealthRow key={d.id} d={d} />)}
+          </div>
+        )}
+        {suspended.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Suspended</p>
+            {suspended.map((d) => <DeploymentHealthRow key={d.id} d={d} />)}
+          </div>
+        )}
+        {deployments.length === 0 && !deploymentsQ.isLoading && (
+          <p className="py-6 text-center text-sm text-muted-foreground">No deployments found.</p>
+        )}
       </CardContent>
     </Card>
   );
@@ -3482,6 +4052,24 @@ function AdminPage() {
           <p className="text-sm text-muted-foreground">Customer-funded and platform enhancements — from request to delivery.</p>
         </div>
         <ChangeRequestsSection />
+      </div>
+
+      {/* ── MODULE 15: SUPPORT CONTRACTS ──────────────────────────── */}
+      <div className="space-y-4">
+        <div className="border-b pb-2">
+          <h2 className="text-base font-semibold">Support contracts</h2>
+          <p className="text-sm text-muted-foreground">SLA agreements per customer and deployment — with renewal alerts.</p>
+        </div>
+        <SupportContractsSection />
+      </div>
+
+      {/* ── MODULE 16: PLATFORM STATUS ────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="border-b pb-2">
+          <h2 className="text-base font-semibold">Platform status</h2>
+          <p className="text-sm text-muted-foreground">Health and uptime across all live and in-flight deployments.</p>
+        </div>
+        <PlatformStatusSection />
       </div>
     </div>
   );

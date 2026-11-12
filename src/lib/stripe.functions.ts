@@ -496,6 +496,7 @@ export const createDonationCheckout = createServerFn({ method: "POST" })
       donorEmail: z.string().email().max(160).optional(),
       message: z.string().max(500).optional(),
       giftAid: z.boolean().optional(),
+      giftAidAddress: z.string().max(300).optional(),
       anonymous: z.boolean().optional(),
       recurring: z.boolean().optional(),
       sourceLocation: z.string().max(120).optional(),
@@ -529,6 +530,8 @@ export const createDonationCheckout = createServerFn({ method: "POST" })
         source: "public_page",
         is_recurring: !!data.recurring,
         gift_aid: !!data.giftAid,
+        gift_aid_address: ((data.giftAid && data.giftAidAddress) ? data.giftAidAddress : null) as never,
+        gift_aid_declared_at: (data.giftAid ? new Date().toISOString() : null) as never,
         is_anonymous: !!data.anonymous,
         donor_name: data.anonymous ? null : (data.donorName ?? null),
         donor_email: data.donorEmail ?? null,
@@ -551,19 +554,31 @@ export const createDonationCheckout = createServerFn({ method: "POST" })
         ? org.stripe_account_id
         : null;
 
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: [
-        {
+    const isRecurring = !!data.recurring;
+
+    const lineItem = isRecurring
+      ? {
+          price_data: {
+            currency,
+            product_data: { name: `Monthly donation to ${org.name}` },
+            unit_amount: Math.round(data.amount * 100),
+            recurring: { interval: "month" as const },
+          },
+          quantity: 1,
+        }
+      : {
           price_data: {
             currency,
             product_data: { name: `Donation to ${org.name}` },
             unit_amount: Math.round(data.amount * 100),
           },
           quantity: 1,
-        },
-      ],
-      mode: "payment",
+        };
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: [lineItem],
+      mode: isRecurring ? "subscription" : "payment",
       ...(data.donorEmail ? { customer_email: data.donorEmail } : {}),
       success_url: `${origin}/give/${data.slug}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/give/${data.slug}?payment=cancelled`,
@@ -571,11 +586,19 @@ export const createDonationCheckout = createServerFn({ method: "POST" })
         donation_id: donation.id,
         org_id: org.id,
       },
-      ...(connectedAccount
+      ...(connectedAccount && !isRecurring
         ? {
             payment_intent_data: {
               transfer_data: { destination: connectedAccount },
               application_fee_amount: 0,
+            },
+          }
+        : {}),
+      ...(connectedAccount && isRecurring
+        ? {
+            subscription_data: {
+              transfer_data: { destination: connectedAccount },
+              application_fee_percent: 0,
             },
           }
         : {}),

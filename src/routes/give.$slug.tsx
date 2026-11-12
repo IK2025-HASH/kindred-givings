@@ -79,6 +79,8 @@ function GivePage() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [giftAid, setGiftAid] = useState(false);
+  const [giftAidHouse, setGiftAidHouse] = useState("");
+  const [giftAidPostcode, setGiftAidPostcode] = useState("");
   const [anonymous, setAnonymous] = useState(false);
   const [recurring, setRecurring] = useState(false);
   const [done, setDone] = useState(payment === "success");
@@ -180,6 +182,10 @@ function GivePage() {
       toast.error("Please choose an amount");
       return;
     }
+    if (giftAid && (!giftAidHouse.trim() || !giftAidPostcode.trim())) {
+      toast.error("Please enter your house name/number and postcode for Gift Aid");
+      return;
+    }
     if (!org) return;
     setBusy(true);
     try {
@@ -195,6 +201,7 @@ function GivePage() {
           donorEmail: email || undefined,
           message: message || undefined,
           giftAid,
+          giftAidAddress: giftAid ? `${giftAidHouse}, ${giftAidPostcode}`.trim().replace(/^,\s*|,\s*$/, "") || undefined : undefined,
           anonymous,
           recurring,
           sourceLocation: loc || undefined,
@@ -734,16 +741,49 @@ function GivePage() {
                         />
                         <span>Make this a regular monthly gift</span>
                       </label>
-                      <label className="flex cursor-pointer items-start gap-2.5">
-                        <Checkbox
-                          checked={giftAid}
-                          onCheckedChange={(v) => setGiftAid(v === true)}
-                          className="mt-0.5"
-                        />
-                        <span>
-                          Add Gift Aid — I'm a UK taxpayer and want {org.name} to claim 25% extra.
-                        </span>
-                      </label>
+                      <div className="space-y-3">
+                        <label className="flex cursor-pointer items-start gap-2.5">
+                          <Checkbox
+                            checked={giftAid}
+                            onCheckedChange={(v) => setGiftAid(v === true)}
+                            className="mt-0.5"
+                          />
+                          <span>
+                            Boost this donation by 25% with <strong>Gift Aid</strong> — at no extra cost to you.
+                          </span>
+                        </label>
+                        {giftAid && (
+                          <div className="ml-7 rounded-lg border border-green-200 bg-green-50/60 dark:border-green-800/50 dark:bg-green-950/30 p-4 space-y-3">
+                            <p className="text-xs font-medium text-green-800 dark:text-green-300 uppercase tracking-wide">Gift Aid declaration</p>
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                              I am a UK taxpayer and understand that if I pay less Income Tax and/or Capital Gains Tax in the current tax year than the amount of Gift Aid claimed on all my donations, it is my responsibility to pay any difference. I want {org.name} to reclaim Gift Aid on this and all future donations I make, until I notify them otherwise.
+                            </p>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              <div className="space-y-1">
+                                <label className="text-xs font-medium">House name or number <span className="text-red-500">*</span></label>
+                                <input
+                                  type="text"
+                                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                  placeholder="e.g. 12 or Flat 3"
+                                  value={giftAidHouse}
+                                  onChange={(e) => setGiftAidHouse(e.target.value)}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-xs font-medium">Postcode <span className="text-red-500">*</span></label>
+                                <input
+                                  type="text"
+                                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-ring"
+                                  placeholder="e.g. SW1A 1AA"
+                                  value={giftAidPostcode}
+                                  onChange={(e) => setGiftAidPostcode(e.target.value.toUpperCase())}
+                                />
+                              </div>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">Your address is required by HMRC for Gift Aid claims. It will be held securely and not shared with third parties.</p>
+                          </div>
+                        )}
+                      </div>
                       <label className="flex cursor-pointer items-start gap-2.5">
                         <Checkbox
                           checked={anonymous}
