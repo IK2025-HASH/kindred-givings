@@ -4050,6 +4050,41 @@ function DeploymentEngineSection() {
   );
 }
 
+// ── Collapsible Admin Section ─────────────────────────────────────────────────
+function AdminSection({ id, title, description, children }: { id: string; title: string; description: string; children: React.ReactNode }) {
+  const storageKey = `admin-section-open-${id}`;
+  const [open, setOpen] = useState(() => {
+    try { return localStorage.getItem(storageKey) === "true"; } catch { return false; }
+  });
+  function toggle() {
+    setOpen((v) => {
+      const next = !v;
+      try { localStorage.setItem(storageKey, String(next)); } catch { /* noop */ }
+      return next;
+    });
+  }
+  return (
+    <div className="rounded-lg border bg-card shadow-sm">
+      <button
+        onClick={toggle}
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left hover:bg-muted/30 transition-colors rounded-lg"
+        aria-expanded={open}
+      >
+        <div>
+          <h2 className="text-base font-semibold leading-tight">{title}</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
+        </div>
+        {open ? <ChevronUp className="size-4 shrink-0 text-muted-foreground" /> : <ChevronDown className="size-4 shrink-0 text-muted-foreground" />}
+      </button>
+      {open && (
+        <div className="border-t px-5 pb-5 pt-4 space-y-4">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Platform Status Section ───────────────────────────────────────────────────
 function PlatformStatusSection() {
   const qc = useQueryClient();
@@ -4476,11 +4511,7 @@ function AdminPage() {
       </div>
 
       {/* ── MODULE 1: USERS & ACCOUNTS ─────────────────────────────── */}
-      <div className="space-y-4">
-        <div className="border-b pb-2">
-          <h2 className="text-base font-semibold">Users &amp; accounts</h2>
-          <p className="text-sm text-muted-foreground">See, suspend and support every organisation and user.</p>
-        </div>
+      <AdminSection id="users" title="Users &amp; accounts" description="See, suspend and support every organisation and user.">
 
         <Card>
           <CardHeader>
@@ -4795,151 +4826,87 @@ function AdminPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </AdminSection>
 
       {/* ── MODULE 2: MONITORING ──────────────────────────────────── */}
-      <div className="space-y-4">
-        <div className="border-b pb-2">
-          <h2 className="text-base font-semibold">Application monitoring</h2>
-          <p className="text-sm text-muted-foreground">Live platform health, usage stats and key metrics.</p>
-        </div>
+      <AdminSection id="monitoring" title="Application monitoring" description="Live platform health, usage stats and key metrics.">
         <MonitoringSection />
-      </div>
+      </AdminSection>
 
       {/* ── MODULE 3: BRANDING ─────────────────────────────────────── */}
-      <div className="space-y-4">
-        <div className="border-b pb-2">
-          <h2 className="text-base font-semibold">Branding</h2>
-          <p className="text-sm text-muted-foreground">White-label name, logo, colours and email styling per customer.</p>
-        </div>
+      <AdminSection id="branding" title="Branding" description="White-label name, logo, colours and email styling per customer.">
         <PlatformSettingsSection />
-      </div>
+      </AdminSection>
 
       {/* ── MODULE 4: PRICING & PLANS ──────────────────────────────── */}
-      <div className="space-y-4">
-        <div className="border-b pb-2">
-          <h2 className="text-base font-semibold">Pricing &amp; plans</h2>
-          <p className="text-sm text-muted-foreground">Plans, limits and usage allowances you can change without a release.</p>
-        </div>
+      <AdminSection id="plans" title="Pricing &amp; plans" description="Plans, limits and usage allowances you can change without a release.">
         <PlansSection />
-      </div>
+      </AdminSection>
 
       {/* ── MODULE 5: PAYMENTS ─────────────────────────────────────── */}
-      <div className="space-y-4">
-        <div className="border-b pb-2">
-          <h2 className="text-base font-semibold">Payments</h2>
-          <p className="text-sm text-muted-foreground">All platform subscriptions — reconciled against Stripe in real time. Issue refunds from here.</p>
-        </div>
+      <AdminSection id="payments" title="Payments" description="All platform subscriptions — reconciled against Stripe in real time. Issue refunds from here.">
         <PaymentsSection />
-      </div>
+      </AdminSection>
 
-      {/* ── MODULE 5: CHAT & SUPPORT ───────────────────────────────── */}
-      <div className="space-y-4">
-        <div className="border-b pb-2">
-          <h2 className="text-base font-semibold">Chat &amp; support</h2>
-          <p className="text-sm text-muted-foreground">Manage support agents and assign incoming conversations.</p>
-        </div>
+      {/* ── MODULE 5b: CHAT & SUPPORT ──────────────────────────────── */}
+      <AdminSection id="chat-support" title="Chat &amp; support" description="Manage support agents and assign incoming conversations.">
         <ChatSupportSection />
-      </div>
+      </AdminSection>
 
       {/* ── MODULE 6: FEATURE LIST / USER STORIES ─────────────────── */}
-      <div className="space-y-4">
-        <div className="border-b pb-2">
-          <h2 className="text-base font-semibold">Feature list &amp; user stories</h2>
-          <p className="text-sm text-muted-foreground">Track product features, epics, user stories and bugs across the backlog.</p>
-        </div>
+      <AdminSection id="features" title="Feature list &amp; user stories" description="Track product features, epics, user stories and bugs across the backlog.">
         <FeaturesSection />
-      </div>
+      </AdminSection>
 
       {/* ── MODULE 7: SQL / DATABASE MANAGEMENT ───────────────────── */}
-      <div className="space-y-4">
-        <div className="border-b pb-2">
-          <h2 className="text-base font-semibold">SQL / database management</h2>
-          <p className="text-sm text-muted-foreground">Run read-only SELECT queries against the live database for diagnostics and reporting.</p>
-        </div>
+      <AdminSection id="sql" title="SQL / database management" description="Run read-only SELECT queries against the live database for diagnostics and reporting.">
         <SQLSection />
-      </div>
+      </AdminSection>
 
       {/* ── MODULE 8: PARTNER MANAGEMENT ──────────────────────────── */}
-      <div className="space-y-4">
-        <div className="border-b pb-2">
-          <h2 className="text-base font-semibold">Partner management</h2>
-          <p className="text-sm text-muted-foreground">Affiliate partners, referral tracking, multi-level rewards (default: service credits).</p>
-        </div>
+      <AdminSection id="partners" title="Partner management" description="Affiliate partners, referral tracking, multi-level rewards (default: service credits).">
         <PartnersSection />
-      </div>
+      </AdminSection>
 
       {/* ── MODULE 9: ONBOARDING PIPELINE ─────────────────────────── */}
-      <div className="space-y-4">
-        <div className="border-b pb-2">
-          <h2 className="text-base font-semibold">Onboarding enquiries</h2>
-          <p className="text-sm text-muted-foreground">Leads from the marketing site — qualify, contact and convert to customers.</p>
-        </div>
+      <AdminSection id="enquiries" title="Onboarding enquiries" description="Leads from the marketing site — qualify, contact and convert to customers.">
         <EnquiriesSection />
-      </div>
+      </AdminSection>
 
       {/* ── MODULE 11: CUSTOMERS ───────────────────────────────────── */}
-      <div className="space-y-4">
-        <div className="border-b pb-2">
-          <h2 className="text-base font-semibold">Customers</h2>
-          <p className="text-sm text-muted-foreground">Customer organisations — both SaaS tenants and customer-hosted deployments.</p>
-        </div>
+      <AdminSection id="customers" title="Customers" description="Customer organisations — both SaaS tenants and customer-hosted deployments.">
         <CustomersSection />
-      </div>
+      </AdminSection>
 
       {/* ── MODULE 12: DEPLOYMENTS ─────────────────────────────────── */}
-      <div className="space-y-4">
-        <div className="border-b pb-2">
-          <h2 className="text-base font-semibold">Deployments</h2>
-          <p className="text-sm text-muted-foreground">Track every live and in-flight deployment through its full lifecycle.</p>
-        </div>
+      <AdminSection id="deployments" title="Deployments" description="Track every live and in-flight deployment through its full lifecycle.">
         <DeploymentsSection />
-      </div>
+      </AdminSection>
 
       {/* ── MODULE 13: LICENCES ────────────────────────────────────── */}
-      <div className="space-y-4">
-        <div className="border-b pb-2">
-          <h2 className="text-base font-semibold">Licences</h2>
-          <p className="text-sm text-muted-foreground">Issue and track annual licences for customer-hosted deployments.</p>
-        </div>
+      <AdminSection id="licences" title="Licences" description="Issue and track annual licences for customer-hosted deployments.">
         <LicencesSection />
-      </div>
+      </AdminSection>
 
       {/* ── MODULE 14: CHANGE REQUESTS ────────────────────────────── */}
-      <div className="space-y-4">
-        <div className="border-b pb-2">
-          <h2 className="text-base font-semibold">Change requests</h2>
-          <p className="text-sm text-muted-foreground">Customer-funded and platform enhancements — from request to delivery.</p>
-        </div>
+      <AdminSection id="change-requests" title="Change requests" description="Customer-funded and platform enhancements — from request to delivery.">
         <ChangeRequestsSection />
-      </div>
+      </AdminSection>
 
       {/* ── MODULE 15: SUPPORT CONTRACTS ──────────────────────────── */}
-      <div className="space-y-4">
-        <div className="border-b pb-2">
-          <h2 className="text-base font-semibold">Support contracts</h2>
-          <p className="text-sm text-muted-foreground">SLA agreements per customer and deployment — with renewal alerts.</p>
-        </div>
+      <AdminSection id="support-contracts" title="Support contracts" description="SLA agreements per customer and deployment — with renewal alerts.">
         <SupportContractsSection />
-      </div>
+      </AdminSection>
 
       {/* ── MODULE 10: DEPLOYMENT ENGINE ──────────────────────────── */}
-      <div className="space-y-4">
-        <div className="border-b pb-2">
-          <h2 className="text-base font-semibold">Deployment engine</h2>
-          <p className="text-sm text-muted-foreground">Guided wizard to provision SaaS geography instances and customer on-premise environments. Generates a full audit log.</p>
-        </div>
+      <AdminSection id="deployment-engine" title="Deployment engine" description="Guided wizard to provision SaaS geography instances and customer on-premise environments. Generates a full audit log.">
         <DeploymentEngineSection />
-      </div>
+      </AdminSection>
 
       {/* ── MODULE 16: PLATFORM STATUS ────────────────────────────── */}
-      <div className="space-y-4">
-        <div className="border-b pb-2">
-          <h2 className="text-base font-semibold">Platform status</h2>
-          <p className="text-sm text-muted-foreground">Health and uptime across all live and in-flight deployments.</p>
-        </div>
+      <AdminSection id="platform-status" title="Platform status" description="Health and uptime across all live and in-flight deployments.">
         <PlatformStatusSection />
-      </div>
+      </AdminSection>
     </div>
   );
 }
