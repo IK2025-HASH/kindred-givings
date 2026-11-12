@@ -1,0 +1,103 @@
+Type,Journey,TestCase,Name,Include,Notes
+Journey,J1,,,, Platform Admin Workflow
+TestCase,J1,J1-TC1,Login as platform admin,Y,
+TestCase,J1,J1-TC2,Smoke admin routes (/app/admin),Y,
+TestCase,J1,J1-TC3,Navigate to donors section,Y,
+TestCase,J1,J1-TC4,Inbox tabs (All / Unread / Starred),Y,
+TestCase,J1,J1-TC5,Open support chat FAB,Y,
+TestCase,J1,J1-TC6,Logout,Y,
+Journey,J2,,,, Support Agent Workflow
+TestCase,J2,J2-TC1,Login as support agent,Y,Skip if AGENT_EMAIL not set
+TestCase,J2,J2-TC2,View support inbox,Y,
+TestCase,J2,J2-TC3,Reply to conversation,Y,Non-fatal if inbox empty
+TestCase,J2,J2-TC4,Close conversation,Y,Non-fatal
+TestCase,J2,J2-TC5,Logout,Y,
+Journey,J3,,,, New Charity Registration (Card)
+TestCase,J3,J3-TC1,Navigate to registration page,Y,
+TestCase,J3,J3-TC2,Select Growth plan,Y,
+TestCase,J3,J3-TC3,Fill registration form,Y,
+TestCase,J3,J3-TC4,Select card payment on Stripe,Y,
+TestCase,J3,J3-TC5,Enter test card 4242,Y,
+TestCase,J3,J3-TC6,Complete Stripe payment,Y,
+TestCase,J3,J3-TC7,Verify app access post-payment,Y,
+Journey,J4,,,, Registration Security Check
+TestCase,J4,J4-TC1,Navigate to registration page,Y,
+TestCase,J4,J4-TC2,Select Starter plan,Y,
+TestCase,J4,J4-TC3,Fill registration form,Y,
+TestCase,J4,J4-TC4,Attempt login before email confirmation,Y,
+TestCase,J4,J4-TC5,Verify login denied for unconfirmed user,Y,Security check
+Journey,J5,,,, New User App Access Smoke
+TestCase,J5,J5-TC1,Login as new user,Y,
+TestCase,J5,J5-TC2,Smoke all user routes,Y,
+TestCase,J5,J5-TC3,Inbox tabs,Y,
+TestCase,J5,J5-TC4,Logout,Y,
+Journey,J6,,,, Admin Post-Registration Verification
+TestCase,J6,J6-TC1,Login as admin,Y,
+TestCase,J6,J6-TC2,Verify registered users visible,Y,
+TestCase,J6,J6-TC3,Verify charity orgs visible,Y,
+TestCase,J6,J6-TC4,Verify Growth subscriptions active,Y,
+TestCase,J6,J6-TC5,Logout,Y,
+Journey,J7,,,, New Charity Registration (Klarna)
+TestCase,J7,J7-TC1,Navigate to registration page,Y,
+TestCase,J7,J7-TC2,Select Klarna payment,N,Requires Stripe interactive flow
+TestCase,J7,J7-TC3,Complete Klarna flow,N,
+TestCase,J7,J7-TC4,Verify redirect back,N,
+TestCase,J7,J7-TC5,Verify app access,N,
+TestCase,J7,J7-TC6,Logout,N,
+Journey,J8,,,, New Charity Registration (Revolut Pay)
+TestCase,J8,J8-TC1,Navigate to registration page,Y,
+TestCase,J8,J8-TC2,Select Revolut Pay,N,Requires Stripe interactive flow
+TestCase,J8,J8-TC3,Complete Revolut flow,N,
+TestCase,J8,J8-TC4,Verify redirect back,N,
+TestCase,J8,J8-TC5,Verify app access,N,
+TestCase,J8,J8-TC6,Logout,N,
+Journey,J9,,,, Charity User Chat
+TestCase,J9,J9-TC1,Login as card charity user,Y,
+TestCase,J9,J9-TC2,Open support chat FAB,Y,
+TestCase,J9,J9-TC3,Send chat message,Y,
+TestCase,J9,J9-TC4,Logout card charity user,Y,
+TestCase,J9,J9-TC5,Login as Klarna charity user,N,Klarna registration deferred
+TestCase,J9,J9-TC6,Open chat,N,
+TestCase,J9,J9-TC7,Send message,N,
+TestCase,J9,J9-TC8,Logout Klarna user,N,
+TestCase,J9,J9-TC9,Login as Revolut charity user,N,Revolut registration deferred
+TestCase,J9,J9-TC10,Open chat,N,
+TestCase,J9,J9-TC11,Send message,N,
+TestCase,J9,J9-TC12,Logout Revolut user,N,
+Journey,J10,,,, Gift Aid Declaration Flow
+TestCase,J10,J10-TC1,Navigate to public giving page,Y,New feature
+TestCase,J10,J10-TC2,Tick Gift Aid checkbox shows declaration panel,Y,New feature
+TestCase,J10,J10-TC3,Verify HMRC declaration text present,Y,New feature
+TestCase,J10,J10-TC4,Try proceed without address — validation fires,Y,New feature
+TestCase,J10,J10-TC5,Fill address and proceed to Stripe,Y,New feature
+Journey,J11,,,, Recurring Giving / Stripe Subscription
+TestCase,J11,J11-TC1,Navigate to public giving page,Y,New feature
+TestCase,J11,J11-TC2,Tick recurring/monthly checkbox,Y,New feature
+TestCase,J11,J11-TC3,Verify monthly text visible,Y,New feature
+TestCase,J11,J11-TC4,Proceed to Stripe subscription checkout,Y,New feature
+Journey,J12,,,, Admin — Support Contracts
+TestCase,J12,J12-TC1,Login as admin,Y,
+TestCase,J12,J12-TC2,Navigate to Support Contracts section,Y,New feature
+TestCase,J12,J12-TC3,Create a support contract,Y,New feature
+TestCase,J12,J12-TC4,Verify contract appears in table,Y,New feature
+TestCase,J12,J12-TC5,Expand contract detail row,Y,New feature
+Journey,J13,,,, Admin — Change Requests Enhanced Workflow
+TestCase,J13,J13-TC1,Login as admin,Y,
+TestCase,J13,J13-TC2,Navigate to Change Requests section,Y,New feature
+TestCase,J13,J13-TC3,Create CR with full fields,Y,New feature
+TestCase,J13,J13-TC4,Verify CRs grouped by status,Y,New feature
+TestCase,J13,J13-TC5,Expand and edit a CR,Y,New feature
+Journey,J14,,,, Admin — Platform Status
+TestCase,J14,J14-TC1,Login as admin,Y,
+TestCase,J14,J14-TC2,Navigate to Platform Status section,Y,New feature
+TestCase,J14,J14-TC3,Verify deployment health display,Y,New feature
+TestCase,J14,J14-TC4,Log a health check,Y,New feature
+Journey,J15,,,, NL Commercial Full Smoke
+TestCase,J15,J15-TC1,Login as admin,Y,
+TestCase,J15,J15-TC2,Customers section loads,Y,
+TestCase,J15,J15-TC3,Deployments section loads,Y,
+TestCase,J15,J15-TC4,Licences section loads,Y,
+TestCase,J15,J15-TC5,Change Requests section loads,Y,
+TestCase,J15,J15-TC6,Support Contracts section loads,Y,
+TestCase,J15,J15-TC7,Platform Status section loads,Y,
+TestCase,J15,J15-TC8,Monitoring stats tiles visible,Y,
