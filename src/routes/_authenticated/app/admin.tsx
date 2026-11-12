@@ -3311,6 +3311,8 @@ function DeploymentEngineSection() {
     app_version: "v1.2.0",
     provisioning_notes: "",
     licence_id: "",
+    deployment_approach: "" as "" | "ssh" | "script" | "manual",
+    install_dir: "C:\\donorbook",
   });
   const [deploying, setDeploying] = useState(false);
   const [deploymentId, setDeploymentId] = useState<string | null>(null);
@@ -3542,7 +3544,7 @@ function DeploymentEngineSection() {
     setLogs([]);
     setSmokeResults([]);
     setCurrentStep(-1);
-    setForm({ customer_id: "", deployment_id: "", delivery_model: "saas", geography: "UK", geography_instance_ref: "", hosting_provider: "", server_hostname: "", server_port: "22", server_user: "ubuntu", delivery_method: "docker", app_domain: "", admin_email: "", app_version: "v0.5.31", provisioning_notes: "", licence_id: "" });
+    setForm({ customer_id: "", deployment_id: "", delivery_model: "saas", geography: "UK", geography_instance_ref: "", hosting_provider: "", server_hostname: "", server_port: "22", server_user: "ubuntu", delivery_method: "docker", app_domain: "", admin_email: "", app_version: "v1.2.0", provisioning_notes: "", licence_id: "", deployment_approach: "", install_dir: "C:\\donorbook" });
   }
 
   const customers = customersQ.data ?? [];
@@ -3818,39 +3820,152 @@ function DeploymentEngineSection() {
               </>
             ) : (
               <>
-                <p className="text-sm text-muted-foreground">Enter the target server details. The engine will record them and generate installation instructions.</p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="sm:col-span-2 space-y-1.5">
-                    <Label>Server hostname / IP <span className="text-red-500">*</span></Label>
-                    <Input value={form.server_hostname} onChange={(e) => setF("server_hostname", e.target.value)} placeholder="192.168.1.100 or server.example.org" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>SSH port</Label>
-                    <Input value={form.server_port} onChange={(e) => setF("server_port", e.target.value)} placeholder="22" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>SSH user</Label>
-                    <Input value={form.server_user} onChange={(e) => setF("server_user", e.target.value)} placeholder="ubuntu" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Hosting provider</Label>
-                    <Input value={form.hosting_provider} onChange={(e) => setF("hosting_provider", e.target.value)} placeholder="Hetzner / AWS / Azure / On-site" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Delivery method</Label>
-                    <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                      value={form.delivery_method} onChange={(e) => setF("delivery_method", e.target.value)}>
-                      <option value="docker">Docker Compose (recommended)</option>
-                      <option value="manual">Manual install</option>
-                      <option value="both">Both</option>
-                    </select>
-                  </div>
-                </div>
+                {/* ── Approach selector ── */}
+                {!form.deployment_approach ? (
+                  <>
+                    <p className="text-sm text-muted-foreground">Choose how you want to deploy to the target machine. Pick what matches what you have available.</p>
+                    <div className="grid gap-3">
+                      {[
+                        {
+                          value: "script",
+                          icon: "📦",
+                          label: "Downloadable script package",
+                          desc: "Wizard generates a PowerShell script + docker-compose.yml + .env pre-filled with your config. Run it once on the target machine. Status phones back to this platform automatically.",
+                          requires: "Docker Desktop installed on target · No network config needed",
+                          recommended: true,
+                        },
+                        {
+                          value: "ssh",
+                          icon: "🔌",
+                          label: "SSH remote execution",
+                          desc: "Platform SSHes into the target machine and executes all steps automatically. Requires the machine to be reachable (direct IP or Cloudflare Tunnel).",
+                          requires: "OpenSSH server enabled · Machine reachable from internet (port forward or Cloudflare Tunnel) · Docker Desktop installed",
+                          recommended: false,
+                        },
+                        {
+                          value: "manual",
+                          icon: "📋",
+                          label: "Manual guided checklist",
+                          desc: "Platform provides step-by-step instructions. You run each command manually and tick it off. Full audit log recorded as you confirm each step.",
+                          requires: "No automation — works anywhere",
+                          recommended: false,
+                        },
+                      ].map((opt) => (
+                        <button key={opt.value} onClick={() => setF("deployment_approach", opt.value as never)}
+                          className="w-full text-left rounded-lg border p-4 hover:bg-muted/40 transition-colors">
+                          <div className="flex items-start gap-3">
+                            <span className="text-2xl mt-0.5">{opt.icon}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-semibold text-sm">{opt.label}</p>
+                                {opt.recommended && <span className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-medium">Recommended</span>}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">{opt.desc}</p>
+                              <p className="text-xs text-amber-700 dark:text-amber-400 mt-1.5 font-medium">Requires: {opt.requires}</p>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 mb-1">
+                      <button onClick={() => setF("deployment_approach", "" as never)} className="text-xs text-blue-600 hover:underline">← Change approach</button>
+                      <span className="text-xs text-muted-foreground">|</span>
+                      <span className="text-xs font-semibold">
+                        {form.deployment_approach === "script" && "📦 Script package"}
+                        {form.deployment_approach === "ssh" && "🔌 SSH remote"}
+                        {form.deployment_approach === "manual" && "📋 Manual guided"}
+                      </span>
+                    </div>
+
+                    {/* Script approach config */}
+                    {form.deployment_approach === "script" && (
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">The wizard will generate a ready-to-run PowerShell package. Tell us about the target machine.</p>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="sm:col-span-2 space-y-1.5">
+                            <Label>Install directory on target</Label>
+                            <Input value={form.install_dir} onChange={(e) => setF("install_dir", e.target.value)} placeholder="C:\donorbook" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Hosting description</Label>
+                            <Input value={form.hosting_provider} onChange={(e) => setF("hosting_provider", e.target.value)} placeholder="Windows laptop / on-site server" />
+                          </div>
+                        </div>
+                        <div className="rounded-md border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-3 text-xs text-green-800 dark:text-green-300 space-y-1">
+                          <p className="font-semibold">What you'll get at the end:</p>
+                          <p>• <code>deploy.ps1</code> — runs the full install on the target machine</p>
+                          <p>• <code>docker-compose.yml</code> — pre-filled with your app config</p>
+                          <p>• <code>.env</code> — all environment variables ready</p>
+                          <p>• Status phones back to this platform as steps complete</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SSH approach config */}
+                    {form.deployment_approach === "ssh" && (
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">Platform will SSH into the target and run all provisioning steps automatically.</p>
+                        <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs text-amber-800 dark:text-amber-300">
+                          <p className="font-semibold mb-1">Pre-requisites on the target machine:</p>
+                          <p>1. Enable OpenSSH Server: <code>Settings → Optional features → OpenSSH Server</code></p>
+                          <p>2. Make port 22 reachable — either port-forward on your router, or install <strong>Cloudflare Tunnel</strong> (free, no port forwarding needed)</p>
+                          <p>3. Docker Desktop must be installed and running</p>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="sm:col-span-2 space-y-1.5">
+                            <Label>Hostname / IP or Cloudflare tunnel hostname <span className="text-red-500">*</span></Label>
+                            <Input value={form.server_hostname} onChange={(e) => setF("server_hostname", e.target.value)} placeholder="192.168.1.100 or abc.trycloudflare.com" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>SSH port</Label>
+                            <Input value={form.server_port} onChange={(e) => setF("server_port", e.target.value)} placeholder="22" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Windows username</Label>
+                            <Input value={form.server_user} onChange={(e) => setF("server_user", e.target.value)} placeholder="Ilyas" />
+                          </div>
+                          <div className="sm:col-span-2 space-y-1.5">
+                            <Label>Install directory</Label>
+                            <Input value={form.install_dir} onChange={(e) => setF("install_dir", e.target.value)} placeholder="C:\donorbook" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Manual approach */}
+                    {form.deployment_approach === "manual" && (
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">You'll be guided through each step with the exact commands to run. Tick each one as you complete it.</p>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="sm:col-span-2 space-y-1.5">
+                            <Label>Hosting description</Label>
+                            <Input value={form.hosting_provider} onChange={(e) => setF("hosting_provider", e.target.value)} placeholder="Windows laptop / on-site server" />
+                          </div>
+                          <div className="sm:col-span-2 space-y-1.5">
+                            <Label>Install directory on target</Label>
+                            <Input value={form.install_dir} onChange={(e) => setF("install_dir", e.target.value)} placeholder="C:\donorbook" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
               </>
             )}
             <div className="flex justify-between">
               <Button variant="ghost" onClick={() => setStep(1)}>← Back</Button>
-              <Button disabled={form.delivery_model !== "saas" && !form.server_hostname} onClick={() => setStep(3)}>Next: Settings →</Button>
+              <Button
+                disabled={
+                  form.delivery_model === "saas"
+                    ? false
+                    : !form.deployment_approach || (form.deployment_approach === "ssh" && !form.server_hostname)
+                }
+                onClick={() => setStep(3)}>
+                Next: Settings →
+              </Button>
             </div>
           </div>
         )}
@@ -3893,7 +4008,13 @@ function DeploymentEngineSection() {
                 <div><span className="font-medium text-muted-foreground">Customer:</span> {customers.find((c) => c.id === form.customer_id)?.name ?? "—"}</div>
                 <div><span className="font-medium text-muted-foreground">Delivery model:</span> {DELIVERY_MODELS.find((m) => m.value === form.delivery_model)?.label ?? "—"}</div>
                 {form.delivery_model === "saas" && <div><span className="font-medium text-muted-foreground">Geography:</span> {form.geography}</div>}
-                {form.delivery_model !== "saas" && <div><span className="font-medium text-muted-foreground">Server:</span> {form.server_hostname}:{form.server_port}</div>}
+                {form.delivery_model !== "saas" && (
+                  <>
+                    <div><span className="font-medium text-muted-foreground">Approach:</span> {form.deployment_approach === "script" ? "📦 Script package" : form.deployment_approach === "ssh" ? "🔌 SSH remote" : "📋 Manual guided"}</div>
+                    {form.server_hostname && <div><span className="font-medium text-muted-foreground">Server:</span> {form.server_hostname}:{form.server_port}</div>}
+                    {form.install_dir && <div><span className="font-medium text-muted-foreground">Install dir:</span> {form.install_dir}</div>}
+                  </>
+                )}
                 <div><span className="font-medium text-muted-foreground">Admin email:</span> {form.admin_email || "—"}</div>
                 <div><span className="font-medium text-muted-foreground">Domain:</span> {form.app_domain || "—"}</div>
                 <div><span className="font-medium text-muted-foreground">Version:</span> {form.app_version}</div>
