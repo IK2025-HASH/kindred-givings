@@ -3308,7 +3308,7 @@ function DeploymentEngineSection() {
     delivery_method: "docker",
     app_domain: "",
     admin_email: "",
-    app_version: "v0.5.31",
+    app_version: "v1.2.0",
     provisioning_notes: "",
     licence_id: "",
   });
