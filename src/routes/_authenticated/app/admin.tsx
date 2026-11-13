@@ -3430,12 +3430,30 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# ── Interactive prompts (press Enter to accept defaults) ──────────────────
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host "  Donorbook On-Premise Install  |  $AppVersion" -ForegroundColor Cyan
 Write-Host "  Customer : ${customerName}" -ForegroundColor Cyan
-Write-Host "  Domain   : $AppDomain" -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Press Enter to accept the defaults shown in [brackets]." -ForegroundColor DarkGray
+Write-Host ""
+
+$inputDomain = Read-Host "  Domain / URL   [$AppDomain]"
+if ($inputDomain -ne "") { $AppDomain = $inputDomain }
+
+$inputPort = Read-Host "  Port number    [$AppPort]"
+if ($inputPort -ne "") { $AppPort = $inputPort }
+
+$inputDir = Read-Host "  Install folder [$InstallDir]"
+if ($inputDir -ne "") { $InstallDir = $inputDir }
+
+Write-Host ""
+Write-Host "  Installing to : $InstallDir" -ForegroundColor Cyan
+Write-Host "  Domain        : $AppDomain" -ForegroundColor Cyan
+Write-Host "  Port          : $AppPort" -ForegroundColor Cyan
 Write-Host ""
 
 # 1. Check Docker
@@ -3451,8 +3469,12 @@ try {
 # 2. Create install directory
 Write-Host "[2/6] Creating install directory: $InstallDir" -ForegroundColor Yellow
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+New-Item -ItemType Directory -Force -Path "$InstallDir\\conf.d" | Out-Null
+New-Item -ItemType Directory -Force -Path "$InstallDir\\html" | Out-Null
 Copy-Item "$PSScriptRoot\\docker-compose.yml" "$InstallDir\\docker-compose.yml" -Force
 Copy-Item "$PSScriptRoot\\.env" "$InstallDir\\.env" -Force
+Copy-Item "$PSScriptRoot\\conf.d\\default.conf" "$InstallDir\\conf.d\\default.conf" -Force
+Copy-Item "$PSScriptRoot\\html\\*" "$InstallDir\\html\\" -Recurse -Force
 Write-Host "      OK - Files copied to $InstallDir" -ForegroundColor Green
 
 # 3. Pull images
@@ -3525,7 +3547,7 @@ services:
       - "${port}:80"
     volumes:
       - ./html:/usr/share/nginx/html:ro
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./conf.d:/etc/nginx/conf.d:ro
     environment:
       - APP_VERSION=${appVersion}
       - ADMIN_EMAIL=${adminEmail}
@@ -3602,10 +3624,11 @@ QUICK START
 
 WHAT INSTALL.PS1 DOES
 -----------------------
+0. Prompts you to confirm/override domain, port, and install folder
 1. Checks Docker Desktop is running
-2. Copies files to ${installDir}
+2. Copies files to your install folder (creates conf.d/ and html/ subfolders)
 3. Pulls Docker images
-4. Starts the application container on port ${port}
+4. Starts the application container on your chosen port
 5. Runs a health check
 6. Phones back to the Donorbook platform to confirm install
 
@@ -3623,12 +3646,12 @@ Contact your Donorbook account manager or email: ${adminEmail}
 
     // Build ZIP using fflate
     const files: Record<string, Uint8Array> = {
-      "install.ps1":        strToU8(installPs1),
-      "docker-compose.yml": strToU8(dockerCompose),
-      "nginx.conf":         strToU8(nginxConf),
-      ".env":               strToU8(envFile),
-      "html/index.html":    strToU8(indexHtml),
-      "README.txt":         strToU8(readme),
+      "install.ps1":           strToU8(installPs1),
+      "docker-compose.yml":    strToU8(dockerCompose),
+      "conf.d/default.conf":   strToU8(nginxConf),
+      ".env":                  strToU8(envFile),
+      "html/index.html":       strToU8(indexHtml),
+      "README.txt":            strToU8(readme),
     };
 
     const zipped = zipSync(files, { level: 6 });
@@ -4495,7 +4518,7 @@ Contact your Donorbook account manager or email: ${adminEmail}
                   <span className="text-xl">📦</span>
                   <div>
                     <p className="font-semibold text-blue-800 dark:text-blue-300">Install package ready</p>
-                    <p className="text-xs text-blue-600 dark:text-blue-400">Contains: install.ps1 · docker-compose.yml · nginx.conf · .env · README.txt</p>
+                    <p className="text-xs text-blue-600 dark:text-blue-400">Contains: install.ps1 · docker-compose.yml · conf.d/default.conf · .env · README.txt</p>
                   </div>
                 </div>
                 <ol className="text-xs text-blue-700 dark:text-blue-300 space-y-1 list-decimal list-inside">
