@@ -3504,17 +3504,20 @@ try {
 Write-Host "[5/6] Health check on port $AppPort..." -ForegroundColor Yellow
 $retries = 0
 $healthy = $false
-while ($retries -lt 10 -and -not $healthy) {
+Write-Host "      Waiting for application to respond" -NoNewline -ForegroundColor DarkGray
+while ($retries -lt 15 -and -not $healthy) {
   try {
     $resp = Invoke-WebRequest -Uri "http://localhost:$AppPort/health" -UseBasicParsing -TimeoutSec 3
     if ($resp.StatusCode -eq 200) { $healthy = $true }
   } catch {}
-  if (-not $healthy) { Start-Sleep -Seconds 2; $retries++ }
+  if (-not $healthy) { Write-Host "." -NoNewline -ForegroundColor DarkGray; Start-Sleep -Seconds 2; $retries++ }
 }
+Write-Host ""
 if ($healthy) {
-  Write-Host "      OK - Application responding on port $AppPort" -ForegroundColor Green
+  Write-Host "      OK - Application is up on port $AppPort" -ForegroundColor Green
 } else {
-  Write-Warning "Health check timed out - check containers with: docker compose logs"
+  Write-Host "      WARN - Health check timed out (container may still be starting)" -ForegroundColor Yellow
+  Write-Host "             Check with: docker compose -f '$InstallDir\\docker-compose.yml' logs" -ForegroundColor DarkGray
 }
 
 # 6. Report back to platform
@@ -3526,17 +3529,34 @@ try {
     -Headers @{ "apikey" = (Get-Content "$InstallDir\\.env" | Select-String "SUPABASE_KEY").ToString().Split("=")[1]; "Authorization" = "Bearer " + (Get-Content "$InstallDir\\.env" | Select-String "SUPABASE_KEY").ToString().Split("=")[1] }
   Write-Host "      OK - Platform notified" -ForegroundColor Green
 } catch {
-  Write-Warning "Could not notify platform (non-fatal): $_"
+  Write-Host "      WARN - Could not notify platform (non-fatal)" -ForegroundColor Yellow
 }
 
+# ── Final summary ─────────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Green
 Write-Host "  INSTALL COMPLETE" -ForegroundColor Green
-Write-Host "  App running at http://localhost:$AppPort" -ForegroundColor Green
-Write-Host "  Admin email  : $AdminEmail" -ForegroundColor Green
-Write-Host "  Stop         : docker compose -f \\"$InstallDir\\docker-compose.yml\\" down" -ForegroundColor Green
 Write-Host "============================================================" -ForegroundColor Green
 Write-Host ""
+Write-Host "  App URL     : http://localhost:$AppPort" -ForegroundColor Cyan
+Write-Host "  Domain      : $AppDomain" -ForegroundColor Cyan
+Write-Host "  Admin email : $AdminEmail" -ForegroundColor Cyan
+Write-Host "  Install dir : $InstallDir" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "  Useful commands:" -ForegroundColor DarkGray
+Write-Host "    View logs : docker compose -f '$InstallDir\\docker-compose.yml' logs -f" -ForegroundColor DarkGray
+Write-Host "    Stop      : docker compose -f '$InstallDir\\docker-compose.yml' down" -ForegroundColor DarkGray
+Write-Host "    Start     : docker compose -f '$InstallDir\\docker-compose.yml' up -d" -ForegroundColor DarkGray
+Write-Host ""
+
+$openBrowser = Read-Host "  Open http://localhost:$AppPort in your browser now? [Y/n]"
+if ($openBrowser -ne "n" -and $openBrowser -ne "N") {
+  Start-Process "http://localhost:$AppPort"
+}
+
+Write-Host ""
+Write-Host "  Press Enter to close this window." -ForegroundColor DarkGray
+Read-Host | Out-Null
 `;
 
     const dockerCompose = `version: "3.9"
