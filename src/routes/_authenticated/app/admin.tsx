@@ -3436,6 +3436,16 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+trap {
+  Write-Host ""
+  Write-Host "============================================================" -ForegroundColor Red
+  Write-Host "  ERROR: $_" -ForegroundColor Red
+  Write-Host "============================================================" -ForegroundColor Red
+  Write-Host ""
+  Write-Host "  Press Enter to close this window." -ForegroundColor DarkGray
+  Read-Host | Out-Null
+  exit 1
+}
 
 # ── Interactive prompts (press Enter to accept defaults) ──────────────────
 Write-Host ""
@@ -3497,9 +3507,16 @@ try {
 
 # 4. Start containers
 Write-Host "[4/8] Starting containers..." -ForegroundColor Yellow
+# Force-remove any containers with conflicting names (from previous installs on different ports)
+@("donorbook-$AppPort", "donorbook-db-$AppPort", "donorbook-rest-$AppPort") | ForEach-Object {
+  $existing = docker ps -aq --filter "name=^$_$" 2>$null
+  if ($existing) {
+    Write-Host "      Removing existing container: $_" -ForegroundColor DarkGray
+    docker rm -f $existing 2>$null | Out-Null
+  }
+}
 Push-Location $InstallDir
 try {
-  # Remove any previous install of this stack cleanly
   docker compose down --remove-orphans 2>$null | Out-Null
   docker compose up -d
   Start-Sleep -Seconds 5
