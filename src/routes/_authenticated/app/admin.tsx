@@ -3354,7 +3354,7 @@ function DeploymentEngineSection() {
     queryFn: async (): Promise<NLDeployment[]> => {
       const { data, error } = await supabase
         .from("nl_deployments" as never)
-        .select("id, customer_id, deployment_model, geography, status, geography_instance_ref, nl_customers(name)")
+        .select("id, customer_id, deployment_model, geography, status, geography_instance_ref, go_live_date, created_at, nl_customers(name)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []).map((r: never) => ({ ...(r as NLDeployment), customer_name: (r as never as { nl_customers: { name: string } | null }).nl_customers?.name }));
@@ -3908,6 +3908,7 @@ Contact your Donorbook account manager or email: ${adminEmail}
                     <TableHead className="hidden sm:table-cell">Model</TableHead>
                     <TableHead className="hidden md:table-cell">Geography / Server</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="hidden lg:table-cell">Date</TableHead>
                     <TableHead />
                   </TableRow>
                 </TableHeader>
@@ -3922,6 +3923,9 @@ Contact your Donorbook account manager or email: ${adminEmail}
                         {d.geography_instance_ref ?? d.geography ?? "—"}
                       </TableCell>
                       <TableCell><StatusChip status={d.status} /></TableCell>
+                      <TableCell className="hidden lg:table-cell text-xs text-muted-foreground whitespace-nowrap">
+                        {d.go_live_date ? new Date(d.go_live_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : d.created_at ? new Date(d.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                      </TableCell>
                       <TableCell className="text-right">
                         <Button size="sm" variant="outline" className="h-7 text-xs"
                           onClick={() => setViewingDepId(d.id)}>
