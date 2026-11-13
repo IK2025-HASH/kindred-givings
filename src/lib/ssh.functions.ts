@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getAppBinaryFiles } from "./fetchAppRelease";
 
 export type SshProvisionInput = {
   host: string;
@@ -59,7 +60,6 @@ export const runSshProvision = createServerFn({ method: "POST" })
       addStep(3, "DIR_CREATED", "ok", `Install directory: ${installDir}`);
 
       const composeContent = [
-        'version: "3.9"',
         'services:',
         '  donorbook:',
         '    image: nginx:alpine',
@@ -123,8 +123,21 @@ export const runSshProvision = createServerFn({ method: "POST" })
       const nginxConf = "server {\n    listen 80;\n    server_name _;\n    root /usr/share/nginx/html;\n    index index.html;\n    location / { try_files $uri $uri/ /index.html; }\n    location /health { return 200 'OK'; add_header Content-Type text/plain; }\n}";
       await ssh.execCommand(`printf '%s' ${JSON.stringify(nginxConf)} > ${installDir}/conf.d/default.conf`);
 
-      const indexHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Donorbook ${data.appVersion}</title></head><body style="font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0f172a;color:#f1f5f9"><div style="text-align:center"><h1>Donorbook ${data.appVersion}</h1><p>${data.appDomain}</p><p>${data.adminEmail}</p><p>Deploy ID: ${data.deployId}</p></div></body></html>`;
-      await ssh.execCommand(`printf '%s' ${JSON.stringify(indexHtml)} > ${installDir}/html/index.html`);
+      // Write app files from GitHub Release; fall back to placeholder if not configured
+      try {
+        const release = await getAppBinaryFiles(data.appVersion);
+        for (const f of release.files) {
+          const filePath = f.path.startsWith("/") ? f.path.slice(1) : f.path;
+          const content = Buffer.from(f.dataBase64, "base64").toString("binary");
+          // Ensure subdirectory exists and write the file
+          await ssh.execCommand(`mkdir -p ${installDir}/html/$(dirname ${filePath})`);
+          await ssh.execCommand(`printf '%s' ${JSON.stringify(content)} > ${installDir}/html/${filePath}`);
+        }
+      } catch {
+        // No GitHub release configured — write placeholder
+        const indexHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Donorbook ${data.appVersion}</title></head><body style="font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0f172a;color:#f1f5f9"><div style="text-align:center"><h1>Donorbook ${data.appVersion}</h1><p>${data.appDomain}</p><p>Deploy ID: ${data.deployId}</p></div></body></html>`;
+        await ssh.execCommand(`printf '%s' ${JSON.stringify(indexHtml)} > ${installDir}/html/index.html`);
+      }
 
       const dbInitSql = `-- Donorbook On-Premise DB\n-- Deploy ID: ${data.deployId}\nCREATE SCHEMA IF NOT EXISTS donorbook;`;
       await ssh.execCommand(`printf '%s' ${JSON.stringify(dbInitSql)} > ${installDir}/db-init/01_schema.sql`);
