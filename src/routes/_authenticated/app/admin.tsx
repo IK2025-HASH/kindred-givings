@@ -1,4 +1,5 @@
 import { strToU8, zipSync } from "fflate";
+import { fetchAppRelease } from "@/lib/fetchAppRelease";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useCallback, useRef } from "react";
@@ -3403,7 +3404,7 @@ function DeploymentEngineSection() {
   function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 
   // ── Script package generator ──────────────────────────────────────────────
-  function buildScriptPackage(depId: string): string {
+  async function buildScriptPackage(depId: string): Promise<string> {
     const customerName = customers.find((c) => c.id === form.customer_id)?.name ?? "customer";
     const installDir   = form.install_dir || "C:\\donorbook";
     const appDomain    = form.app_domain  || "localhost:8090";
@@ -3851,10 +3852,23 @@ Contact your Donorbook account manager or email: ${adminEmail}
       "docker-compose.yml":         strToU8(dockerCompose),
       "conf.d/default.conf":        strToU8(nginxConf),
       ".env":                       strToU8(envFile),
-      "html/index.html":            strToU8(indexHtml),
       "db-init/01_schema.sql":      strToU8(dbInitSql),
       "README.txt":                 strToU8(readme),
     };
+
+    // Fetch real app binary from GitHub Release; fall back to placeholder if not configured
+    try {
+      const release = await fetchAppRelease({ data: { version: appVersion } });
+      for (const f of release.files) {
+        const path = f.path.startsWith("/") ? f.path.slice(1) : f.path;
+        const bytes = Uint8Array.from(atob(f.dataBase64), (c) => c.charCodeAt(0));
+        files[`html/${path}`] = bytes;
+      }
+    } catch (err) {
+      // No GitHub release configured or not yet published — use placeholder
+      console.warn("App binary not available from GitHub release, using placeholder:", err);
+      files["html/index.html"] = strToU8(indexHtml);
+    }
 
     const zipped = zipSync(files, { level: 6 });
     const blob = new Blob([zipped], { type: "application/zip" });
