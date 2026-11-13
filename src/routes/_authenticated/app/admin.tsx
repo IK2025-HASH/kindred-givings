@@ -26,6 +26,7 @@ import { DEFAULTS, type PlatformSettings } from "@/lib/platform-settings.functio
 import { formatDate, formatMoney } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 import { syncPlansToStripe, getAdminSubscriptions, processAdminRefund, cancelAdminSubscription, type AdminSubscription } from "@/lib/stripe.functions";
+import { runSshProvision } from "@/lib/ssh.functions";
 
 export const Route = createFileRoute("/_authenticated/app/admin")({
   beforeLoad: async () => {
@@ -3315,6 +3316,9 @@ function DeploymentEngineSection() {
     licence_id: "",
     deployment_approach: "" as "" | "ssh" | "script" | "manual",
     install_dir: "C:\\donorbook",
+    ssh_auth_method: "password" as "password" | "key",
+    ssh_password: "",
+    ssh_private_key: "",
   });
   const [deploying, setDeploying] = useState(false);
   const [deploymentId, setDeploymentId] = useState<string | null>(null);
@@ -4270,11 +4274,86 @@ Internal NL deployment — contact ilyas@networklogic.uk
     setCurrentStep(steps.length);
   }
 
+  // ── Real provisioning: SSH remote execution ──────────────────────────────
+  async function runSshProvisioning(depId: string) {
+    const actor = `operator:${user?.id ?? "unknown"}`;
+    const dbPassword = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10).toUpperCase();
+    const appPort = form.app_domain?.includes(":") ? form.app_domain.split(":")[1] : "80";
+    const installDir = form.install_dir || `/opt/donorbook-${appPort}`;
+
+    const steps = [
+      { code: "SSH_CONNECTED",    label: "SSH connection established",             real: true },
+      { code: "DOCKER_CHECK",     label: "Docker verified on target",              real: true },
+      { code: "DIR_CREATED",      label: "Install directory created",              real: true },
+      { code: "COMPOSE_WRITTEN",  label: "docker-compose.yml written",             real: true },
+      { code: "FILES_WRITTEN",    label: "Config files written to target",         real: true },
+      { code: "PULLING_IMAGES",   label: "Docker images pulled",                   real: true },
+      { code: "CONTAINERS_START", label: "Containers started (nginx + DB + REST)", real: true },
+      { code: "HEALTH_CHECK",     label: "Application health verified",            real: true },
+    ];
+    setTotalSteps(steps.length);
+    setCurrentStep(0);
+
+    await writeLog(depId, { event_code: "SSH_PROVISION_START", severity: "info", actor, message: `SSH provisioning started → ${form.server_hostname}:${form.server_port}`, detail: { host: form.server_hostname, port: form.server_port, user: form.server_user, installDir }, duration_ms: null, step_index: 0 });
+
+    let result: { success: boolean; steps: { step: number; code: string; status: string; message: string }[]; error?: string };
+    try {
+      result = await runSshProvision({
+        data: {
+          host: form.server_hostname,
+          port: parseInt(form.server_port || "22"),
+          username: form.server_user || "root",
+          authMethod: form.ssh_auth_method,
+          password: form.ssh_password || undefined,
+          privateKey: form.ssh_private_key || undefined,
+          appDomain: form.app_domain || "",
+          appPort,
+          adminEmail: form.admin_email || "",
+          appVersion: form.app_version || "v1.2.0",
+          deployId: depId,
+          installDir,
+          dbPassword,
+        },
+      });
+    } catch (err) {
+      result = { success: false, steps: [], error: String(err) };
+    }
+
+    // Log each step result
+    for (let i = 0; i < steps.length; i++) {
+      const s = steps[i];
+      setCurrentStep(i + 1);
+      const resultStep = result.steps.find((r) => r.code === s.code);
+      const severity = resultStep?.status === "error" ? "error" : resultStep?.status === "warn" ? "warn" : "success";
+      await writeLog(depId, { event_code: s.code, severity, actor, message: resultStep?.message ?? (result.success ? s.label : "Step not reached"), detail: null, duration_ms: null, step_index: i + 1 });
+    }
+
+    if (result.success) {
+      await supabase.from("deployments").update({
+        status: "live",
+        go_live_date: new Date().toISOString().slice(0, 10),
+        app_version: form.app_version,
+        geography_instance_ref: `${form.server_hostname}:${form.server_port} (SSH)`,
+      } as never).eq("id", depId);
+      await writeLog(depId, { event_code: "SSH_PROVISION_COMPLETE", severity: "success", actor, message: `Deployment live — ${form.app_domain || form.server_hostname}:${appPort}`, detail: { installDir }, duration_ms: null, step_index: steps.length + 1 });
+      setCurrentStep(steps.length);
+      setDone(true);
+    } else {
+      await supabase.from("deployments").update({ status: "failed" } as never).eq("id", depId);
+      await writeLog(depId, { event_code: "SSH_PROVISION_FAILED", severity: "error", actor, message: result.error ?? "SSH provisioning failed", detail: null, duration_ms: null, step_index: steps.length + 1 });
+    }
+  }
+
   // ── Main provisioning runner ──────────────────────────────────────────────
   async function runProvisioning(depId: string) {
     // SaaS + Script package: generate real SaaS geography ZIP
     if (form.delivery_model === "saas" && form.deployment_approach === "script") {
       await runSaasScriptPackageProvisioning(depId);
+      return;
+    }
+    // On-premise + SSH remote execution
+    if (form.delivery_model !== "saas" && form.deployment_approach === "ssh") {
+      await runSshProvisioning(depId);
       return;
     }
     // On-premise + Script package: run real steps (generate actual ZIP)
@@ -4433,7 +4512,7 @@ Internal NL deployment — contact ilyas@networklogic.uk
     setScriptPackageUrl(null);
     setSaasPackageUrl(null);
     setCurrentStep(-1);
-    setForm({ customer_id: "", deployment_id: "", delivery_model: "saas", geography: "UK", geography_instance_ref: "", hosting_provider: "", server_hostname: "", server_port: "22", server_user: "ubuntu", delivery_method: "docker", app_domain: "", app_port: "80", admin_email: "", app_version: "v1.2.0", provisioning_notes: "", licence_id: "", deployment_approach: "", install_dir: "C:\\donorbook" });
+    setForm({ customer_id: "", deployment_id: "", delivery_model: "saas", geography: "UK", geography_instance_ref: "", hosting_provider: "", server_hostname: "", server_port: "22", server_user: "ubuntu", delivery_method: "docker", app_domain: "", app_port: "80", admin_email: "", app_version: "v1.2.0", provisioning_notes: "", licence_id: "", deployment_approach: "", install_dir: "C:\\donorbook", ssh_auth_method: "password", ssh_password: "", ssh_private_key: "" });
   }
 
   const customers = customersQ.data ?? [];
@@ -4821,10 +4900,38 @@ Internal NL deployment — contact ilyas@networklogic.uk
                             <Input value={form.server_user} onChange={(e) => setF("server_user", e.target.value)} placeholder="Ilyas" />
                           </div>
                           <div className="sm:col-span-2 space-y-1.5">
-                            <Label>Install directory</Label>
-                            <Input value={form.install_dir} onChange={(e) => setF("install_dir", e.target.value)} placeholder="C:\donorbook" />
+                            <Label>Install directory (Linux path)</Label>
+                            <Input value={form.install_dir} onChange={(e) => setF("install_dir", e.target.value)} placeholder="/opt/donorbook" />
                           </div>
                         </div>
+                        {/* Auth method */}
+                        <div className="space-y-2 pt-1">
+                          <Label>Authentication method</Label>
+                          <div className="flex gap-4">
+                            <label className="flex items-center gap-2 text-sm cursor-pointer">
+                              <input type="radio" name="ssh_auth" checked={form.ssh_auth_method === "password"} onChange={() => setF("ssh_auth_method", "password" as never)} />
+                              Password
+                            </label>
+                            <label className="flex items-center gap-2 text-sm cursor-pointer">
+                              <input type="radio" name="ssh_auth" checked={form.ssh_auth_method === "key"} onChange={() => setF("ssh_auth_method", "key" as never)} />
+                              Private Key (PEM)
+                            </label>
+                          </div>
+                        </div>
+                        {form.ssh_auth_method === "password" ? (
+                          <div className="space-y-1.5">
+                            <Label>SSH Password</Label>
+                            <Input type="password" value={form.ssh_password} onChange={(e) => setF("ssh_password", e.target.value)} placeholder="SSH password" />
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            <Label>Private Key (PEM format)</Label>
+                            <Textarea value={form.ssh_private_key} onChange={(e) => setF("ssh_private_key", e.target.value)} placeholder={"-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"} rows={4} className="font-mono text-xs" />
+                          </div>
+                        )}
+                        <p className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/30 p-2 rounded border border-amber-200 dark:border-amber-800">
+                          ⚠ Credentials are used once for provisioning and never stored. Linux target required (Ubuntu/Debian recommended).
+                        </p>
                       </div>
                     )}
 
