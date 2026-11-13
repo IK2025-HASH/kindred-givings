@@ -3435,17 +3435,7 @@ param(
   [string]$DeploymentId = "${depId}"
 )
 
-$ErrorActionPreference = "Stop"
-trap {
-  Write-Host ""
-  Write-Host "============================================================" -ForegroundColor Red
-  Write-Host "  ERROR: $_" -ForegroundColor Red
-  Write-Host "============================================================" -ForegroundColor Red
-  Write-Host ""
-  Write-Host "  Press Enter to close this window." -ForegroundColor DarkGray
-  Read-Host | Out-Null
-  exit 1
-}
+$ErrorActionPreference = "Continue"
 
 # ── Interactive prompts (press Enter to accept defaults) ──────────────────
 Write-Host ""
@@ -3518,7 +3508,18 @@ Write-Host "[4/8] Starting containers..." -ForegroundColor Yellow
 Push-Location $InstallDir
 try {
   docker compose down --remove-orphans 2>$null | Out-Null
-  docker compose up -d
+  $upOut = docker compose up -d 2>&1
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host ""
+    Write-Host "============================================================" -ForegroundColor Red
+    Write-Host "  FAILED to start containers:" -ForegroundColor Red
+    Write-Host "  $upOut" -ForegroundColor Red
+    Write-Host "============================================================" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "  Press Enter to close this window." -ForegroundColor DarkGray
+    Read-Host | Out-Null
+    exit 1
+  }
   Start-Sleep -Seconds 5
   Write-Host "      OK - Containers started" -ForegroundColor Green
 } finally {
@@ -3628,8 +3629,7 @@ Write-Host "  Press Enter to close this window." -ForegroundColor DarkGray
 Read-Host | Out-Null
 `;
 
-    const dockerCompose = `version: "3.9"
-services:
+    const dockerCompose = `services:
   db:
     image: postgres:16-alpine
     container_name: donorbook-db-${port}
@@ -3994,8 +3994,7 @@ Write-Host "  Press Enter to close this window." -ForegroundColor DarkGray
 Read-Host | Out-Null
 `;
 
-    const dockerCompose = `version: "3.9"
-services:
+    const dockerCompose = `services:
   donorbook:
     image: nginx:alpine
     container_name: donorbook-saas-${geography.toLowerCase()}-${port}
