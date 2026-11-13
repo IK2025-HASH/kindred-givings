@@ -3491,6 +3491,8 @@ try {
 Write-Host "[4/6] Starting containers..." -ForegroundColor Yellow
 Push-Location $InstallDir
 try {
+  # Remove any previous install of this stack cleanly
+  docker compose down --remove-orphans 2>$null | Out-Null
   docker compose up -d
   Start-Sleep -Seconds 3
   Write-Host "      OK - Containers started" -ForegroundColor Green
