@@ -3308,6 +3308,7 @@ function DeploymentEngineSection() {
     server_user: "ubuntu",
     delivery_method: "docker",
     app_domain: "",
+    app_port: "80",
     admin_email: "",
     app_version: "v1.2.0",
     provisioning_notes: "",
@@ -3404,7 +3405,7 @@ function DeploymentEngineSection() {
     const appDomain    = form.app_domain  || "localhost:8090";
     const adminEmail   = form.admin_email || "admin@example.com";
     const appVersion   = form.app_version || "v1.2.0";
-    const port         = appDomain.includes(":") ? appDomain.split(":")[1] : "80";
+    const port         = form.app_port || (appDomain.includes(":") ? appDomain.split(":")[1] : "80");
     const today        = new Date().toLocaleDateString("en-GB");
 
     const installPs1 = `# Donorbook On-Premise Install Script
@@ -4432,7 +4433,7 @@ Internal NL deployment — contact ilyas@networklogic.uk
     setScriptPackageUrl(null);
     setSaasPackageUrl(null);
     setCurrentStep(-1);
-    setForm({ customer_id: "", deployment_id: "", delivery_model: "saas", geography: "UK", geography_instance_ref: "", hosting_provider: "", server_hostname: "", server_port: "22", server_user: "ubuntu", delivery_method: "docker", app_domain: "", admin_email: "", app_version: "v1.2.0", provisioning_notes: "", licence_id: "", deployment_approach: "", install_dir: "C:\\donorbook" });
+    setForm({ customer_id: "", deployment_id: "", delivery_model: "saas", geography: "UK", geography_instance_ref: "", hosting_provider: "", server_hostname: "", server_port: "22", server_user: "ubuntu", delivery_method: "docker", app_domain: "", app_port: "80", admin_email: "", app_version: "v1.2.0", provisioning_notes: "", licence_id: "", deployment_approach: "", install_dir: "C:\\donorbook" });
   }
 
   const customers = customersQ.data ?? [];
@@ -4874,6 +4875,11 @@ Internal NL deployment — contact ilyas@networklogic.uk
               <div className="space-y-1.5">
                 <Label>Domain / subdomain</Label>
                 <Input value={form.app_domain} onChange={(e) => setF("app_domain", e.target.value)} placeholder="app.customer.org" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Port number</Label>
+                <Input value={form.app_port} onChange={(e) => setF("app_port", e.target.value)} placeholder="80" />
+                <p className="text-xs text-muted-foreground">The port the app will listen on (e.g. 80, 8080, 8090). Used in docker-compose.yml and install script.</p>
               </div>
               <div className="space-y-1.5">
                 <Label>App version</Label>
