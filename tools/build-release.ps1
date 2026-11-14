@@ -41,7 +41,8 @@ Push-Location $CloneDir
 npm ci --silent
 Write-Host "      OK - dependencies installed" -ForegroundColor Green
 
-Write-Host "[3/4] Building app (npm run build)..." -ForegroundColor Yellow
+Write-Host "[3/4] Building app (npm run build) with Node.js server preset..." -ForegroundColor Yellow
+$env:NITRO_PRESET = "node-server"
 npm run build
 if ($LASTEXITCODE -ne 0) {
   Write-Host "ERROR: Build failed (exit code $LASTEXITCODE)" -ForegroundColor Red
