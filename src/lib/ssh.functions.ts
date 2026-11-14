@@ -56,25 +56,39 @@ export const runSshProvision = createServerFn({ method: "POST" })
       addStep(2, "DOCKER_CHECK", "ok", dockerCheck.stdout.split("\n")[0]);
 
       const installDir = data.installDir || `/opt/donorbook-${data.appPort}`;
-      await ssh.execCommand(`mkdir -p ${installDir}/conf.d ${installDir}/html ${installDir}/db-init`);
+      await ssh.execCommand(`mkdir -p ${installDir}/conf.d ${installDir}/app ${installDir}/db-init`);
       addStep(3, "DIR_CREATED", "ok", `Install directory: ${installDir}`);
 
       const composeContent = [
         'services:',
-        '  donorbook:',
-        '    image: nginx:alpine',
-        `    container_name: donorbook-${data.appPort}`,
+        '  app:',
+        '    image: node:18-alpine',
+        `    container_name: donorbook-app-${data.appPort}`,
         '    restart: unless-stopped',
-        '    ports:',
-        `      - "${data.appPort}:80"`,
+        '    working_dir: /app',
+        '    command: node .output/server/index.mjs',
+        '    environment:',
+        '      PORT: "4000"',
+        '      NODE_ENV: production',
         '    volumes:',
-        `      - ${installDir}/html:/usr/share/nginx/html:ro`,
-        `      - ${installDir}/conf.d:/etc/nginx/conf.d:ro`,
+        `      - ${installDir}/app:/app:ro`,
         '    depends_on:',
         '      db:',
         '        condition: service_healthy',
         '      rest:',
         '        condition: service_started',
+        '',
+        '  nginx:',
+        '    image: nginx:alpine',
+        `    container_name: donorbook-${data.appPort}`,
+        '    restart: unless-stopped',
+        '    depends_on:',
+        '      - app',
+        '    ports:',
+        `      - "${data.appPort}:80"`,
+        '    volumes:',
+        `      - ${installDir}/conf.d:/etc/nginx/conf.d:ro`,
+        `      - ${installDir}/app/.output/public:/usr/share/nginx/html:ro`,
         '    healthcheck:',
         '      test: ["CMD", "wget", "-qO-", "http://localhost/health"]',
         '      interval: 30s',
@@ -106,9 +120,7 @@ export const runSshProvision = createServerFn({ method: "POST" })
         `      PGRST_DB_URI: postgres://donorbook:${data.dbPassword}@db:5432/donorbook`,
         '      PGRST_DB_SCHEMA: public',
         '      PGRST_DB_ANON_ROLE: donorbook',
-        '      PGRST_SERVER_PORT: 3000',
-        '    ports:',
-        '      - "3000:3000"',
+        '      PGRST_SERVER_PORT: "3000"',
         '    depends_on:',
         '      db:',
         '        condition: service_healthy',
@@ -120,7 +132,7 @@ export const runSshProvision = createServerFn({ method: "POST" })
       await ssh.execCommand(`printf '%s' ${JSON.stringify(composeContent)} > ${installDir}/docker-compose.yml`);
       addStep(4, "COMPOSE_WRITTEN", "ok", "docker-compose.yml written");
 
-      const nginxConf = "server {\n    listen 80;\n    server_name _;\n    root /usr/share/nginx/html;\n    index index.html;\n    location / { try_files $uri $uri/ /index.html; }\n    location /health { return 200 'OK'; add_header Content-Type text/plain; }\n}";
+      const nginxConf = "server {\n    listen 80;\n    server_name _;\n    location /assets/ { root /usr/share/nginx/html; expires 1y; add_header Cache-Control \"public, immutable\"; }\n    location /health { return 200 'OK'; add_header Content-Type text/plain; }\n    location / { proxy_pass http://app:4000; proxy_http_version 1.1; proxy_set_header Host $host; proxy_set_header X-Real-IP $remote_addr; }\n}";
       await ssh.execCommand(`printf '%s' ${JSON.stringify(nginxConf)} > ${installDir}/conf.d/default.conf`);
 
       // Write app files from GitHub Release; fall back to placeholder if not configured
@@ -129,14 +141,15 @@ export const runSshProvision = createServerFn({ method: "POST" })
         for (const f of release.files) {
           const filePath = f.path.startsWith("/") ? f.path.slice(1) : f.path;
           const content = Buffer.from(f.dataBase64, "base64").toString("binary");
-          // Ensure subdirectory exists and write the file
-          await ssh.execCommand(`mkdir -p ${installDir}/html/$(dirname ${filePath})`);
-          await ssh.execCommand(`printf '%s' ${JSON.stringify(content)} > ${installDir}/html/${filePath}`);
+          // Release files are server/ and public/ from .output/ — nest under app/.output/
+          await ssh.execCommand(`mkdir -p ${installDir}/app/.output/$(dirname ${filePath})`);
+          await ssh.execCommand(`printf '%s' ${JSON.stringify(content)} > ${installDir}/app/.output/${filePath}`);
         }
       } catch {
-        // No GitHub release configured — write placeholder
-        const indexHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Donorbook ${data.appVersion}</title></head><body style="font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0f172a;color:#f1f5f9"><div style="text-align:center"><h1>Donorbook ${data.appVersion}</h1><p>${data.appDomain}</p><p>Deploy ID: ${data.deployId}</p></div></body></html>`;
-        await ssh.execCommand(`printf '%s' ${JSON.stringify(indexHtml)} > ${installDir}/html/index.html`);
+        // No GitHub release configured — write placeholder index so nginx has something
+        await ssh.execCommand(`mkdir -p ${installDir}/app/.output/public`);
+        const indexHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Donorbook ${data.appVersion}</title></head><body style="font-family:system-ui;background:#0f172a;color:#f1f5f9;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0"><div style="text-align:center"><h1>Donorbook ${data.appVersion}</h1><p>${data.appDomain}</p></div></body></html>`;
+        await ssh.execCommand(`printf '%s' ${JSON.stringify(indexHtml)} > ${installDir}/app/.output/public/index.html`);
       }
 
       const dbInitSql = `-- Donorbook On-Premise DB\n-- Deploy ID: ${data.deployId}\nCREATE SCHEMA IF NOT EXISTS donorbook;`;

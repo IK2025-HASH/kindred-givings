@@ -3477,17 +3477,17 @@ try {
 Write-Host "[2/8] Creating install directory: $InstallDir" -ForegroundColor Yellow
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 New-Item -ItemType Directory -Force -Path "$InstallDir\\conf.d" | Out-Null
-New-Item -ItemType Directory -Force -Path "$InstallDir\\html" | Out-Null
+New-Item -ItemType Directory -Force -Path "$InstallDir\\app" | Out-Null
 New-Item -ItemType Directory -Force -Path "$InstallDir\\db-init" | Out-Null
 Copy-Item "$PSScriptRoot\\docker-compose.yml" "$InstallDir\\docker-compose.yml" -Force
 Copy-Item "$PSScriptRoot\\.env" "$InstallDir\\.env" -Force
 Copy-Item "$PSScriptRoot\\conf.d\\default.conf" "$InstallDir\\conf.d\\default.conf" -Force
-Copy-Item "$PSScriptRoot\\html\\*" "$InstallDir\\html\\" -Recurse -Force
+Copy-Item "$PSScriptRoot\\app\\*" "$InstallDir\\app\\" -Recurse -Force
 Copy-Item "$PSScriptRoot\\db-init\\*" "$InstallDir\\db-init\\" -Recurse -Force
 Write-Host "      OK - Files copied to $InstallDir" -ForegroundColor Green
 
 # 3. Pull images
-Write-Host "[3/8] Pulling Docker images (nginx, postgres:16, postgrest)..." -ForegroundColor Yellow
+Write-Host "[3/8] Pulling Docker images (node:18, nginx, postgres:16, postgrest)..." -ForegroundColor Yellow
 Push-Location $InstallDir
 try {
   docker compose pull
@@ -3499,7 +3499,7 @@ try {
 # 4. Start containers
 Write-Host "[4/8] Starting containers..." -ForegroundColor Yellow
 # Force-remove any containers with conflicting names (from previous installs on different ports)
-@("donorbook-$AppPort", "donorbook-db-$AppPort", "donorbook-rest-$AppPort") | ForEach-Object {
+@("donorbook-$AppPort", "donorbook-app-$AppPort", "donorbook-db-$AppPort", "donorbook-rest-$AppPort") | ForEach-Object {
   $existing = docker ps -aq --filter "name=^$_$" 2>$null
   if ($existing) {
     Write-Host "      Removing existing container: $_" -ForegroundColor DarkGray
@@ -3631,6 +3631,40 @@ Read-Host | Out-Null
 `;
 
     const dockerCompose = `services:
+  app:
+    image: node:18-alpine
+    container_name: donorbook-app-${port}
+    restart: unless-stopped
+    working_dir: /app
+    command: node .output/server/index.mjs
+    environment:
+      PORT: "4000"
+      NODE_ENV: production
+    volumes:
+      - ./app:/app:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      rest:
+        condition: service_started
+
+  nginx:
+    image: nginx:alpine
+    container_name: donorbook-${port}
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "${port}:80"
+    volumes:
+      - ./conf.d:/etc/nginx/conf.d:ro
+      - ./app/.output/public:/usr/share/nginx/html:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   db:
     image: postgres:16-alpine
     container_name: donorbook-db-${port}
@@ -3655,36 +3689,11 @@ Read-Host | Out-Null
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "3000:3000"
     environment:
       PGRST_DB_URI: postgres://donorbook:\${DB_PASSWORD:-changeme}@db:5432/donorbook
       PGRST_DB_SCHEMA: public
       PGRST_DB_ANON_ROLE: donorbook
       PGRST_SERVER_PORT: "3000"
-
-  donorbook:
-    image: nginx:alpine
-    container_name: donorbook-${port}
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    ports:
-      - "${port}:80"
-    volumes:
-      - ./html:/usr/share/nginx/html:ro
-      - ./conf.d:/etc/nginx/conf.d:ro
-    environment:
-      - APP_VERSION=${appVersion}
-      - ADMIN_EMAIL=${adminEmail}
-      - APP_DOMAIN=${appDomain}
-      - DATABASE_URL=postgresql://donorbook:\${DB_PASSWORD:-changeme}@db:5432/donorbook
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
 
 volumes:
   db_data:
@@ -3693,10 +3702,28 @@ volumes:
     const nginxConf = `server {
     listen 80;
     server_name _;
-    root /usr/share/nginx/html;
-    index index.html;
-    location / { try_files $uri $uri/ /index.html; }
-    location /health { return 200 'OK'; add_header Content-Type text/plain; }
+
+    location /assets/ {
+        root /usr/share/nginx/html;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location /health {
+        return 200 'OK';
+        add_header Content-Type text/plain;
+    }
+
+    location / {
+        proxy_pass http://app:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_cache_bypass $http_upgrade;
+    }
 }
 `;
 
@@ -3860,9 +3887,10 @@ Contact your Donorbook account manager or email: ${adminEmail}
     try {
       const release = await fetchAppRelease({ data: { version: appVersion } });
       for (const f of release.files) {
-        const path = f.path.startsWith("/") ? f.path.slice(1) : f.path;
+        const p = f.path.startsWith("/") ? f.path.slice(1) : f.path;
         const bytes = Uint8Array.from(atob(f.dataBase64), (c) => c.charCodeAt(0));
-        files[`html/${path}`] = bytes;
+        // Release ZIP contains server/ and public/ from .output/ — nest under app/.output/
+        files[`app/.output/${p}`] = bytes;
       }
     } catch (err) {
       // No GitHub release configured or not yet published — use placeholder

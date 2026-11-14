@@ -46,21 +46,17 @@ Write-Host "      OK - build complete (dist/ ready)" -ForegroundColor Green
 
 Write-Host "[4/4] Creating $OutputZip ..." -ForegroundColor Yellow
 Pop-Location
-# TanStack Start puts the client bundle in .output/public (not dist/)
-$PublicDir = "$CloneDir\.output\public"
-if (-not (Test-Path $PublicDir)) {
-  # Fallback: check dist/ as well
-  $PublicDir = "$CloneDir\dist"
-}
-if (-not (Test-Path $PublicDir)) {
-  Write-Host "ERROR: Could not find build output. Looked in .output/public and dist/" -ForegroundColor Red
+# TanStack Start builds to .output/ (server/ + public/ subdirs)
+$OutputDir = "$CloneDir\.output"
+if (-not (Test-Path $OutputDir)) {
+  Write-Host "ERROR: Build output not found at $OutputDir" -ForegroundColor Red
   Write-Host "Contents of clone dir:" -ForegroundColor Yellow
   Get-ChildItem $CloneDir | Select-Object Name
   Read-Host "Press Enter to close"
   exit 1
 }
-Write-Host "      Using build output from: $PublicDir" -ForegroundColor DarkGray
-Compress-Archive -Path "$PublicDir\*" -DestinationPath $OutputZip -Force
+Write-Host "      Zipping $OutputDir (server/ + public/)..." -ForegroundColor DarkGray
+Compress-Archive -Path "$OutputDir\*" -DestinationPath $OutputZip -Force
 Write-Host "      OK - $OutputZip created" -ForegroundColor Green
 
 Write-Host ""
