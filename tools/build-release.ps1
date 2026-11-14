@@ -43,7 +43,12 @@ Write-Host "      OK - dependencies installed" -ForegroundColor Green
 
 Write-Host "[3/4] Building app (npm run build)..." -ForegroundColor Yellow
 npm run build
-Write-Host "      OK - build complete (dist/ ready)" -ForegroundColor Green
+if ($LASTEXITCODE -ne 0) {
+  Write-Host "ERROR: Build failed (exit code $LASTEXITCODE)" -ForegroundColor Red
+  Read-Host "Press Enter to close"
+  exit 1
+}
+Write-Host "      OK - build complete (.output/ ready)" -ForegroundColor Green
 
 Write-Host "[4/4] Creating $OutputZip ..." -ForegroundColor Yellow
 Pop-Location
