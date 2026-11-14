@@ -62,8 +62,36 @@ if (-not (Test-Path $OutputDir)) {
   Read-Host "Press Enter to close"
   exit 1
 }
-Write-Host "      Zipping $OutputDir (server/ + public/)..." -ForegroundColor DarkGray
-Compress-Archive -Path "$OutputDir\*" -DestinationPath $OutputZip -Force
+Write-Host "      Staging output (excluding nan C++ headers not needed at runtime)..." -ForegroundColor DarkGray
+$StagingDir = "$CloneDir\.output-staging"
+New-Item -ItemType Directory -Force -Path $StagingDir | Out-Null
+
+# Copy public/ as-is
+if (Test-Path "$OutputDir\public") {
+  Copy-Item "$OutputDir\public" "$StagingDir\public" -Recurse -Force
+}
+
+# Copy server/ — exclude nan (1MB C++ header-only package, not needed at Node.js runtime)
+if (Test-Path "$OutputDir\server") {
+  New-Item -ItemType Directory -Force -Path "$StagingDir\server" | Out-Null
+  Get-ChildItem "$OutputDir\server" | ForEach-Object {
+    if ($_.Name -eq "node_modules") {
+      New-Item -ItemType Directory -Force -Path "$StagingDir\server\node_modules" | Out-Null
+      Get-ChildItem "$OutputDir\server\node_modules" | Where-Object { $_.Name -ne "nan" } |
+        Copy-Item -Destination "$StagingDir\server\node_modules" -Recurse -Force
+    } else {
+      Copy-Item $_.FullName "$StagingDir\server\$($_.Name)" -Recurse -Force
+    }
+  }
+}
+
+# Copy nitro.json if present
+if (Test-Path "$OutputDir\nitro.json") {
+  Copy-Item "$OutputDir\nitro.json" "$StagingDir\" -Force
+}
+
+Write-Host "      Zipping staging dir (server/ + public/)..." -ForegroundColor DarkGray
+Compress-Archive -Path "$StagingDir\*" -DestinationPath $OutputZip -Force
 Write-Host "      OK - $OutputZip created" -ForegroundColor Green
 
 Write-Host ""

@@ -3883,19 +3883,22 @@ Contact your Donorbook account manager or email: ${adminEmail}
       "README.txt":                 strToU8(readme),
     };
 
-    // Fetch real app binary from GitHub Release; fall back to placeholder if not configured
-    try {
-      const release = await fetchAppRelease({ data: { version: appVersion } });
-      for (const f of release.files) {
-        const p = f.path.startsWith("/") ? f.path.slice(1) : f.path;
-        const bytes = Uint8Array.from(atob(f.dataBase64), (c) => c.charCodeAt(0));
-        // Release ZIP contains server/ and public/ from .output/ — nest under app/.output/
-        files[`app/.output/${p}`] = bytes;
-      }
-    } catch (err) {
-      // No GitHub release configured or not yet published — use placeholder
-      console.warn("App binary not available from GitHub release, using placeholder:", err);
-      files["html/index.html"] = strToU8(indexHtml);
+    // Fetch real app binary from GitHub Release
+    const release = await fetchAppRelease({ data: { version: appVersion } });
+    for (const f of release.files) {
+      // Paths are already normalized to forward slashes by fetchAppRelease
+      const p = f.path.startsWith("/") ? f.path.slice(1) : f.path;
+      const bytes = Uint8Array.from(atob(f.dataBase64), (c) => c.charCodeAt(0));
+      files[`app/.output/${p}`] = bytes;
+    }
+    // Verify both halves arrived
+    const hasServer = Object.keys(files).some(k => k.startsWith("app/.output/server/"));
+    const hasPublic = Object.keys(files).some(k => k.startsWith("app/.output/public/"));
+    if (!hasServer || !hasPublic) {
+      throw new Error(
+        `Release ${appVersion} is incomplete: server=${hasServer}, public=${hasPublic}. ` +
+        `Got ${release.files.length} files. Check APP_GITHUB_REPO / APP_GITHUB_TOKEN and ensure the release was built with NITRO_PRESET=node-server.`
+      );
     }
 
     const zipped = zipSync(files, { level: 6 });

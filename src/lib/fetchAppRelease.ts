@@ -52,10 +52,17 @@ export async function getAppBinaryFiles(version: string): Promise<{ files: AppRe
   const { unzipSync } = await import("fflate");
   const unzipped = unzipSync(new Uint8Array(buffer));
 
-  const files: AppReleaseFile[] = Object.entries(unzipped).map(([path, data]) => ({
-    path,
-    dataBase64: Buffer.from(data).toString("base64"),
-  }));
+  const files: AppReleaseFile[] = Object.entries(unzipped)
+    // Normalize Windows backslash paths to forward slashes (Compress-Archive on Windows uses \)
+    .map(([path, data]) => ({
+      path: path.replace(/\\/g, "/"),
+      dataBase64: Buffer.from(data).toString("base64"),
+    }))
+    // Exclude directories (zero-length entries) and nan C++ headers (not needed at runtime)
+    .filter(({ path, dataBase64: _ }) =>
+      !path.endsWith("/") &&
+      !path.includes("node_modules/nan/")
+    );
 
   return { files, assetName: asset.name };
 }
