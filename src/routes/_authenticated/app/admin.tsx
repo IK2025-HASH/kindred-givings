@@ -4202,7 +4202,7 @@ Internal NL deployment — contact ilyas@networklogic.uk
         await writeLog(depId, { event_code: s.code, severity: "info", actor: "engine", message: "Generating install package files…", detail: null, duration_ms: null, step_index: i + 1 });
         await new Promise((r) => setTimeout(r, 300)); // small pause so the log appears
         try {
-          const url = buildScriptPackage(depId);
+          const url = await buildScriptPackage(depId);
           setScriptPackageUrl(url);
           await writeLog(depId, { event_code: "PACKAGE_READY", severity: "success", actor: "engine", message: "Install package (ZIP) generated — ready for download", detail: { install_dir: form.install_dir, app_domain: form.app_domain }, duration_ms: 300, step_index: i + 1 });
         } catch (err) {
@@ -5227,7 +5227,7 @@ Internal NL deployment — contact ilyas@networklogic.uk
                   <span className="text-xl">📦</span>
                   <div>
                     <p className="font-semibold text-blue-800 dark:text-blue-300">On-Premise install package ready</p>
-                    <p className="text-xs text-blue-600 dark:text-blue-400">Contains: install.ps1 · docker-compose.yml · conf.d/default.conf · .env · db-init/01_schema.sql · html/index.html · README.txt</p>
+                    <p className="text-xs text-blue-600 dark:text-blue-400">Contains: install.ps1 · docker-compose.yml · conf.d/default.conf · .env · db-init/01_schema.sql · app/.output/server/ · app/.output/public/ · README.txt</p>
                   </div>
                 </div>
                 <ol className="text-xs text-blue-700 dark:text-blue-300 space-y-1 list-decimal list-inside">
