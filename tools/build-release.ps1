@@ -8,8 +8,8 @@
 #   GitHub → Releases → New Release → tag vX.Y.Z → attach dist-vX.Y.Z.zip
 #
 param(
-  [string]$Version = "v1.2.1",
-  [string]$RepoUrl = "",
+  [string]$Version = "v1.2.3",
+  [string]$RepoUrl = "https://github.com/IK2025-HASH/kindred-givings.git",
   [string]$Branch = "app",
   [string]$BuildDir = "C:\temp\donorbook-build"
 )
@@ -22,11 +22,6 @@ Write-Host "  Donorbook Release Build  |  $Version" -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Prompt for repo URL if not provided
-if ($RepoUrl -eq "") {
-  $RepoUrl = Read-Host "  GitHub repo URL (e.g. https://github.com/networklogic-uk/donorbook)"
-}
-
 $Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $CloneDir  = "$BuildDir-$Timestamp"
 $OutputZip = "$env:USERPROFILE\Desktop\donorbook-dist-$Version.zip"
@@ -34,6 +29,11 @@ $OutputZip = "$env:USERPROFILE\Desktop\donorbook-dist-$Version.zip"
 Write-Host ""
 Write-Host "[1/4] Cloning $RepoUrl (branch: $Branch) into $CloneDir ..." -ForegroundColor Yellow
 git clone --branch $Branch --single-branch $RepoUrl $CloneDir
+if ($LASTEXITCODE -ne 0) {
+  Write-Host "ERROR: git clone failed (exit code $LASTEXITCODE)" -ForegroundColor Red
+  Read-Host "Press Enter to close"
+  exit 1
+}
 Write-Host "      OK - cloned" -ForegroundColor Green
 
 Write-Host "[2/4] Installing dependencies (npm ci)..." -ForegroundColor Yellow
