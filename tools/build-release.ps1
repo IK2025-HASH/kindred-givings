@@ -8,8 +8,9 @@
 #   GitHub → Releases → New Release → tag vX.Y.Z → attach dist-vX.Y.Z.zip
 #
 param(
-  [string]$Version = "v1.2.0",
+  [string]$Version = "v1.2.1",
   [string]$RepoUrl = "",
+  [string]$Branch = "app",
   [string]$BuildDir = "C:\temp\donorbook-build"
 )
 
@@ -31,8 +32,8 @@ $CloneDir  = "$BuildDir-$Timestamp"
 $OutputZip = "$env:USERPROFILE\Desktop\donorbook-dist-$Version.zip"
 
 Write-Host ""
-Write-Host "[1/4] Cloning $RepoUrl into $CloneDir ..." -ForegroundColor Yellow
-git clone $RepoUrl $CloneDir
+Write-Host "[1/4] Cloning $RepoUrl (branch: $Branch) into $CloneDir ..." -ForegroundColor Yellow
+git clone --branch $Branch --single-branch $RepoUrl $CloneDir
 Write-Host "      OK - cloned" -ForegroundColor Green
 
 Write-Host "[2/4] Installing dependencies (npm ci)..." -ForegroundColor Yellow
